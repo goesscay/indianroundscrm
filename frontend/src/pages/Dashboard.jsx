@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
@@ -7,12 +7,12 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, LineChart, Line, Legend
 } from "recharts";
-import { TrendingUp, Users2, IndianRupee, CalendarClock, Clock, CheckCircle2, XCircle, Layers } from "lucide-react";
+import { TrendingUp, Users2, IndianRupee, CalendarClock, Clock, CheckCircle2, XCircle, Layers, GripVertical, RotateCcw } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 
 const INR = (n) => "₹" + (Number(n) || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
-function Kpi({ label, value, icon: Icon, tone = "default", testId }) {
+function Kpi({ label, value, icon: Icon, tone = "default", testId, dragHandlers }) {
   const tones = {
     default: "bg-card",
     primary: "bg-[#106EBE] text-white",
@@ -20,7 +20,13 @@ function Kpi({ label, value, icon: Icon, tone = "default", testId }) {
   };
   const isDark = tone !== "default";
   return (
-    <Card className={`p-6 rounded-lg border border-border ${tones[tone]} transition-all hover:-translate-y-0.5 hover:shadow-sm`} data-testid={testId}>
+    <Card
+      className={`p-6 rounded-lg border border-border ${tones[tone]} transition-all hover:-translate-y-0.5 hover:shadow-sm relative group cursor-move`}
+      data-testid={testId}
+      draggable
+      {...dragHandlers}
+    >
+      <GripVertical size={14} className={`absolute top-2 right-2 opacity-0 group-hover:opacity-60 transition-opacity ${isDark ? "text-white" : "text-muted-foreground"}`} />
       <div className="flex items-start justify-between">
         <div>
           <div className={`label-caps ${isDark ? "!text-white/70" : ""}`}>{label}</div>
@@ -32,12 +38,22 @@ function Kpi({ label, value, icon: Icon, tone = "default", testId }) {
   );
 }
 
+const DEFAULT_ORDER = ["total_leads", "today_leads", "booked", "quote_pending", "revenue", "profit", "followups", "cancelled"];
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [err, setErr] = useState("");
   const nav = useNavigate();
+  const storageKey = `ir_kpi_order_${user.id}`;
+  const [order, setOrder] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey)) || DEFAULT_ORDER; }
+    catch { return DEFAULT_ORDER; }
+  });
+  const dragIdx = useRef(null);
+
+  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(order)); }, [order, storageKey]);
 
   useEffect(() => {
     (async () => {
@@ -52,13 +68,35 @@ export default function Dashboard() {
     })();
   }, [user.role]);
 
-  if (!stats) {
-    return <div className="text-muted-foreground text-sm">Loading dashboard…{err && ` · ${err}`}</div>;
-  }
+  if (!stats) return <div className="text-muted-foreground text-sm">Loading dashboard…{err && ` · ${err}`}</div>;
+
+  const kpiMap = {
+    total_leads: { label: "Total Leads", value: stats.total_leads, icon: Layers, testId: "kpi-total-leads" },
+    today_leads: { label: "Today's Leads", value: stats.today_leads, icon: CalendarClock, tone: "primary", testId: "kpi-today" },
+    booked: { label: "Booked", value: stats.booked, icon: CheckCircle2, tone: "accent", testId: "kpi-booked" },
+    quote_pending: { label: "Quote Pending", value: stats.quote_pending, icon: Clock, testId: "kpi-quote-pending" },
+    revenue: { label: "Revenue", value: INR(stats.revenue), icon: IndianRupee, testId: "kpi-revenue" },
+    profit: { label: "Profit", value: INR(stats.profit), icon: TrendingUp, testId: "kpi-profit" },
+    followups: { label: "Follow-ups Today", value: stats.followups_today, icon: Users2, testId: "kpi-followups" },
+    cancelled: { label: "Cancelled", value: stats.cancelled, icon: XCircle, testId: "kpi-cancelled" },
+  };
+
+  const onDragStart = (i) => (e) => { dragIdx.current = i; e.dataTransfer.effectAllowed = "move"; };
+  const onDragOver = (i) => (e) => {
+    e.preventDefault();
+    if (dragIdx.current === null || dragIdx.current === i) return;
+    setOrder((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIdx.current, 1);
+      next.splice(i, 0, moved);
+      dragIdx.current = i;
+      return next;
+    });
+  };
+  const onDragEnd = () => { dragIdx.current = null; };
 
   const statusChart = Object.entries(stats.status_counts || {}).map(([k, v]) => ({ name: k, value: v }));
   const COLORS = ["#106EBE", "#0FFCBE", "#8B5CF6", "#F59E0B", "#EC4899", "#10B981", "#EF4444", "#3B82F6"];
-
   const title = user.role === "sales" ? "My Dashboard" : user.role === "operations" ? "Operations Dashboard" : "Master Dashboard";
 
   return (
@@ -67,24 +105,26 @@ export default function Dashboard() {
         <div>
           <div className="label-caps">Overview</div>
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">{title}</h1>
-          <p className="text-sm text-muted-foreground mt-2">Welcome back, {user.name}.</p>
+          <p className="text-sm text-muted-foreground mt-2">Welcome back, {user.name}. Drag KPI cards to reorder.</p>
         </div>
-        {user.role !== "operations" && (
-          <Button onClick={() => nav("/leads/new")} className="h-11 px-5" style={{ background: "#106EBE" }} data-testid="dashboard-new-lead">
-            + New Lead
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setOrder(DEFAULT_ORDER)} data-testid="reset-kpi-order">
+            <RotateCcw size={14} /> Reset layout
           </Button>
-        )}
+          {user.role !== "operations" && (
+            <Button onClick={() => nav("/leads/new")} className="h-10 px-5" style={{ background: "#106EBE" }} data-testid="dashboard-new-lead">+ New Lead</Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Kpi label="Total Leads" value={stats.total_leads} icon={Layers} testId="kpi-total-leads" />
-        <Kpi label="Today's Leads" value={stats.today_leads} icon={CalendarClock} tone="primary" testId="kpi-today" />
-        <Kpi label="Booked" value={stats.booked} icon={CheckCircle2} tone="accent" testId="kpi-booked" />
-        <Kpi label="Quote Pending" value={stats.quote_pending} icon={Clock} testId="kpi-quote-pending" />
-        <Kpi label="Revenue" value={INR(stats.revenue)} icon={IndianRupee} testId="kpi-revenue" />
-        <Kpi label="Profit" value={INR(stats.profit)} icon={TrendingUp} testId="kpi-profit" />
-        <Kpi label="Follow-ups Today" value={stats.followups_today} icon={Users2} testId="kpi-followups" />
-        <Kpi label="Cancelled" value={stats.cancelled} icon={XCircle} testId="kpi-cancelled" />
+        {order.filter(k => kpiMap[k]).map((k, i) => (
+          <Kpi key={k} {...kpiMap[k]} dragHandlers={{
+            onDragStart: onDragStart(i),
+            onDragOver: onDragOver(i),
+            onDragEnd,
+          }} />
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -189,6 +229,7 @@ export default function Dashboard() {
                 <Link to="/leads/new"><Button className="h-11" style={{ background: "#106EBE" }} data-testid="quick-new-lead">+ Create Lead</Button></Link>
               )}
               <Link to="/leads"><Button variant="outline" className="h-11" data-testid="quick-view-leads">View Leads</Button></Link>
+              <Link to="/calendar"><Button variant="outline" className="h-11">Calendar</Button></Link>
               <Link to="/ai"><Button variant="outline" className="h-11" data-testid="quick-ai">AI Assistant</Button></Link>
             </div>
           </Card>

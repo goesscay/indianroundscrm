@@ -15,6 +15,7 @@ import Suppliers from "@/pages/Suppliers";
 import MasterData from "@/pages/MasterData";
 import ActivityLog from "@/pages/ActivityLog";
 import AIAssistant from "@/pages/AIAssistant";
+import CalendarView from "@/pages/CalendarView";
 
 const Shell = ({ children }) => (
   <ProtectedRoute>
@@ -57,6 +58,7 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/ai" element={<Shell><AIAssistant /></Shell>} />
+          <Route path="/calendar" element={<Shell><CalendarView /></Shell>} />
         </Routes>
         <Toaster position="top-right" richColors />
       </BrowserRouter>

@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, Users, ClipboardList, PlusCircle, Truck, Database,
-  Activity, LogOut, Sparkles, Mail
+  Activity, LogOut, Sparkles, Mail, Calendar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ const NAV = {
     { to: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard" },
     { to: "/leads", label: "All Leads", icon: ClipboardList, testId: "nav-leads" },
     { to: "/leads/new", label: "New Lead", icon: PlusCircle, testId: "nav-new-lead" },
+    { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar" },
     { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers" },
     { to: "/users", label: "Users", icon: Users, testId: "nav-users" },
     { to: "/master", label: "Master Data", icon: Database, testId: "nav-master" },
@@ -21,6 +22,7 @@ const NAV = {
   operations: [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard" },
     { to: "/leads", label: "All Leads", icon: ClipboardList, testId: "nav-leads" },
+    { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar" },
     { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers" },
     { to: "/ai", label: "AI Assistant", icon: Sparkles, testId: "nav-ai" },
   ],
@@ -28,6 +30,7 @@ const NAV = {
     { to: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard" },
     { to: "/leads", label: "My Leads", icon: ClipboardList, testId: "nav-leads" },
     { to: "/leads/new", label: "New Lead", icon: PlusCircle, testId: "nav-new-lead" },
+    { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar" },
     { to: "/ai", label: "AI Assistant", icon: Sparkles, testId: "nav-ai" },
   ],
 };

@@ -12,7 +12,7 @@ from bson import ObjectId
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Query
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
@@ -128,6 +128,32 @@ class LeadCreate(BaseModel):
     departure_from: str = ""
     special_requests: str = ""
     lead_source: str = ""
+
+    @field_validator("children")
+    @classmethod
+    def _children_range(cls, v):
+        if v < 0 or v > 10:
+            raise ValueError("Number of children must be between 0 and 10")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_child_ages(self):
+        if self.children == 0:
+            self.child_ages = ""
+            return self
+        raw = (self.child_ages or "").strip()
+        if not raw:
+            raise ValueError(f"Child ages required — expected {self.children} age(s)")
+        parts = [p.strip() for p in raw.split(",") if p.strip() != ""]
+        if len(parts) != self.children:
+            raise ValueError(f"Expected {self.children} child age(s), got {len(parts)}")
+        for i, p in enumerate(parts, 1):
+            if not p.lstrip("-").isdigit():
+                raise ValueError(f"Child {i} age must be a whole number")
+            age = int(p)
+            if age < 0 or age > 12:
+                raise ValueError(f"Child {i} age must be between 0 and 12")
+        return self
 
 
 class LeadUpdate(BaseModel):
@@ -286,6 +312,53 @@ async def delete_user(uid: str, user=Depends(require_roles("admin"))):
 
 
 # =================== Leads ===================
+@api.get("/leads/duplicate-check")
+async def duplicate_check(phone: str = "", email: str = "", user=Depends(get_current_user)):
+    """Return matching leads by phone or email (case-insensitive)."""
+    ors = []
+    if phone.strip():
+        ors.append({"phone": phone.strip()})
+    if email.strip():
+        ors.append({"email": {"$regex": f"^{email.strip()}$", "$options": "i"}})
+    if not ors:
+        return {"matches": []}
+    query = {"$or": ors}
+    # Sales users only check within their own leads
+    if user["role"] == "sales":
+        query["staff_id"] = user["id"]
+    docs = await db.leads.find(query).sort("created_at", -1).limit(10).to_list(10)
+    return {"matches": [{
+        "lead_id": d.get("lead_id"),
+        "customer_name": d.get("customer_name"),
+        "phone": d.get("phone"),
+        "email": d.get("email"),
+        "destination": d.get("destination"),
+        "created_at": d.get("created_at"),
+        "lead_status": d.get("lead_status"),
+        "staff_name": d.get("staff_name"),
+    } for d in docs]}
+
+
+@api.get("/leads/calendar")
+async def calendar_events(user=Depends(get_current_user), month: str = ""):
+    """Return travel + follow-up dates for calendar view. month optional YYYY-MM filter."""
+    query = _lead_filter_for_user(user)
+    leads = await db.leads.find(query).to_list(5000)
+    events = []
+    for l in leads:  # noqa: E741
+        for kind, field in (("travel", "travel_date"), ("follow-up", "follow_up_date")):
+            d = (l.get(field) or "")[:10]
+            if d and (not month or d.startswith(month)):
+                events.append({
+                    "date": d, "kind": kind,
+                    "lead_id": l.get("lead_id"),
+                    "customer_name": l.get("customer_name"),
+                    "destination": l.get("destination"),
+                    "lead_status": l.get("lead_status"),
+                })
+    return sorted(events, key=lambda e: e["date"])
+
+
 def _lead_filter_for_user(user: dict) -> dict:
     if user["role"] == "sales":
         return {"staff_id": user["id"]}

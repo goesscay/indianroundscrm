@@ -39,3 +39,15 @@ Enterprise-grade Travel CRM with 3 roles (Sales / Operations / Admin). Auto-gene
 
 ## Test Credentials
 See `/app/memory/test_credentials.md`
+
+## Update — 2026-02 iteration 2
+- [x] Dynamic child age fields (0-12 whole numbers, per-child, auto add/remove) with backend + frontend validation
+- [x] Duplicate lead detection (warn-only on New Lead form via phone/email match, debounced)
+- [x] Calendar view (`/calendar`) — month grid showing travel dates (blue) + follow-ups (amber) with day-detail panel
+- [x] Draggable KPI cards on Dashboard (order saved per-user in localStorage, Reset layout button)
+- [x] PWA — manifest.json + service worker (offline app shell caching, installable)
+
+## Still deferred
+- Real email sending (Resend/SendGrid) — user did not provide API key; MOCKED simulation still in place
+- Full widget system (add/remove/resize) — current impl is reorder-only
+- PDF export
