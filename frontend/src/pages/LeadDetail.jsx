@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
 import SupplierTracker from "@/components/app/SupplierTracker";
+import LeadNotes from "@/components/app/LeadNotes";
+import FollowupCountdown from "@/components/app/FollowupCountdown";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { Mail, MessageCircle, Sparkles, ArrowLeft, Phone, Copy, MessageSquare } from "lucide-react";
@@ -237,10 +239,11 @@ export default function LeadDetail() {
               </Select>
             </div>
             <div>
-              <Label className="label-caps">Follow-up Date</Label>
-              <Input type="date" defaultValue={(lead.follow_up_date || "").slice(0, 10)}
-                     onBlur={(e) => e.target.value && update({ follow_up_date: e.target.value })}
+              <Label className="label-caps">Follow-up Date & Time</Label>
+              <Input type="datetime-local" defaultValue={(lead.follow_up_date || "").slice(0, 16)}
+                     onBlur={(e) => e.target.value && update({ follow_up_date: new Date(e.target.value).toISOString() })}
                      className="mt-1.5" data-testid="update-followup" />
+              {lead.follow_up_date && <FollowupCountdown iso={lead.follow_up_date} />}
             </div>
           </div>
         </Card>
@@ -323,6 +326,8 @@ export default function LeadDetail() {
       </div>
 
       <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} />
+
+      <LeadNotes leadId={lead.lead_id} />
 
       {/* Mail Dialog */}
       <Dialog open={mailOpen} onOpenChange={setMailOpen}>

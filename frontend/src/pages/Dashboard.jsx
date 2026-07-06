@@ -3,11 +3,12 @@ import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import FollowupCountdown from "@/components/app/FollowupCountdown";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, LineChart, Line, Legend
 } from "recharts";
-import { TrendingUp, Users2, IndianRupee, CalendarClock, Clock, CheckCircle2, XCircle, Layers, GripVertical, RotateCcw } from "lucide-react";
+import { TrendingUp, Users2, IndianRupee, CalendarClock, Clock, CheckCircle2, XCircle, Layers, GripVertical, RotateCcw, Phone, MessageCircle } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 
 const INR = (n) => "₹" + (Number(n) || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -61,6 +62,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [supSummary, setSupSummary] = useState(null);
+  const [followups, setFollowups] = useState([]);
   const [err, setErr] = useState("");
   const nav = useNavigate();
   const storageKey = `ir_kpi_order_${user.id}`;
@@ -84,6 +86,7 @@ export default function Dashboard() {
         if (user.role === "admin" || user.role === "operations") {
           try { const sup = await api.get("/lead-suppliers/dashboard/summary"); setSupSummary(sup.data); } catch { /* ignore */ }
         }
+        try { const fu = await api.get("/followups/upcoming?hours=72"); setFollowups(fu.data); } catch { /* ignore */ }
       } catch (e) { setErr(formatApiError(e)); }
     })();
   }, [user.role]);
@@ -174,6 +177,43 @@ export default function Dashboard() {
           )}
         </Card>
       )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="p-6 rounded-lg lg:col-span-3" data-testid="followup-timer">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="label-caps">Task timer</div>
+              <h3 className="font-display text-xl font-bold mt-1">Follow-ups (next 72h)</h3>
+            </div>
+            <span className="label-caps">{followups.length} pending</span>
+          </div>
+          {followups.length === 0 && <div className="text-sm text-muted-foreground py-4">No follow-ups scheduled. Set follow-up date & time on any lead.</div>}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {followups.slice(0, 12).map((f) => {
+              const digits = (f.phone || "").replace(/\D/g, "");
+              const ten = digits.slice(-10);
+              return (
+                <Link key={f.lead_id} to={`/leads/${f.lead_id}`}
+                      className={`p-3 rounded-md border transition-colors block ${f.overdue ? "border-red-300 bg-red-50" : "border-border hover:bg-secondary/40"}`}
+                      data-testid={`followup-${f.lead_id}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-sm">{f.lead_id}</span>
+                    <FollowupCountdown iso={f.follow_up_at} />
+                  </div>
+                  <div className="font-medium text-sm mt-1 truncate">{f.customer_name}</div>
+                  <div className="text-xs text-muted-foreground truncate">{f.destination} · {f.lead_status}</div>
+                  {ten.length === 10 && (
+                    <div className="flex gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
+                      <a href={`tel:+91${ten}`} className="text-[#106EBE] p-1 hover:bg-[#106EBE]/10 rounded"><Phone size={13} /></a>
+                      <a href={`https://wa.me/91${ten}`} target="_blank" rel="noreferrer" className="text-emerald-600 p-1 hover:bg-emerald-100 rounded"><MessageCircle size={13} /></a>
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-6 lg:col-span-2 rounded-lg" data-testid="chart-monthly">

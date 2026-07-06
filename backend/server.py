@@ -983,6 +983,81 @@ async def resend_webhook(request: Request):
     return {"ok": True}
 
 
+# =================== Notes ===================
+class NoteCreate(BaseModel):
+    note: str
+
+
+@api.get("/leads/{lead_id}/notes")
+async def list_notes(lead_id: str, user=Depends(get_current_user)):
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead: raise HTTPException(status_code=404, detail="Lead not found")
+    if user["role"] == "sales" and lead.get("staff_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    docs = await db.lead_notes.find({"lead_id": lead_id}).sort("created_at", -1).to_list(500)
+    return [clean_doc(d) for d in docs]
+
+
+@api.post("/leads/{lead_id}/notes")
+async def add_note(lead_id: str, body: NoteCreate, user=Depends(get_current_user)):
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead: raise HTTPException(status_code=404, detail="Lead not found")
+    if user["role"] == "sales" and lead.get("staff_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not body.note.strip():
+        raise HTTPException(status_code=400, detail="Note cannot be empty")
+    doc = {
+        "lead_id": lead_id, "note": body.note.strip(),
+        "created_by_id": user["id"], "created_by": user.get("name") or user["email"],
+        "created_at": now_iso(),
+    }
+    r = await db.lead_notes.insert_one(doc)
+    doc["_id"] = r.inserted_id
+    return clean_doc(doc)
+
+
+@api.delete("/notes/{nid}")
+async def delete_note(nid: str, user=Depends(get_current_user)):
+    note = await db.lead_notes.find_one({"_id": oid(nid)})
+    if not note: raise HTTPException(status_code=404, detail="Not found")
+    if user["role"] != "admin" and note.get("created_by_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Only the author or admin can delete")
+    await db.lead_notes.delete_one({"_id": oid(nid)})
+    return {"success": True}
+
+
+# =================== Followups Timer ===================
+@api.get("/followups/upcoming")
+async def upcoming_followups(user=Depends(get_current_user), hours: int = 72):
+    now = datetime.now(timezone.utc)
+    horizon = now + __import__("datetime").timedelta(hours=hours)
+    query = _lead_filter_for_user(user)
+    query["follow_up_date"] = {"$exists": True, "$ne": None, "$ne": ""}
+    leads = await db.leads.find(query).to_list(2000)
+    result = []
+    for l in leads:  # noqa: E741
+        fu = l.get("follow_up_date")
+        if not fu: continue
+        try:
+            dt = datetime.fromisoformat(fu.replace("Z", "+00:00")) if "T" in fu else datetime.fromisoformat(fu[:10] + "T09:00:00+00:00")
+            secs = (dt - now).total_seconds()
+        except Exception:
+            continue
+        if secs > horizon.timestamp() - now.timestamp() and secs > 0:
+            continue
+        result.append({
+            "lead_id": l.get("lead_id"),
+            "customer_name": l.get("customer_name"),
+            "phone": l.get("phone"),
+            "destination": l.get("destination"),
+            "lead_status": l.get("lead_status"),
+            "follow_up_at": dt.isoformat(),
+            "seconds_left": int(secs),
+            "overdue": secs < 0,
+        })
+    return sorted(result, key=lambda x: x["seconds_left"])
+
+
 @api.get("/dashboard/stats")
 async def dashboard_stats(user=Depends(get_current_user)):
     base = _lead_filter_for_user(user)
