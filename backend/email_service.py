@@ -47,9 +47,22 @@ def render_supplier_rfq_html(lead: dict, intro_text: str = "") -> str:
 
     return f"""
 <div style="max-width:820px;margin:auto;font-family:Arial,sans-serif;border:1px solid #ddd;border-radius:12px;overflow:hidden;background:#ffffff;">
-  <div style="background:#01265c;padding:16px 24px;">
-    <div style="font-size:22px;line-height:28px;font-weight:bold;color:white;letter-spacing:0.5px;">INDIAN ROUNDS</div>
-    <div style="font-size:12px;letter-spacing:3px;color:#0FFCBE;margin-top:2px;">TRAVEL ENQUIRY</div>
+  <div style="background:#01265c;padding:12px 20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-collapse:collapse;">
+      <tr>
+        <td width="110" align="center" valign="middle" style="padding:0;">
+          <img src="https://customer-assets.emergentagent.com/job_journey-crm-hub-1/artifacts/i3r285or_Indian%20rounds_logo.png"
+               alt="Indian Rounds"
+               height="80"
+               style="display:block;border:0;background:#01265c;padding:4px;border-radius:8px;">
+        </td>
+        <td width="1" style="background:#ffffff;"></td>
+        <td valign="middle" style="padding-left:16px;white-space:nowrap;">
+          <div style="font-size:22px;line-height:28px;font-weight:bold;color:white;letter-spacing:0.5px;">INDIAN ROUNDS</div>
+          <div style="font-size:12px;letter-spacing:3px;color:#0FFCBE;margin-top:2px;">TRAVEL ENQUIRY</div>
+        </td>
+      </tr>
+    </table>
   </div>
   <div style="padding:22px 26px;">
     <p style="font-size:16px;margin:0 0 10px 0;">Dear Team,</p>

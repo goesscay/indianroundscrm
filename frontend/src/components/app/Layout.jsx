@@ -60,9 +60,10 @@ export default function Layout({ children }) {
       {/* Sidebar */}
       <aside className="hidden md:flex md:w-64 flex-col border-r border-border bg-card" data-testid="sidebar">
         <div className="p-6 border-b border-border">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: "#106EBE" }}>
-              <Mail className="text-white" size={18} />
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-md flex items-center justify-center overflow-hidden" style={{ background: "#01265c" }}>
+              <img src="https://customer-assets.emergentagent.com/job_journey-crm-hub-1/artifacts/i3r285or_Indian%20rounds_logo.png"
+                   alt="IR" className="w-9 h-9 object-contain" />
             </div>
             <div>
               <div className="font-display text-lg font-black tracking-tight text-foreground leading-none">INDIAN ROUNDS</div>
