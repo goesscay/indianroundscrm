@@ -1,0 +1,42 @@
+{
+  "summary": "Retest of Users page after missing JSX was added. All 5 review-request checks PASS: consultant-code input renders correctly (maxLength=2, auto-uppercase), allocations-section Card renders with a-destination/a-consultant/a-save controls, Thailand→Karuva (KA) pill is visible with delete X icon, sales user's Thailand lead auto-allocates to IRKA prefix (IRKA07004, staff=Karuva), and Bali lead correctly falls back to IRRK prefix (IRRK07009, staff=Ravi Kumar).",
+  "tested_scope": ["frontend"],
+  "passed": [
+    "Admin login → /users: Add-new-user form has 6 columns; Consultant Code input has data-testid='u-consultant', maxLength=2, placeholder='KA'. Typing 'ab' auto-uppercased to 'AB'. ✅",
+    "Lead Allocation by Destination Card (data-testid='allocations-section') renders below the users table with a-destination, a-consultant, a-save and helper text. ✅",
+    "Existing Thailand → Karuva (KA) allocation renders as pill (data-testid='alloc-Thailand') with content 'Thailand → Karuva KA' and delete X icon. ✅",
+    "Sales user (sales@indianrounds.com) creates lead with destination='Thailand', phone='9876540197' → Lead ID = IRKA07004 (IRKA prefix, Karuva's code). Backend correctly reassigns owner to Karuva. ✅",
+    "Sales user creates lead with destination='Bali', phone='9876540198' → Lead ID = IRRK07009 (IRRK prefix, Ravi Kumar's own code). Lead detail: destination=Bali, staff=Ravi Kumar. ✅"
+  ],
+  "failed": [],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Sales user creates a lead whose destination triggers auto-reassignment (e.g. Thailand → Karuva)", "issue": "After POST /api/leads the SPA redirects the sales user (Ravi) to /leads/IRKA07004, but that lead is now owned by Karuva after backend auto-reassign, so GET /api/leads/IRKA07004 returns 403 and the page displays 'Loading…' plus a red 'Forbidden' toast. The lead is created successfully — this is purely a redirect UX regression. Recommend: after create, if the response owner_id !== current user id, redirect to /leads (or show a 'Lead auto-assigned to <consultant>' message and go back to listing) instead of the lead-detail page the sales user cannot view.", "affected_selectors": ["Sales user post-submit redirect on /leads/new"]}
+    ],
+    "design_issues": [
+      {"screen": "/users → Add new user form", "issues": ["Consultant Code field shares the last grid cell with the Add button (`flex gap-2`), which is a nice compact layout but on narrow screens the Add button may squeeze the 2-char input; acceptable at md+."]},
+      {"screen": "Master Data → destination", "issues": ["Destination options include both 'Kerala' and 'KERALA' (case-duplicate). Also 'Singapore' appears in the list even though it was mentioned as a case-sensitivity fix in past iterations. Consider normalising master values to Title Case."]}
+    ]
+  },
+  "critical_code_review_comments": [
+    "Users.jsx (v6): JSX is now complete and correct. Consultant-code input is bound to f.consultant_code with maxLength=2 and auto-uppercase (line 89). Allocations Card renders destination Select from master data, consultant Select filtered to role in ['sales','admin'], Save button, and pill list with removeAllocation X-button.",
+    "Post-submit redirect in /leads/new needs to be role-aware. When backend auto-reassigns a newly created lead to another consultant, the current sales user gets a 403 on the follow-up GET /api/leads/{lead_id}. Consider returning owner_id in the create response and, if owner_id !== me.id, route to '/leads' or show a success toast without the detail navigation.",
+    "Non-blocking console noise: two 403s (likely /api/users or /api/allocations pre-fetches by non-admin) still occur on some pages. Consider gating those fetches behind role checks — not blocking."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "Fix post-submit redirect for sales user when backend auto-reassigns the newly created lead to a different consultant — currently shows a 'Forbidden' toast and a Loading… page (lead IRKA07004 created by Ravi, owned by Karuva).",
+    "Clean up master-data duplicate 'Kerala'/'KERALA' entry (non-blocking).",
+    "Optional: suppress background 403s for /api/users and /api/allocations when a non-admin role loads pages that don't need them."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only scope; all backend endpoints exercised through UI returned expected results, except the intentional 403 on sales-user GET of a re-assigned lead which is correct RBAC behaviour)", "frontend": "100% (5 of 5 review-request checks pass)"},
+  "test_credentials": "admin@indianrounds.com/admin123 and sales@indianrounds.com/sales123 — both valid.",
+  "seed_data_creation": "Created 3 test leads while retesting (all TEST_ prefixed): IRRK07008 (TEST_Retest Thailand, phone 9876540199 — mis-selected Singapore due to Playwright option-picker quirk on first attempt; kept with Ravi), IRRK07009 (TEST_Retest Bali, phone 9876540198 — correct Bali+Ravi), IRKA07004 (TEST_Retest Thailand v2, phone 9876540197 — correct Thailand+Karuva). Main agent can safely delete these TEST_ leads.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Feature is functionally complete and passing. The only outstanding UX issue is that when a sales user submits a lead whose destination is allocated to another consultant, the SPA still tries to navigate to the just-created lead's detail page and hits a 403. Backend RBAC and allocation logic are correct — this is a purely client-side redirect concern. Master data has minor Kerala/KERALA duplicate.",
+  "rca of the issue": "Previous iteration_5 flagged missing JSX for consultant-code input and allocations-section. Main agent has now added both: (a) Input with data-testid='u-consultant' inside a shared grid cell with the Add button, and (b) full Card with data-testid='allocations-section' containing Destination select (a-destination), Consultant select (a-consultant) filtered to sales/admin, Save button (a-save) and pill list (alloc-<Destination>) with remove icon. End-to-end auto-allocation now verified through the UI: Thailand lead created by Ravi → owner reassigned to Karuva → Lead ID IRKA07004; Bali lead by Ravi → kept as Ravi → IRRK07009. The residual UX regression (403 on post-submit redirect for reassigned leads) is a small router-level fix in New Lead submit handler."
+}

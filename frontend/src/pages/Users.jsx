@@ -69,7 +69,7 @@ export default function Users() {
 
       <Card className="p-6 rounded-lg">
         <h3 className="font-display text-xl font-bold mb-4">Add new user</h3>
-        <form onSubmit={create} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+        <form onSubmit={create} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
           <div><Label className="label-caps">Name</Label><Input className="mt-1.5" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required data-testid="u-name" /></div>
           <div><Label className="label-caps">Email</Label><Input type="email" className="mt-1.5" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required data-testid="u-email" /></div>
           <div><Label className="label-caps">Password</Label><Input type="password" className="mt-1.5" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} required data-testid="u-password" /></div>
@@ -83,9 +83,13 @@ export default function Users() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex gap-2">
-            <Input placeholder="Staff Code" value={f.staff_code} onChange={e => setF({ ...f, staff_code: e.target.value })} data-testid="u-code" />
-            <Button type="submit" style={{ background: "#106EBE" }} data-testid="u-add">Add</Button>
+          <div><Label className="label-caps">Staff Code</Label><Input className="mt-1.5" placeholder="SAL001" value={f.staff_code} onChange={e => setF({ ...f, staff_code: e.target.value })} data-testid="u-code" /></div>
+          <div><Label className="label-caps">Consultant Code</Label>
+            <div className="flex gap-2 mt-1.5">
+              <Input placeholder="KA" maxLength={2} value={f.consultant_code} onChange={e => setF({ ...f, consultant_code: e.target.value.toUpperCase() })} data-testid="u-consultant" />
+              <Button type="submit" style={{ background: "#106EBE" }} data-testid="u-add">Add</Button>
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-1">Used in Lead ID (IR<b>KA</b>07001)</div>
           </div>
         </form>
       </Card>
@@ -124,6 +128,44 @@ export default function Users() {
               ))}
             </TableBody>
           </Table>
+        </div>
+      </Card>
+
+      <Card className="p-6 rounded-lg" data-testid="allocations-section">
+        <h3 className="font-display text-xl font-bold mb-1">Lead Allocation by Destination</h3>
+        <p className="text-xs text-muted-foreground mb-4">When a customer picks a destination, the lead auto-assigns to the mapped consultant + uses their code in the Lead ID (e.g. IRKA07001 for Karuva).</p>
+        <form onSubmit={setAllocation} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-6">
+          <div>
+            <Label className="label-caps">Destination</Label>
+            <Select value={allocForm.destination || undefined} onValueChange={(v) => setAllocForm({ ...allocForm, destination: v })}>
+              <SelectTrigger className="mt-1.5" data-testid="a-destination"><SelectValue placeholder="Choose destination" /></SelectTrigger>
+              <SelectContent>{destinations.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="label-caps">Assign to consultant</Label>
+            <Select value={allocForm.consultant_id || undefined} onValueChange={(v) => setAllocForm({ ...allocForm, consultant_id: v })}>
+              <SelectTrigger className="mt-1.5" data-testid="a-consultant"><SelectValue placeholder="Choose sales consultant" /></SelectTrigger>
+              <SelectContent>
+                {users.filter(u => u.role === "sales" || u.role === "admin").map(u =>
+                  <SelectItem key={u.id} value={u.id}>{u.name} · {u.consultant_code || "??"}</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button type="submit" style={{ background: "#106EBE" }} data-testid="a-save">Set allocation</Button>
+        </form>
+        <div className="flex flex-wrap gap-2">
+          {allocations.length === 0 && <div className="text-sm text-muted-foreground">No allocations yet. Add destination → consultant mappings above.</div>}
+          {allocations.map(a => (
+            <span key={a.id} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-secondary/40" data-testid={`alloc-${a.destination}`}>
+              <span className="font-semibold text-sm">{a.destination}</span>
+              <span className="text-muted-foreground">→</span>
+              <span className="font-medium text-sm">{a.consultant_name}</span>
+              <span className="font-mono font-bold text-[#106EBE] text-xs">{a.consultant_code}</span>
+              <button onClick={() => removeAllocation(a.id)} className="text-muted-foreground hover:text-destructive ml-1"><Trash2 size={12} /></button>
+            </span>
+          ))}
         </div>
       </Card>
     </div>
