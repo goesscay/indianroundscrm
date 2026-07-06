@@ -29,6 +29,7 @@ export default function LeadDetail() {
   const [cc, setCc] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [mailPreviewHtml, setMailPreviewHtml] = useState("");
   const [aiOpen, setAiOpen] = useState(false);
   const [aiContent, setAiContent] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
@@ -44,6 +45,18 @@ export default function LeadDetail() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [leadId]);
 
+  // Refresh mail preview when intro body changes
+  useEffect(() => {
+    if (!mailOpen || !lead) return;
+    const t = setTimeout(async () => {
+      try {
+        const p = await api.get(`/supplier-mail/preview/${lead.lead_id}`, { params: { intro: body } });
+        setMailPreviewHtml(p.data.html || "");
+      } catch { /* ignore */ }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [body, mailOpen, lead, leadId]);
+
   const canOps = user.role === "operations" || user.role === "admin";
 
   const update = async (patch) => {
@@ -58,8 +71,12 @@ export default function LeadDetail() {
     const { data } = await api.get("/suppliers");
     setSuppliers(data);
     setSubject(`Travel Enquiry - ${lead.lead_id} - ${lead.destination}`);
-    setBody(defaultEmailBody(lead));
+    setBody("");
     setSelected({});
+    try {
+      const p = await api.get(`/supplier-mail/preview/${lead.lead_id}`);
+      setMailPreviewHtml(p.data.html || "");
+    } catch { /* ignore */ }
     setMailOpen(true);
   };
 
@@ -309,12 +326,12 @@ export default function LeadDetail() {
 
       {/* Mail Dialog */}
       <Dialog open={mailOpen} onOpenChange={setMailOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="mail-dialog">
+        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="mail-dialog">
           <DialogHeader><DialogTitle>Send Supplier Enquiry — {lead.lead_id}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
               <Label className="label-caps">Select suppliers</Label>
-              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-border rounded-md p-3">
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-border rounded-md p-3">
                 {suppliers.length === 0 && <div className="text-sm text-muted-foreground">No suppliers. Add some in Suppliers page.</div>}
                 {suppliers.map(s => (
                   <label key={s.id} className="flex items-start gap-2 cursor-pointer text-sm" data-testid={`supplier-${s.id}`}>
@@ -336,9 +353,22 @@ export default function LeadDetail() {
               <Input className="mt-1.5" value={subject} onChange={(e) => setSubject(e.target.value)} data-testid="mail-subject" />
             </div>
             <div>
-              <Label className="label-caps">Body</Label>
-              <Textarea rows={14} className="mt-1.5 font-mono text-xs" value={body} onChange={(e) => setBody(e.target.value)} data-testid="mail-body" />
+              <Label className="label-caps">Intro (optional — replaces the default line)</Label>
+              <Textarea rows={3} className="mt-1.5" value={body} onChange={(e) => setBody(e.target.value)} data-testid="mail-body"
+                placeholder="Leave blank to use default: 'Please share your best quotation for the travel requirement detailed below.'" />
+              <div className="text-[11px] text-muted-foreground mt-1">Trip / accommodation / guest tables are auto-generated from lead data in the branded HTML template.</div>
             </div>
+            <details className="border border-border rounded-md">
+              <summary className="cursor-pointer text-sm font-semibold px-3 py-2 hover:bg-secondary/40">Preview email</summary>
+              <div className="p-3 border-t border-border">
+                <iframe
+                  title="mail-preview"
+                  className="w-full h-[500px] border border-border rounded-md bg-white"
+                  srcDoc={mailPreviewHtml}
+                  data-testid="mail-preview-iframe"
+                />
+              </div>
+            </details>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMailOpen(false)}>Cancel</Button>

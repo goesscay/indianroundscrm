@@ -2,9 +2,101 @@
 import os
 import asyncio
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 logger = logging.getLogger("ir-crm.email")
+
+
+def _fmt_date(iso: str) -> str:
+    if not iso: return "TBD"
+    try:
+        d = datetime.fromisoformat(iso.replace("Z", "+00:00")) if "T" in iso else datetime.strptime(iso[:10], "%Y-%m-%d")
+        return d.strftime("%d/%m/%Y")
+    except Exception:
+        return iso[:10] or "TBD"
+
+
+def render_supplier_rfq_html(lead: dict, intro_text: str = "") -> str:
+    """Branded HTML for a supplier RFQ."""
+    esc = lambda v: (str(v) if v is not None else "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") or "—"
+    lead_id = esc(lead.get("lead_id"))
+    destination = esc(lead.get("destination"))
+    travel_date = _fmt_date(lead.get("travel_date") or "")
+    hotel = esc(lead.get("hotel_category"))
+    meal = esc(lead.get("meal_plan"))
+    pkg = esc(lead.get("package_type"))
+    adults = esc(lead.get("adults"))
+    children = esc(lead.get("children"))
+    child_age = esc(lead.get("child_ages") or "Nil")
+    rooms = esc(lead.get("rooms"))
+    room_type = esc(lead.get("room_type"))
+    special = esc(lead.get("special_requests") or "Nil")
+    intro = esc(intro_text) if intro_text else "Please share your best quotation for the travel requirement detailed below."
+
+    row = lambda label, val: (
+        f'<tr>'
+        f'<td width="42%" style="padding:10px 15px;border:1px solid #ddd;">{label}</td>'
+        f'<td width="58%" style="padding:10px 15px;border:1px solid #ddd;"><b>{val}</b></td>'
+        f'</tr>'
+    )
+    section_hdr = lambda title: (
+        '<tr><td colspan="2" style="background:#106EBE;color:white;padding:10px 15px;'
+        f'font-size:15px;font-weight:bold;">{title}</td></tr>'
+    )
+
+    return f"""
+<div style="max-width:820px;margin:auto;font-family:Arial,sans-serif;border:1px solid #ddd;border-radius:12px;overflow:hidden;background:#ffffff;">
+  <div style="background:#01265c;padding:16px 24px;">
+    <div style="font-size:22px;line-height:28px;font-weight:bold;color:white;letter-spacing:0.5px;">INDIAN ROUNDS</div>
+    <div style="font-size:12px;letter-spacing:3px;color:#0FFCBE;margin-top:2px;">TRAVEL ENQUIRY</div>
+  </div>
+  <div style="padding:22px 26px;">
+    <p style="font-size:16px;margin:0 0 10px 0;">Dear Team,</p>
+    <p style="margin:0 0 10px 0;"><b style="font-size:18px;color:#001d66;">Greetings from Indian Rounds!</b></p>
+    <p style="font-size:15px;margin:0 0 15px 0;">{intro}</p>
+
+    <table width="100%" style="table-layout:fixed;border-collapse:collapse;margin-top:15px;">
+      {section_hdr('TRIP DETAILS')}
+      {row('Lead ID', lead_id)}
+      {row('Destination', destination)}
+      {row('Travel Date', travel_date)}
+      {row('Package Type', pkg)}
+    </table>
+    <br>
+    <table width="100%" style="table-layout:fixed;border-collapse:collapse;">
+      {section_hdr('ACCOMMODATION DETAILS')}
+      {row('Hotel Category', hotel)}
+      {row('Meal Plan', meal)}
+      {row('No of Rooms', rooms)}
+      {row('Room Type', room_type)}
+    </table>
+    <br>
+    <table width="100%" style="table-layout:fixed;border-collapse:collapse;">
+      {section_hdr('GUEST DETAILS')}
+      {row('No of Adults', adults)}
+      {row('No of Children', children)}
+      {row('Child Age(s)', child_age)}
+    </table>
+    <br>
+    <div style="border:2px solid #ff6d6d;border-radius:8px;padding:12px 16px;">
+      <div style="color:#d10000;font-size:16px;font-weight:bold;">⭐ SPECIAL REQUESTS</div>
+      <div style="margin-top:4px;font-size:15px;white-space:pre-wrap;">{special}</div>
+    </div>
+    <p style="margin-top:26px;font-size:16px;">We look forward to receiving your best rates at the earliest.</p>
+    <div style="border-left:4px solid #01265c;padding-left:15px;margin-top:20px;">
+      Regards,<br><br>
+      <b>Sri</b><br>
+      +91 73056 69082<br>
+      Sales &amp; Operations Team<br>
+      <b style="color:#001d66;">Indian Rounds</b>
+    </div>
+  </div>
+  <div style="background:#f5f7fb;color:#6b7280;padding:10px 24px;font-size:11px;text-align:center;border-top:1px solid #e5e7eb;">
+    This is an automated enquiry from Indian Rounds CRM.
+  </div>
+</div>
+"""
 
 
 def _body_to_html(text: str) -> str:
@@ -24,8 +116,9 @@ async def send_email(
     cc: Optional[List[str]] = None,
     bcc: Optional[List[str]] = None,
     from_addr: Optional[str] = None,
+    html_override: Optional[str] = None,
 ) -> dict:
-    """Returns {status, provider, message_id?, error?}."""
+    """Returns {status, provider, message_id?, error?}. html_override, if provided, is used instead of body."""
     api_key = os.environ.get("RESEND_API_KEY", "").strip()
     sender = (from_addr or os.environ.get("RESEND_FROM", "")).strip()
 
@@ -41,7 +134,7 @@ async def send_email(
             "from": sender,
             "to": to,
             "subject": subject,
-            "html": _body_to_html(body),
+            "html": html_override or _body_to_html(body),
         }
         if cc: params["cc"] = cc
         if bcc: params["bcc"] = bcc
