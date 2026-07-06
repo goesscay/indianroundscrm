@@ -19,6 +19,7 @@ from auth import (
     set_auth_cookies, clear_auth_cookies, get_current_user, require_roles, seed_admin
 )
 from ai_service import generate_itinerary, recommend_quote
+from email_service import send_email as send_email_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ir-crm")
@@ -568,6 +569,15 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
     if not suppliers:
         raise HTTPException(status_code=400, detail="No valid suppliers selected")
 
+    # Attempt real send via Resend (falls back to simulation if unconfigured)
+    send_result = await send_email_service(
+        to=[s["email"] for s in suppliers],
+        subject=body.subject,
+        body=body.body,
+        cc=body.cc,
+        bcc=body.bcc,
+    )
+
     mail_doc = {
         "lead_id": body.lead_id,
         "to_suppliers": suppliers,
@@ -577,7 +587,10 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
         "body": body.body,
         "sent_by": user["email"],
         "sent_at": now_iso(),
-        "status": "simulated_sent",  # NOTE: MOCKED - not actually sending email
+        "status": send_result.get("status", "unknown"),
+        "provider": send_result.get("provider"),
+        "message_id": send_result.get("message_id"),
+        "error": send_result.get("error"),
     }
     r = await db.mail_history.insert_one(mail_doc)
 
@@ -593,9 +606,9 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
             "updated_by": user["email"],
         }}
     )
-    await log_activity(user, "send_supplier_mail", "lead", body.lead_id, None, {"suppliers": supplier_names})
+    await log_activity(user, "send_supplier_mail", "lead", body.lead_id, None, {"suppliers": supplier_names, "status": send_result.get("status"), "provider": send_result.get("provider")})
     mail_doc["_id"] = r.inserted_id
-    return clean_doc(mail_doc)
+    return {**clean_doc(mail_doc), "send_result": send_result}
 
 
 @api.get("/supplier-mail/{lead_id}")

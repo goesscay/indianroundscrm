@@ -66,14 +66,17 @@ export default function LeadDetail() {
     const ids = Object.keys(selected).filter(k => selected[k]);
     if (ids.length === 0) { toast.error("Select at least one supplier"); return; }
     try {
-      await api.post("/supplier-mail/send", {
+      const { data } = await api.post("/supplier-mail/send", {
         lead_id: lead.lead_id,
         supplier_ids: ids,
         cc: cc.split(",").map(s => s.trim()).filter(Boolean),
         bcc: [],
         subject, body,
       });
-      toast.success("Supplier email dispatched (simulated). Mail status updated.");
+      const r = data.send_result || {};
+      if (r.status === "sent") toast.success(`Email sent via Resend (${(r.message_id || "").slice(0, 8)}…)`);
+      else if (r.status === "failed") toast.error(`Resend failed: ${r.error || "unknown"}`);
+      else toast.info("Email simulated — configure RESEND_API_KEY in backend .env to send for real.");
       setMailOpen(false);
       load();
     } catch (e) { toast.error(formatApiError(e)); }
@@ -250,6 +253,17 @@ export default function LeadDetail() {
                 <div className="label-caps mt-0.5">{(h.sent_at || "").slice(0, 16).replace("T", " ")}</div>
                 <div className="text-xs text-muted-foreground mt-1">
                   To: {h.to_suppliers.map(s => s.name).join(", ")}
+                </div>
+                <div className="text-[10px] mt-1">
+                  <span className={`px-1.5 py-0.5 rounded font-semibold ${
+                    h.status === "sent" ? "bg-emerald-100 text-emerald-800" :
+                    h.status === "failed" ? "bg-red-100 text-red-800" :
+                    "bg-amber-100 text-amber-800"
+                  }`}>
+                    {h.status === "sent" ? `SENT via ${h.provider || "resend"}` :
+                     h.status === "failed" ? "FAILED" : "SIMULATED"}
+                  </span>
+                  {h.message_id && <span className="ml-2 text-muted-foreground font-mono">{h.message_id.slice(0, 12)}…</span>}
                 </div>
               </div>
             ))}
