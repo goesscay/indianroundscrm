@@ -122,8 +122,8 @@ async def seed_admin(db):
 
     # Seed a demo sales and operations user (idempotent)
     demos = [
-        {"email": "sales@indianrounds.com", "password": "sales123", "name": "Ravi Kumar", "role": "sales", "staff_code": "SAL001"},
-        {"email": "ops@indianrounds.com", "password": "ops123", "name": "Priya Sharma", "role": "operations", "staff_code": "OPS001"},
+        {"email": "sales@indianrounds.com", "password": "sales123", "name": "Ravi Kumar", "role": "sales", "staff_code": "SAL001", "consultant_code": "RK"},
+        {"email": "ops@indianrounds.com", "password": "ops123", "name": "Priya Sharma", "role": "operations", "staff_code": "OPS001", "consultant_code": ""},
     ]
     for d in demos:
         e = d["email"].lower()
@@ -132,5 +132,8 @@ async def seed_admin(db):
             await db.users.insert_one({
                 "email": e, "password_hash": hash_password(d["password"]),
                 "name": d["name"], "role": d["role"], "staff_code": d["staff_code"],
+                "consultant_code": d["consultant_code"],
                 "active": True, "created_at": now,
             })
+        elif not exists.get("consultant_code") and d["consultant_code"]:
+            await db.users.update_one({"email": e}, {"$set": {"consultant_code": d["consultant_code"]}})

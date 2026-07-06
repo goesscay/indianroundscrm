@@ -13,10 +13,17 @@ import { Trash2 } from "lucide-react";
 export default function Users() {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
-  const [f, setF] = useState({ email: "", password: "", name: "", role: "sales", staff_code: "" });
+  const [f, setF] = useState({ email: "", password: "", name: "", role: "sales", staff_code: "", consultant_code: "" });
+  const [allocations, setAllocations] = useState([]);
+  const [allocForm, setAllocForm] = useState({ destination: "", consultant_id: "" });
+  const [destinations, setDestinations] = useState([]);
 
   const load = async () => {
-    try { const { data } = await api.get("/users"); setUsers(data); }
+    try {
+      const { data } = await api.get("/users"); setUsers(data);
+      const a = await api.get("/allocations"); setAllocations(a.data);
+      const m = await api.get("/master?category=destination"); setDestinations(m.data.map(x => x.value));
+    }
     catch (e) { toast.error(formatApiError(e)); }
   };
   useEffect(() => { load(); }, []);
@@ -26,9 +33,25 @@ export default function Users() {
     try {
       await api.post("/users", f);
       toast.success("User created");
-      setF({ email: "", password: "", name: "", role: "sales", staff_code: "" });
+      setF({ email: "", password: "", name: "", role: "sales", staff_code: "", consultant_code: "" });
       load();
     } catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const setAllocation = async (e) => {
+    e.preventDefault();
+    if (!allocForm.destination || !allocForm.consultant_id) return;
+    try {
+      await api.post("/allocations", allocForm);
+      toast.success("Allocation saved");
+      setAllocForm({ destination: "", consultant_id: "" });
+      load();
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const removeAllocation = async (id) => {
+    try { await api.delete(`/allocations/${id}`); toast.success("Removed"); load(); }
+    catch (e) { toast.error(formatApiError(e)); }
   };
 
   const remove = async (uid) => {
@@ -76,6 +99,7 @@ export default function Users() {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Staff Code</TableHead>
+                <TableHead>Consultant Code</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -87,6 +111,7 @@ export default function Users() {
                   <TableCell>{u.email}</TableCell>
                   <TableCell><span className="label-caps px-2 py-1 rounded bg-secondary">{u.role}</span></TableCell>
                   <TableCell className="font-mono text-xs">{u.staff_code || "—"}</TableCell>
+                  <TableCell className="font-mono font-bold text-[#106EBE]">{u.consultant_code || "—"}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{(u.created_at || "").slice(0, 10)}</TableCell>
                   <TableCell className="text-right">
                     {u.id !== user.id && (

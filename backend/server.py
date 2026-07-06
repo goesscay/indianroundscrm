@@ -72,12 +72,14 @@ async def log_activity(user: dict, action: str, entity: str, entity_id: str = ""
     })
 
 
-async def generate_lead_id() -> str:
+async def generate_lead_id(consultant_code: str = "") -> str:
+    """IR + <2-letter consultant code> + MM + 3-digit running number (per consultant per month)."""
     now = datetime.now(timezone.utc)
     month = f"{now.month:02d}"
     year = now.year
-    prefix = f"IR{month}"
-    counter_key = f"lead_seq_{year}_{month}"
+    cc = (consultant_code or "XX").upper()[:2]
+    prefix = f"IR{cc}{month}"
+    counter_key = f"lead_seq_{cc}_{year}_{month}"
     result = await db.counters.find_one_and_update(
         {"_id": counter_key},
         {"$inc": {"seq": 1}},
@@ -100,14 +102,21 @@ class UserCreate(BaseModel):
     name: str
     role: str  # 'admin' | 'sales' | 'operations'
     staff_code: str = ""
+    consultant_code: str = ""  # 2-letter code used in lead IDs (KA, ME, SU)
 
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[str] = None
     staff_code: Optional[str] = None
+    consultant_code: Optional[str] = None
     active: Optional[bool] = None
     password: Optional[str] = None
+
+
+class DestinationAllocation(BaseModel):
+    destination: str
+    consultant_id: str
 
 
 class LeadCreate(BaseModel):
@@ -340,7 +349,9 @@ async def create_user(body: UserCreate, user=Depends(require_roles("admin"))):
         raise HTTPException(status_code=400, detail="Invalid role")
     doc = {
         "email": email, "password_hash": hash_password(body.password),
-        "name": body.name, "role": body.role, "staff_code": body.staff_code,
+        "name": body.name, "role": body.role,
+        "staff_code": body.staff_code,
+        "consultant_code": (body.consultant_code or "").upper()[:2],
         "active": True, "created_at": now_iso(),
     }
     r = await db.users.insert_one(doc)
@@ -352,6 +363,8 @@ async def create_user(body: UserCreate, user=Depends(require_roles("admin"))):
 @api.patch("/users/{uid}")
 async def update_user(uid: str, body: UserUpdate, user=Depends(require_roles("admin"))):
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if "consultant_code" in updates:
+        updates["consultant_code"] = updates["consultant_code"].upper()[:2]
     if "password" in updates:
         updates["password_hash"] = hash_password(updates.pop("password"))
     if not updates:
@@ -467,14 +480,25 @@ async def create_lead(body: LeadCreate, force: bool = False,
             "phone": body.phone, "original_lead_id": existing.get("lead_id"),
             "created_by": user["email"], "timestamp": now_iso(),
         })
-    lead_id = await generate_lead_id()
+
+    # Auto-allocate to destination consultant if mapping exists
+    owner = user
+    alloc = await db.allocations.find_one({"destination": body.destination})
+    if alloc:
+        consultant = await db.users.find_one({"_id": ObjectId(alloc["consultant_id"])})
+        if consultant:
+            consultant["id"] = str(consultant["_id"])
+            owner = consultant
+
+    consultant_code = (owner.get("consultant_code") or owner.get("staff_code") or "XX")[:2].upper()
+    lead_id = await generate_lead_id(consultant_code)
     doc = body.model_dump()
     doc.update({
         "lead_id": lead_id,
         "lead_date": doc.get("lead_date") or now_iso(),
-        "staff_id": user["id"],
-        "staff_name": user.get("name", ""),
-        "staff_code": user.get("staff_code", ""),
+        "staff_id": owner.get("id") or str(owner.get("_id")),
+        "staff_name": owner.get("name", ""),
+        "staff_code": owner.get("consultant_code") or owner.get("staff_code", ""),
         "lead_status": "New Lead",
         "mail_status": "Not Sent",
         "supplier_mail_date": None,
@@ -1122,6 +1146,48 @@ async def shutdown():
 @api.get("/")
 async def root():
     return {"service": "Indian Rounds CRM", "status": "ok"}
+
+
+# =================== Destination Allocations ===================
+@api.get("/allocations")
+async def list_allocations(user=Depends(get_current_user)):
+    docs = await db.allocations.find({}).sort("destination", 1).to_list(500)
+    result = []
+    for a in docs:
+        try:
+            c = await db.users.find_one({"_id": ObjectId(a["consultant_id"])})
+        except Exception:
+            c = None
+        result.append({
+            "id": str(a["_id"]),
+            "destination": a["destination"],
+            "consultant_id": a["consultant_id"],
+            "consultant_name": (c or {}).get("name", "—"),
+            "consultant_code": (c or {}).get("consultant_code") or (c or {}).get("staff_code", ""),
+        })
+    return result
+
+
+@api.post("/allocations")
+async def set_allocation(body: DestinationAllocation, user=Depends(require_roles("admin"))):
+    consultant = await db.users.find_one({"_id": oid(body.consultant_id)})
+    if not consultant:
+        raise HTTPException(status_code=404, detail="Consultant not found")
+    if consultant["role"] not in ("sales", "admin"):
+        raise HTTPException(status_code=400, detail="Assigned user must be a sales consultant or admin")
+    await db.allocations.update_one(
+        {"destination": body.destination},
+        {"$set": {"destination": body.destination, "consultant_id": body.consultant_id, "updated_at": now_iso()}},
+        upsert=True,
+    )
+    await log_activity(user, "set_allocation", "allocation", body.destination, None, {"consultant_id": body.consultant_id})
+    return {"success": True}
+
+
+@api.delete("/allocations/{aid}")
+async def delete_allocation(aid: str, user=Depends(require_roles("admin"))):
+    await db.allocations.delete_one({"_id": oid(aid)})
+    return {"success": True}
 
 
 app.include_router(api)
