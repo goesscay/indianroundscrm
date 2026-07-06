@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
+import SupplierTracker from "@/components/app/SupplierTracker";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { Mail, MessageCircle, Sparkles, ArrowLeft } from "lucide-react";

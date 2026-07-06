@@ -1,0 +1,22 @@
+{
+  "summary": "Retested LeadDetail page after SupplierTracker import fix. Page now loads cleanly for IR07004 with no runtime error overlay. Supplier Response Tracker card renders below other cards with 3 supplier rows (Andaman Blue, Emirates, GOA) — each showing sequence #, status pill, hours-since-email, and action buttons (bell/email/call/whatsapp/Update). Clicking Update opens the dialog with Status dropdown ('Email Sent'), Quote Received checkbox, hotel offered, flight/transfer included, activities, valid until, remarks, and Save/Cancel buttons. Top-bar actions (Back, Supplier Mail, WhatsApp, AI Itinerary, AI Quote) all present and clickable. Previous CRITICAL blocker is RESOLVED.",
+  "tested_scope": ["frontend"],
+  "passed": [
+    "Ops login (ops@indianrounds.com/ops123) → redirects to dashboard",
+    "/leads → IR07004 detail page loads (URL: /leads/IR07004) with NO crash overlay and NO 'SupplierTracker is not defined' error",
+    "Supplier Response Tracker card renders with 3 rows (#1 Andaman Blue, #2 Emirates, #3 GOA)",
+    "Each tracker row shows sequence #, supplier name, status pill, and Update button (3 Update buttons detected)",
+    "Update dialog opens for row #1 with Status dropdown, Quote Received checkbox, Hotel Offered, Flight/Transfer Included, Activities, Valid Until, Ops Remarks, Save Response + Cancel",
+    "Top-bar: Back, Supplier Mail, WhatsApp, AI Itinerary, AI Quote all rendered",
+    "Supplier mail history sidebar renders with RFQ entries and resend IDs",
+    "No page-level JS errors captured for LeadDetail"
+  ],
+  "failed": [],
+  "action_items": [
+    "None from this retest. Minor non-blocking console warnings observed (Recharts width/height -1 on some hidden containers, DialogContent missing aria-describedby) — cosmetic only.",
+    "Two 401 responses appeared in console (likely notification poller before auth ready) — not blocking. Optional cleanup."
+  ],
+  "success_rate": {"backend": "n/a (not retested)", "frontend": "100% for LeadDetail scope"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}
