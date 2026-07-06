@@ -125,7 +125,7 @@ export default function LeadForm() {
           <Textarea rows={4} value={f.special_requests} onChange={set("special_requests")} placeholder="Any preferences, allergies, celebrations…" data-testid="f-special" />
         </Card>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 pb-24">
           <Button type="button" variant="outline" onClick={() => setF({ customer_name: "", phone: "", email: "", travel_date: "", destination: "", hotel_category: "", meal_plan: "", package_type: "", budget: "", adults: 2, children: 0, child_ages: "", rooms: 1, room_type: "", departure_from: "", special_requests: "", lead_source: "" })} data-testid="reset-btn">Reset</Button>
           <Button type="submit" disabled={busy} className="px-8" style={{ background: "#106EBE" }} data-testid="submit-lead">
             {busy ? "Saving…" : "Create Lead →"}
