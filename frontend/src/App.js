@@ -16,6 +16,8 @@ import MasterData from "@/pages/MasterData";
 import ActivityLog from "@/pages/ActivityLog";
 import AIAssistant from "@/pages/AIAssistant";
 import CalendarView from "@/pages/CalendarView";
+import AuthCallback from "@/pages/AuthCallback";
+import { useLocation } from "react-router-dom";
 
 const Shell = ({ children }) => (
   <ProtectedRoute>
@@ -27,7 +29,22 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
+        <RouterInner />
+        <Toaster position="top-right" richColors />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+
+function RouterInner() {
+  const location = useLocation();
+  // CRITICAL: Handle session_id in URL fragment SYNCHRONOUSLY before ProtectedRoute runs
+  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+  if (location.hash && location.hash.includes("session_id=")) {
+    return <AuthCallback />;
+  }
+  return (
+    <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Shell><Dashboard /></Shell>} />
           <Route path="/leads" element={<Shell><LeadList /></Shell>} />
@@ -60,8 +77,5 @@ export default function App() {
           <Route path="/ai" element={<Shell><AIAssistant /></Shell>} />
           <Route path="/calendar" element={<Shell><CalendarView /></Shell>} />
         </Routes>
-        <Toaster position="top-right" richColors />
-      </BrowserRouter>
-    </AuthProvider>
   );
 }

@@ -230,6 +230,41 @@ class AIQuoteReq(BaseModel):
 
 
 # =================== Auth Routes ===================
+@api.post("/auth/google-callback")
+async def google_callback(request: Request, response: Response):
+    """Exchange Emergent Auth session_id for our own JWT. Only pre-registered users allowed."""
+    import httpx
+    body = await request.json()
+    session_id = body.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id required")
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+            headers={"X-Session-ID": session_id},
+        )
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="Google auth failed")
+    data = r.json()
+    email = (data.get("email") or "").lower()
+    if not email:
+        raise HTTPException(status_code=401, detail="No email from Google")
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=403, detail=f"Not authorized — {email} is not registered. Contact admin.")
+    if not user.get("active", True):
+        raise HTTPException(status_code=403, detail="Account disabled")
+    uid = str(user["_id"])
+    access = create_access_token(uid, email, user["role"])
+    refresh = create_refresh_token(uid)
+    set_auth_cookies(response, access, refresh)
+    return {
+        "id": uid, "email": email, "name": user.get("name") or data.get("name"),
+        "role": user["role"], "staff_code": user.get("staff_code", ""),
+        "access_token": access,
+    }
+
+
 @api.post("/auth/login")
 async def login(body: LoginBody, response: Response):
     email = body.email.lower()
