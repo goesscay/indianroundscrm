@@ -244,8 +244,7 @@ export default function LeadDetail() {
         </Card>
 
         <Card className="p-6 rounded-lg">
-          <h3 className="font-display text-xl font-bold mb-4">Supplier mail history</h3>
-          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}
+          <h3 className="font-display text-xl font-bold mb-4">Supplier mail history</h3>          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}
           <div className="space-y-3">
             {history.map((h) => (
               <div key={h.id} className="border-l-2 border-[#106EBE] pl-3 py-1">
@@ -270,6 +269,8 @@ export default function LeadDetail() {
           </div>
         </Card>
       </div>
+
+      <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} />
 
       {/* Mail Dialog */}
       <Dialog open={mailOpen} onOpenChange={setMailOpen}>

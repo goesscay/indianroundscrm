@@ -12,6 +12,22 @@ import { useNavigate, Link } from "react-router-dom";
 
 const INR = (n) => "₹" + (Number(n) || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
+function Metric({ label, value, tone }) {
+  const tones = {
+    primary: "bg-[#106EBE] text-white",
+    accent: "bg-[#0FFCBE] text-[#024a37]",
+    amber: "bg-amber-100 text-amber-900",
+    red: "bg-red-100 text-red-900",
+    orange: "bg-orange-100 text-orange-900",
+  };
+  return (
+    <div className={`p-3 rounded-md ${tones[tone] || "bg-secondary"}`}>
+      <div className="label-caps opacity-80">{label}</div>
+      <div className="font-display font-black text-2xl tracking-tight mt-1">{value}</div>
+    </div>
+  );
+}
+
 function Kpi({ label, value, icon: Icon, tone = "default", testId, dragHandlers }) {
   const tones = {
     default: "bg-card",
@@ -44,6 +60,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [supSummary, setSupSummary] = useState(null);
   const [err, setErr] = useState("");
   const nav = useNavigate();
   const storageKey = `ir_kpi_order_${user.id}`;
@@ -63,6 +80,9 @@ export default function Dashboard() {
         if (user.role === "admin") {
           const lb = await api.get("/dashboard/leaderboard");
           setLeaderboard(lb.data);
+        }
+        if (user.role === "admin" || user.role === "operations") {
+          try { const sup = await api.get("/lead-suppliers/dashboard/summary"); setSupSummary(sup.data); } catch { /* ignore */ }
         }
       } catch (e) { setErr(formatApiError(e)); }
     })();
@@ -126,6 +146,34 @@ export default function Dashboard() {
           }} />
         ))}
       </div>
+
+      {supSummary && (user.role === "admin" || user.role === "operations") && (
+        <Card className="p-6 rounded-lg" data-testid="supplier-summary">
+          <div className="label-caps">Supplier operations</div>
+          <h3 className="font-display text-xl font-bold mt-1 mb-4">Response tracker · live</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            <Metric label="Sent today" value={supSummary.sent_today} tone="primary" />
+            <Metric label="Awaiting" value={supSummary.awaiting_replies} tone="amber" />
+            <Metric label="Quotes today" value={supSummary.quotes_received_today} tone="accent" />
+            <Metric label="Overdue >24h" value={supSummary.overdue} tone="red" />
+            <Metric label="Need f/up" value={supSummary.need_followup} tone="orange" />
+            <Metric label="Avg reply" value={`${supSummary.avg_response_hours}h`} />
+            <Metric label="No-email supp." value={supSummary.suppliers_no_email} />
+          </div>
+          {supSummary.top_fastest?.length > 0 && (
+            <div className="mt-4">
+              <div className="label-caps mb-2">Fastest responders</div>
+              <div className="flex flex-wrap gap-2">
+                {supSummary.top_fastest.map((f, i) => (
+                  <span key={i} className="text-xs px-2.5 py-1 rounded-md bg-secondary font-medium">
+                    <span className="font-bold">{f.name}</span> · {f.avg_hours}h · {f.replies} replies
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-6 lg:col-span-2 rounded-lg" data-testid="chart-monthly">

@@ -210,6 +210,21 @@ class SupplierEmailSend(BaseModel):
     body: str
 
 
+class SupplierResponseUpdate(BaseModel):
+    status: Optional[str] = None  # Email Sent, Awaiting Reply, Quote Received, Quote Rejected, Supplier Declined, No Response, Follow-up Required, Booking Confirmed, Quote Accepted
+    reply_received: Optional[bool] = None
+    reply_date: Optional[str] = None
+    quote_received: Optional[bool] = None
+    quote_amount: Optional[float] = None
+    currency: Optional[str] = None
+    hotel_offered: Optional[str] = None
+    flight_included: Optional[bool] = None
+    transfer_included: Optional[bool] = None
+    activities_included: Optional[str] = None
+    valid_until: Optional[str] = None
+    remarks: Optional[str] = None
+
+
 class AIItineraryReq(BaseModel):
     destination: str
     days: int = 5
@@ -595,6 +610,37 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
     r = await db.mail_history.insert_one(mail_doc)
 
     supplier_names = ", ".join(s["name"] for s in suppliers)
+
+    # Upsert lead_suppliers tracker rows (assign sequence #)
+    existing_count = await db.lead_suppliers.count_documents({"lead_id": body.lead_id})
+    for i, s in enumerate(suppliers):
+        existing = await db.lead_suppliers.find_one({"lead_id": body.lead_id, "supplier_id": s["id"]})
+        if existing:
+            await db.lead_suppliers.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"status": "Email Sent", "last_email_at": now_iso(),
+                          "last_update": now_iso()},
+                 "$inc": {"emails_sent": 1}}
+            )
+        else:
+            existing_count += 1
+            await db.lead_suppliers.insert_one({
+                "lead_id": body.lead_id,
+                "supplier_id": s["id"],
+                "supplier_name": s["name"],
+                "supplier_email": s["email"],
+                "sequence": existing_count,
+                "status": "Email Sent",
+                "emails_sent": 1,
+                "first_email_at": now_iso(),
+                "last_email_at": now_iso(),
+                "reply_received": False,
+                "quote_received": False,
+                "followups": 0,
+                "last_update": now_iso(),
+                "created_at": now_iso(),
+            })
+
     await db.leads.update_one(
         {"lead_id": body.lead_id},
         {"$set": {
@@ -615,6 +661,137 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
 async def mail_history(lead_id: str, user=Depends(get_current_user)):
     docs = await db.mail_history.find({"lead_id": lead_id}).sort("sent_at", -1).to_list(200)
     return [clean_doc(d) for d in docs]
+
+
+# =================== Supplier Response Tracker ===================
+@api.get("/lead-suppliers/{lead_id}")
+async def get_lead_suppliers(lead_id: str, user=Depends(get_current_user)):
+    docs = await db.lead_suppliers.find({"lead_id": lead_id}).sort("sequence", 1).to_list(200)
+    now = datetime.now(timezone.utc)
+    results = []
+    for d in docs:
+        d = clean_doc(d)
+        # Compute hours since last email
+        le = d.get("last_email_at")
+        if le:
+            try:
+                lt = datetime.fromisoformat(le.replace("Z", "+00:00"))
+                d["hours_since_email"] = int((now - lt).total_seconds() // 3600)
+            except Exception:
+                d["hours_since_email"] = 0
+        else:
+            d["hours_since_email"] = 0
+        results.append(d)
+    return results
+
+
+@api.patch("/lead-suppliers/{tracker_id}")
+async def update_lead_supplier(tracker_id: str, body: SupplierResponseUpdate,
+                               user=Depends(require_roles("admin", "operations"))):
+    existing = await db.lead_suppliers.find_one({"_id": oid(tracker_id)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Tracker not found")
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    # If marking quote received, require quote_amount
+    if updates.get("quote_received") and updates.get("quote_amount") is None and not existing.get("quote_amount"):
+        raise HTTPException(status_code=400, detail="Quote Amount required when Quote Received = Yes")
+    if updates.get("status") == "Quote Received":
+        updates.setdefault("reply_received", True)
+        updates.setdefault("reply_date", now_iso())
+        updates.setdefault("quote_received", True)
+    updates["last_update"] = now_iso()
+    updates["updated_by"] = user["email"]
+    await db.lead_suppliers.update_one({"_id": oid(tracker_id)}, {"$set": updates})
+    await log_activity(user, "update_supplier_response", "lead_supplier", tracker_id, None, updates)
+    return clean_doc(await db.lead_suppliers.find_one({"_id": oid(tracker_id)}))
+
+
+@api.post("/lead-suppliers/{tracker_id}/followup")
+async def log_followup(tracker_id: str, user=Depends(require_roles("admin", "operations"))):
+    r = await db.lead_suppliers.update_one(
+        {"_id": oid(tracker_id)},
+        {"$set": {"last_followup_at": now_iso(), "status": "Follow-up Required", "last_update": now_iso()},
+         "$inc": {"followups": 1, "emails_sent": 1}}
+    )
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"success": True}
+
+
+@api.get("/lead-suppliers/dashboard/summary")
+async def supplier_dashboard(user=Depends(require_roles("admin", "operations"))):
+    now = datetime.now(timezone.utc)
+    today_str = now.strftime("%Y-%m-%d")
+    all_rows = await db.lead_suppliers.find({}).to_list(10000)
+
+    sent_today = sum(1 for r in all_rows if (r.get("last_email_at") or "").startswith(today_str))
+    awaiting = sum(1 for r in all_rows if r.get("status") in ("Email Sent", "Awaiting Reply", "Follow-up Required") and not r.get("reply_received"))
+    quotes_today = sum(1 for r in all_rows if r.get("quote_received") and (r.get("reply_date") or "").startswith(today_str))
+
+    overdue = 0
+    response_hours = []
+    for r in all_rows:
+        le = r.get("last_email_at")
+        if not le: continue
+        try:
+            lt = datetime.fromisoformat(le.replace("Z", "+00:00"))
+            hrs = (now - lt).total_seconds() / 3600
+            if hrs > 24 and not r.get("reply_received"):
+                overdue += 1
+            if r.get("reply_received") and r.get("reply_date"):
+                try:
+                    rt = datetime.fromisoformat(r["reply_date"].replace("Z", "+00:00"))
+                    fe = r.get("first_email_at") or le
+                    ft = datetime.fromisoformat(fe.replace("Z", "+00:00"))
+                    response_hours.append((rt - ft).total_seconds() / 3600)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    avg_response = round(sum(response_hours) / len(response_hours), 1) if response_hours else 0
+
+    # Top fastest suppliers
+    by_supplier = {}
+    for r in all_rows:
+        if not r.get("reply_received"): continue
+        sid = r.get("supplier_id")
+        by_supplier.setdefault(sid, {"name": r.get("supplier_name"), "hours": [], "replies": 0})
+        by_supplier[sid]["replies"] += 1
+        try:
+            fe = r.get("first_email_at"); rp = r.get("reply_date")
+            if fe and rp:
+                ft = datetime.fromisoformat(fe.replace("Z", "+00:00"))
+                rt = datetime.fromisoformat(rp.replace("Z", "+00:00"))
+                by_supplier[sid]["hours"].append((rt - ft).total_seconds() / 3600)
+        except Exception:
+            pass
+    fastest = []
+    for sid, d in by_supplier.items():
+        if d["hours"]:
+            fastest.append({"name": d["name"], "avg_hours": round(sum(d["hours"]) / len(d["hours"]), 1), "replies": d["replies"]})
+    fastest.sort(key=lambda x: x["avg_hours"])
+
+    # Suppliers without email
+    suppliers = await db.suppliers.find({}).to_list(1000)
+    no_email = sum(1 for s in suppliers if not (s.get("email") or "").strip())
+
+    # Need follow-up (sent > 24h, no reply, followups < 3)
+    need_followup = sum(1 for r in all_rows
+                        if not r.get("reply_received") and (r.get("followups") or 0) < 3
+                        and r.get("last_email_at")
+                        and (now - datetime.fromisoformat(r["last_email_at"].replace("Z", "+00:00"))).total_seconds() > 86400)
+
+    return {
+        "sent_today": sent_today,
+        "awaiting_replies": awaiting,
+        "quotes_received_today": quotes_today,
+        "overdue": overdue,
+        "avg_response_hours": avg_response,
+        "top_fastest": fastest[:5],
+        "suppliers_no_email": no_email,
+        "need_followup": need_followup,
+    }
 
 
 # =================== Master Data ===================
