@@ -1,9 +1,12 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, PlusCircle, Truck, Database,
-  Activity, LogOut, Sparkles, Mail, Calendar
+  Activity, LogOut, Sparkles, Mail, Calendar, Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +42,18 @@ export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const items = NAV[user.role] || [];
+  const [alerts, setAlerts] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchAlerts = async () => {
+      try { const { data } = await api.get("/notifications"); if (mounted) setAlerts(data); }
+      catch { /* ignore */ }
+    };
+    fetchAlerts();
+    const t = setInterval(fetchAlerts, 30000);
+    return () => { mounted = false; clearInterval(t); };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -77,9 +92,44 @@ export default function Layout({ children }) {
           ))}
         </nav>
         <div className="p-3 border-t border-border">
-          <div className="px-3 pb-2">
-            <div className="text-sm font-semibold truncate">{user.name || user.email}</div>
-            <div className="label-caps mt-0.5">{user.role}</div>
+          <div className="px-3 pb-2 flex items-center justify-between">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold truncate">{user.name || user.email}</div>
+              <div className="label-caps mt-0.5">{user.role}</div>
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="relative p-1.5 rounded-md hover:bg-secondary" data-testid="bell-btn">
+                  <Bell size={18} />
+                  {alerts.length > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                      {alerts.length}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 max-h-96 overflow-y-auto p-0" side="top" data-testid="bell-popover">
+                <div className="p-3 border-b border-border">
+                  <div className="font-display font-bold">Notifications</div>
+                  <div className="text-xs text-muted-foreground">Auto-refreshes every 30s</div>
+                </div>
+                {alerts.length === 0 && <div className="p-4 text-sm text-muted-foreground text-center">All caught up! 🎉</div>}
+                <div className="divide-y divide-border">
+                  {alerts.map((a, i) => (
+                    <button key={i} onClick={() => a.lead_id && nav(`/leads/${a.lead_id}`)}
+                            className="w-full text-left p-3 hover:bg-secondary/60 transition-colors" data-testid={`alert-${i}`}>
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">{a.icon}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold truncate">{a.title}</div>
+                          <div className="text-xs text-muted-foreground truncate">{a.detail}</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <Button
             variant="outline"

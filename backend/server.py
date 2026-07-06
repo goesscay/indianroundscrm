@@ -822,6 +822,100 @@ async def delete_master(mid: str, user=Depends(require_roles("admin"))):
 
 
 # =================== Dashboard ===================
+@api.get("/notifications")
+async def notifications(user=Depends(get_current_user)):
+    """Return live alerts for the current user's role."""
+    now = datetime.now(timezone.utc)
+    today = now.strftime("%Y-%m-%d")
+    alerts = []
+
+    if user["role"] in ("admin", "operations"):
+        # New replies received in last 24h
+        recent = await db.lead_suppliers.find({
+            "reply_received": True,
+            "reply_date": {"$gte": (now - __import__("datetime").timedelta(hours=24)).isoformat()}
+        }).sort("reply_date", -1).limit(10).to_list(10)
+        for r in recent:
+            alerts.append({
+                "kind": "reply_received",
+                "icon": "🔔",
+                "title": f"New reply from #{r.get('sequence')} {r.get('supplier_name')}",
+                "detail": f"Lead {r['lead_id']} · Quote {r.get('currency') or ''} {r.get('quote_amount') or ''}",
+                "lead_id": r["lead_id"],
+                "timestamp": r.get("reply_date"),
+            })
+
+        # Overdue > 24h with no reply
+        all_trackers = await db.lead_suppliers.find({"reply_received": False}).to_list(500)
+        for r in all_trackers:
+            le = r.get("last_email_at") or ""
+            try:
+                lt = datetime.fromisoformat(le.replace("Z", "+00:00"))
+                hrs = (now - lt).total_seconds() / 3600
+                if hrs > 24:
+                    alerts.append({
+                        "kind": "overdue",
+                        "icon": "🔴",
+                        "title": f"#{r.get('sequence')} {r.get('supplier_name')} overdue {int(hrs)}h",
+                        "detail": f"Lead {r['lead_id']} · {r.get('followups', 0)} follow-ups",
+                        "lead_id": r["lead_id"],
+                        "timestamp": le,
+                    })
+            except Exception:
+                pass
+
+    # Follow-ups due today (all roles, scoped)
+    q = _lead_filter_for_user(user)
+    q["follow_up_date"] = {"$regex": f"^{today}"}
+    fups = await db.leads.find(q).limit(20).to_list(20)
+    for l in fups:  # noqa: E741
+        alerts.append({
+            "kind": "followup_due",
+            "icon": "🟠",
+            "title": f"Follow-up today: {l.get('customer_name')}",
+            "detail": f"Lead {l.get('lead_id')} · {l.get('destination')}",
+            "lead_id": l.get("lead_id"),
+            "timestamp": l.get("follow_up_date"),
+        })
+
+    return sorted(alerts, key=lambda a: a.get("timestamp") or "", reverse=True)[:20]
+
+
+# =================== Resend Inbound Webhook (scaffold) ===================
+@api.post("/webhooks/resend")
+async def resend_webhook(request: Request):
+    """Resend event webhook. Configure at https://resend.com/webhooks pointing to /api/webhooks/resend.
+    Handles email.delivered, email.opened, email.bounced, and inbound events."""
+    payload = await request.json()
+    event = payload.get("type") or payload.get("event") or ""
+    data = payload.get("data") or {}
+    msg_id = data.get("email_id") or data.get("id") or ""
+
+    # Match by our stored message_id in mail_history
+    if msg_id:
+        mh = await db.mail_history.find_one({"message_id": msg_id})
+        if mh:
+            update = {"webhook_last_event": event, "webhook_last_at": now_iso()}
+            if event.endswith(".delivered"): update["delivery_status"] = "delivered"
+            elif event.endswith(".bounced"): update["delivery_status"] = "bounced"
+            elif event.endswith(".opened"): update["opened_at"] = now_iso()
+            await db.mail_history.update_one({"_id": mh["_id"]}, {"$set": update})
+
+    # Inbound reply → auto-flip supplier tracker to Awaiting Quote (Ops to fill quote details)
+    if event in ("email.received", "inbound.received"):
+        from_email = (data.get("from") or "").lower()
+        if from_email:
+            supp = await db.suppliers.find_one({"email": {"$regex": f"^{from_email}$", "$options": "i"}})
+            if supp:
+                await db.lead_suppliers.update_many(
+                    {"supplier_id": str(supp["_id"]), "reply_received": False},
+                    {"$set": {"reply_received": True, "reply_date": now_iso(),
+                              "status": "Awaiting Quote", "last_update": now_iso(),
+                              "inbound_snippet": (data.get("text") or "")[:500]}}
+                )
+    return {"ok": True}
+
+
 @api.get("/dashboard/stats")
 async def dashboard_stats(user=Depends(get_current_user)):
     base = _lead_filter_for_user(user)
