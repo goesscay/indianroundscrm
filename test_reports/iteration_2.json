@@ -1,0 +1,42 @@
+{
+  "summary": "Comprehensive regression test after multi-iteration feature additions. Backend endpoints all healthy (notifications, lead-suppliers, dashboard summary, webhooks/resend, auth). Frontend mostly working — Google button, bell notifications, draggable KPIs, Supplier Operations summary, Calendar, dynamic child ages, and duplicate detection all confirmed. CRITICAL: LeadDetail page crashes with a runtime error because SupplierTracker component is used but not imported — the entire Supplier Response Tracker feature is inaccessible from the UI.",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "POST /api/auth/login OK for admin/sales/ops",
+    "GET /api/auth/me returns admin user",
+    "GET /api/notifications returns 200 with reply_received alert for IR07004",
+    "GET /api/lead-suppliers/IR07004 returns tracker rows with sequence, status, hours_since_email",
+    "GET /api/lead-suppliers/dashboard/summary returns 200 with sent_today/awaiting/quotes_today/overdue/avg_response_hours/top_fastest/suppliers_no_email/need_followup",
+    "POST /api/webhooks/resend returns 200 {ok:true}",
+    "GET /api/users → 403 for sales (RBAC enforced)",
+    "Login page shows 'Continue with Google' button (data-testid=google-login visible)",
+    "Admin login → dashboard renders. 8 draggable KPI cards present, 'Reset layout' button visible, supplier-summary card renders with all metrics + Fastest Responders row",
+    "Bell button clickable, bell popover opens with 1 alert (reply_received for IR07004)",
+    "Calendar page renders month grid, cal-day-* cells present",
+    "New Lead form: children field triggers child-ages-section; f-child-age-0 and f-child-age-1 render when children=2",
+    "Duplicate detection: phone +91-9876543210 shows amber 'Possible duplicate — 1 existing lead(s) match' warning card listing IR07001 (Aarav Test/Bali). Submit remains allowed.",
+    "Ops user login → dashboard shows supplier-summary card"
+  ],
+  "failed": [
+    {
+      "area": "Frontend — Lead Detail page (CRITICAL BLOCKER)",
+      "issue": "LeadDetail.jsx line 273 uses <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} /> but the component is NEVER imported. Result: 'ReferenceError: SupplierTracker is not defined' — entire /leads/:id page crashes with the Uncaught Runtime Errors overlay. Supplier Response Tracker feature (sequence #, status pill, hours-since-email, follow-up counter, quote amount, Bell/Email/Call/WhatsApp/Update actions, Update dialog with Quote Received checkbox + amount validation) is COMPLETELY UNREACHABLE from the UI.",
+      "evidence": "Console: ReferenceError: SupplierTracker is not defined at LeadDetail (bundle.js:9461:91). Screenshot shows red 'Uncaught runtime errors' overlay. grep confirms LeadDetail.jsx imports list (lines 1–15) contains no reference to SupplierTracker.",
+      "priority": "HIGH"
+    },
+    {
+      "area": "Backend RBAC — /api/suppliers",
+      "issue": "Sales user can call GET /api/suppliers and receive 200. Task states sales must NOT access /suppliers. Frontend sidebar hides it, but the API endpoint itself is not restricted for sales role.",
+      "evidence": "curl with sales JWT → HTTP 200 on /api/suppliers.",
+      "priority": "MEDIUM"
+    }
+  ],
+  "action_items": [
+    "HIGH: Add `import SupplierTracker from '@/components/app/SupplierTracker';` to /app/frontend/src/pages/LeadDetail.jsx (top of file). Verify LeadDetail renders the tracker card at the bottom of the page and Update dialog works with Quote Received checkbox + amount validation.",
+    "MEDIUM: Add role guard on GET /api/suppliers to restrict sales role (or clarify intent — spec says sales cannot access it).",
+    "RETEST: Once import is added, retest the full Supplier Response Tracker flow — sequence, status pill color coding, Update dialog with amount validation, and verify status flips to 'Quote Received' (emerald)."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "~70% (LeadDetail blocked)"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}
