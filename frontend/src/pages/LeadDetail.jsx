@@ -13,7 +13,7 @@ import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
 import SupplierTracker from "@/components/app/SupplierTracker";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Mail, MessageCircle, Sparkles, ArrowLeft } from "lucide-react";
+import { Mail, MessageCircle, Sparkles, ArrowLeft, Phone, Copy, MessageSquare } from "lucide-react";
 
 const INR = (n) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
 
@@ -102,7 +102,14 @@ export default function LeadDetail() {
 
   if (!lead) return <div className="text-muted-foreground">Loading…</div>;
 
-  const whatsappLink = `https://wa.me/${(lead.phone || "").replace(/\D/g, "")}`;
+  const cleanPhone = (lead.phone || "").replace(/\D/g, "");
+  const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+  const whatsappLink = `https://wa.me/${waPhone}`;
+
+  const copy = (val, label) => {
+    if (!val) return;
+    navigator.clipboard.writeText(val).then(() => toast.success(`${label} copied`));
+  };
 
   return (
     <div className="space-y-6" data-testid="lead-detail-page">
@@ -139,6 +146,33 @@ export default function LeadDetail() {
           </Button>
         </div>
       </div>
+
+      <Card className="p-4 rounded-lg border-l-4 border-l-[#106EBE]" data-testid="contact-panel">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="font-display font-bold text-lg">{lead.customer_name}</div>
+              <button onClick={() => copy(lead.phone, "Mobile")} className="text-sm font-mono text-muted-foreground hover:text-foreground flex items-center gap-1" data-testid="copy-phone">
+                {lead.phone} <Copy size={11} />
+              </button>
+              {lead.email && (
+                <button onClick={() => copy(lead.email, "Email")} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1" data-testid="copy-email">
+                  {lead.email} <Copy size={10} />
+                </button>
+              )}
+            </div>
+            <div className="label-caps mt-1">
+              {lead.destination} · {lead.staff_name || "—"} · <StatusPill status={lead.lead_status} />
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <a href={`tel:+91${cleanPhone.slice(-10)}`}><Button size="sm" variant="outline" title="Call" data-testid="qa-call"><Phone size={14} /> Call</Button></a>
+            <a href={whatsappLink} target="_blank" rel="noreferrer"><Button size="sm" style={{ background: "#25D366", color: "white" }} title="WhatsApp" data-testid="qa-whatsapp"><MessageCircle size={14} /> WhatsApp</Button></a>
+            <a href={`sms:+91${cleanPhone.slice(-10)}`}><Button size="sm" variant="outline" title="SMS" data-testid="qa-sms"><MessageSquare size={14} /> SMS</Button></a>
+            {lead.email && <a href={`mailto:${lead.email}?subject=Indian Rounds - ${lead.lead_id}`}><Button size="sm" variant="outline" title="Email" data-testid="qa-email"><Mail size={14} /> Email</Button></a>}
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-6 rounded-lg lg:col-span-2">

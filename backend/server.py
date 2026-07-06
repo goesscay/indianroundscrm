@@ -130,6 +130,19 @@ class LeadCreate(BaseModel):
     special_requests: str = ""
     lead_source: str = ""
 
+    @field_validator("phone")
+    @classmethod
+    def _phone_10_digit(cls, v):
+        digits = "".join(c for c in (v or "") if c.isdigit())
+        # Strip leading 91 country code if 12 digits
+        if len(digits) == 12 and digits.startswith("91"): digits = digits[2:]
+        if len(digits) == 11 and digits.startswith("0"): digits = digits[1:]
+        if len(digits) != 10:
+            raise ValueError("Please enter a valid 10-digit mobile number.")
+        if not digits[0] in "6789":
+            raise ValueError("Invalid Indian mobile number (must start with 6/7/8/9).")
+        return digits
+
     @field_validator("children")
     @classmethod
     def _children_range(cls, v):
@@ -433,7 +446,27 @@ def _calc_derived(lead: dict) -> dict:
 
 
 @api.post("/leads")
-async def create_lead(body: LeadCreate, user=Depends(require_roles("sales", "admin", "operations"))):
+async def create_lead(body: LeadCreate, force: bool = False,
+                     user=Depends(require_roles("sales", "admin", "operations"))):
+    # Duplicate block — only admin can override with ?force=true
+    existing = await db.leads.find_one({"phone": body.phone})
+    if existing and not (force and user["role"] == "admin"):
+        raise HTTPException(status_code=409, detail={
+            "message": "Lead already exists for this mobile number.",
+            "existing": {
+                "lead_id": existing.get("lead_id"),
+                "customer_name": existing.get("customer_name"),
+                "staff_name": existing.get("staff_name"),
+                "destination": existing.get("destination"),
+                "lead_status": existing.get("lead_status"),
+                "follow_up_date": existing.get("follow_up_date"),
+            },
+        })
+    if existing and force and user["role"] == "admin":
+        await db.duplicate_log.insert_one({
+            "phone": body.phone, "original_lead_id": existing.get("lead_id"),
+            "created_by": user["email"], "timestamp": now_iso(),
+        })
     lead_id = await generate_lead_id()
     doc = body.model_dump()
     doc.update({

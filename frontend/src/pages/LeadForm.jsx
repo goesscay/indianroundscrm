@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const F = ({ label, required, children, testId }) => (
   <div>
@@ -37,12 +39,23 @@ const EMPTY = {
 
 export default function LeadForm() {
   const nav = useNavigate();
+  const { user } = useAuth();
   const [master, setMaster] = useState({});
   const [f, setF] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [ageErrors, setAgeErrors] = useState({});
   const [duplicates, setDuplicates] = useState([]);
   const [dupBusy, setDupBusy] = useState(false);
+  const [phoneErr, setPhoneErr] = useState("");
+  const [blockDialog, setBlockDialog] = useState(null); // { message, existing }
+
+  const cleanPhone = (raw) => (raw || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "");
+  const validPhone = (raw) => {
+    const d = cleanPhone(raw);
+    if (d.length !== 10) return "Please enter a valid 10-digit mobile number.";
+    if (!/^[6-9]/.test(d)) return "Indian mobile must start with 6, 7, 8 or 9.";
+    return "";
+  };
 
   useEffect(() => {
     (async () => {
@@ -109,10 +122,12 @@ export default function LeadForm() {
     return ok;
   };
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!f.customer_name || !f.phone || !f.destination) {
-      toast.error("Customer name, phone and destination are required");
+  const submit = async (e, force = false) => {
+    if (e) e.preventDefault();
+    const pErr = validPhone(f.phone);
+    if (pErr) { setPhoneErr(pErr); toast.error(pErr); return; }
+    if (!f.customer_name || !f.destination) {
+      toast.error("Customer name and destination are required");
       return;
     }
     if (f.children > 0 && !validateAllAges()) {
@@ -123,16 +138,25 @@ export default function LeadForm() {
     try {
       const payload = {
         ...f,
+        phone: cleanPhone(f.phone),
         adults: Number(f.adults),
         children: Number(f.children),
         rooms: Number(f.rooms),
         child_ages: f.child_ages_arr.join(", "),
       };
       delete payload.child_ages_arr;
-      const { data } = await api.post("/leads", payload);
+      const url = force ? "/leads?force=true" : "/leads";
+      const { data } = await api.post(url, payload);
       toast.success(`Lead ${data.lead_id} created`);
       nav(`/leads/${data.lead_id}`);
-    } catch (err) { toast.error(formatApiError(err)); }
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 409 && detail?.existing) {
+        setBlockDialog(detail);
+      } else {
+        toast.error(formatApiError(err));
+      }
+    }
     finally { setBusy(false); }
   };
 
@@ -164,7 +188,18 @@ export default function LeadForm() {
           <h3 className="font-display text-xl font-bold mb-4">Customer</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <F label="Customer Name" required><Input value={f.customer_name} onChange={set("customer_name")} data-testid="f-customer-name" /></F>
-            <F label="Phone" required><Input value={f.phone} onChange={set("phone")} data-testid="f-phone" /></F>
+            <F label="Mobile Number" required>
+              <Input
+                value={f.phone}
+                onChange={(e) => { const v = e.target.value; setF(p => ({ ...p, phone: v })); setPhoneErr(validPhone(v)); }}
+                placeholder="10-digit Indian mobile"
+                inputMode="numeric"
+                maxLength={13}
+                className={phoneErr ? "border-destructive" : ""}
+                data-testid="f-phone"
+              />
+              {phoneErr && <div className="text-xs text-destructive mt-1" data-testid="f-phone-err">{phoneErr}</div>}
+            </F>
             <F label="Email"><Input type="email" value={f.email} onChange={set("email")} data-testid="f-email" /></F>
             <F label="Lead Source"><SelectMaster options={master.lead_source} value={f.lead_source} onChange={set("lead_source")} placeholder="Website / Instagram…" testId="f-lead-source" /></F>
             <F label="Departure From"><SelectMaster options={master.departure_city} value={f.departure_from} onChange={set("departure_from")} placeholder="City" testId="f-departure" /></F>
@@ -247,11 +282,40 @@ export default function LeadForm() {
 
         <div className="flex justify-end gap-3 pb-24">
           <Button type="button" variant="outline" onClick={() => { setF(EMPTY); setAgeErrors({}); }} data-testid="reset-btn">Reset</Button>
-          <Button type="submit" disabled={busy} className="px-8" style={{ background: "#106EBE" }} data-testid="submit-lead">
+          <Button type="submit" disabled={busy || !!validPhone(f.phone)} className="px-8" style={{ background: "#106EBE" }} data-testid="submit-lead">
             {busy ? "Saving…" : "Create Lead →"}
           </Button>
         </div>
       </form>
+
+      <Dialog open={!!blockDialog} onOpenChange={(o) => !o && setBlockDialog(null)}>
+        <DialogContent data-testid="dup-block-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle size={18} /> Lead already exists
+            </DialogTitle>
+          </DialogHeader>
+          {blockDialog?.existing && (
+            <div className="text-sm space-y-1.5 border border-border rounded-md p-4 bg-secondary/40">
+              <div><span className="label-caps">Lead ID:</span> <span className="font-mono font-bold">{blockDialog.existing.lead_id}</span></div>
+              <div><span className="label-caps">Customer:</span> {blockDialog.existing.customer_name}</div>
+              <div><span className="label-caps">Sales Consultant:</span> {blockDialog.existing.staff_name}</div>
+              <div><span className="label-caps">Destination:</span> {blockDialog.existing.destination}</div>
+              <div><span className="label-caps">Status:</span> {blockDialog.existing.lead_status}</div>
+              <div><span className="label-caps">Last Follow-up:</span> {(blockDialog.existing.follow_up_date || "—").slice(0,10)}</div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBlockDialog(null)}>Cancel</Button>
+            <Button onClick={() => { const lid = blockDialog?.existing?.lead_id; setBlockDialog(null); if (lid) nav(`/leads/${lid}`); }} data-testid="open-existing-lead">Open Existing</Button>
+            {user.role === "admin" && (
+              <Button style={{ background: "#106EBE" }} onClick={() => { setBlockDialog(null); submit(null, true); }} data-testid="force-create-lead">
+                Create anyway (Admin)
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
