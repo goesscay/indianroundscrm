@@ -125,11 +125,13 @@ export default function LeadList() {
                       {tenDigit.length === 10 && (
                         <>
                           <a href={`tel:+91${tenDigit}`} title="Call"
+                             onClick={(e) => { e.stopPropagation(); logContact(l.lead_id, "call", l.phone); }}
                              className="p-1 rounded hover:bg-[#106EBE]/10 text-[#106EBE]"
                              data-testid={`row-call-${l.lead_id}`}>
                             <Phone size={13} />
                           </a>
                           <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" title="WhatsApp"
+                             onClick={(e) => { e.stopPropagation(); logContact(l.lead_id, "whatsapp", l.phone); }}
                              className="p-1 rounded hover:bg-emerald-100 text-emerald-600"
                              data-testid={`row-wa-${l.lead_id}`}>
                             <MessageCircle size={13} />

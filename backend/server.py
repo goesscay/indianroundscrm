@@ -1058,6 +1058,67 @@ async def upcoming_followups(user=Depends(get_current_user), hours: int = 72):
     return sorted(result, key=lambda x: x["seconds_left"])
 
 
+# =================== Contact Events (activity timeline) ===================
+class ContactEvent(BaseModel):
+    kind: str  # call, whatsapp, sms, email, itinerary_shared, payment_link_sent
+    channel: str = ""  # customer, supplier
+    target: str = ""   # phone or email
+    note: str = ""
+
+
+@api.post("/leads/{lead_id}/contact-events")
+async def log_contact(lead_id: str, body: ContactEvent, user=Depends(get_current_user)):
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead: raise HTTPException(status_code=404, detail="Lead not found")
+    if user["role"] == "sales" and lead.get("staff_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    doc = {
+        "lead_id": lead_id, "kind": body.kind, "channel": body.channel or "customer",
+        "target": body.target, "note": body.note,
+        "user_id": user["id"], "user_name": user.get("name") or user["email"],
+        "timestamp": now_iso(),
+    }
+    r = await db.contact_events.insert_one(doc)
+    doc["_id"] = r.inserted_id
+    return clean_doc(doc)
+
+
+@api.get("/leads/{lead_id}/contact-events")
+async def list_contacts(lead_id: str, user=Depends(get_current_user)):
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead: raise HTTPException(status_code=404, detail="Lead not found")
+    if user["role"] == "sales" and lead.get("staff_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    docs = await db.contact_events.find({"lead_id": lead_id}).sort("timestamp", -1).limit(500).to_list(500)
+    return [clean_doc(d) for d in docs]
+
+
+# =================== Reassign Lead ===================
+class ReassignBody(BaseModel):
+    consultant_id: str
+    reason: str = ""
+
+
+@api.post("/leads/{lead_id}/reassign")
+async def reassign_lead(lead_id: str, body: ReassignBody, user=Depends(require_roles("admin", "operations"))):
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead: raise HTTPException(status_code=404, detail="Lead not found")
+    consultant = await db.users.find_one({"_id": oid(body.consultant_id)})
+    if not consultant: raise HTTPException(status_code=404, detail="Consultant not found")
+    if consultant["role"] not in ("sales", "admin"):
+        raise HTTPException(status_code=400, detail="Assigned user must be a sales consultant or admin")
+    prev = {"staff_id": lead.get("staff_id"), "staff_name": lead.get("staff_name"), "staff_code": lead.get("staff_code")}
+    new = {
+        "staff_id": str(consultant["_id"]),
+        "staff_name": consultant.get("name", ""),
+        "staff_code": consultant.get("consultant_code") or consultant.get("staff_code", ""),
+        "updated_at": now_iso(), "updated_by": user["email"],
+    }
+    await db.leads.update_one({"lead_id": lead_id}, {"$set": new})
+    await log_activity(user, "reassign_lead", "lead", lead_id, prev, {**new, "reason": body.reason})
+    return await db.leads.find_one({"lead_id": lead_id}, {"_id": 0})
+
+
 @api.get("/dashboard/stats")
 async def dashboard_stats(user=Depends(get_current_user)):
     base = _lead_filter_for_user(user)

@@ -13,9 +13,10 @@ import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
 import SupplierTracker from "@/components/app/SupplierTracker";
 import LeadNotes from "@/components/app/LeadNotes";
 import FollowupCountdown from "@/components/app/FollowupCountdown";
+import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Mail, MessageCircle, Sparkles, ArrowLeft, Phone, Copy, MessageSquare } from "lucide-react";
+import { Mail, MessageCircle, Sparkles, ArrowLeft, Phone, Copy, MessageSquare, UserCog } from "lucide-react";
 
 const INR = (n) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
 
@@ -32,6 +33,11 @@ export default function LeadDetail() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [mailPreviewHtml, setMailPreviewHtml] = useState("");
+  const [timelineKey, setTimelineKey] = useState(0);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [consultants, setConsultants] = useState([]);
+  const [assignTo, setAssignTo] = useState("");
+  const [reassignReason, setReassignReason] = useState("");
   const [aiOpen, setAiOpen] = useState(false);
   const [aiContent, setAiContent] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
@@ -121,6 +127,31 @@ export default function LeadDetail() {
 
   if (!lead) return <div className="text-muted-foreground">Loading…</div>;
 
+  const canReassign = user.role === "admin" || user.role === "operations";
+
+  const openReassign = async () => {
+    try {
+      const { data } = await api.get("/users");
+      setConsultants(data.filter(u => u.role === "sales" || u.role === "admin"));
+    } catch { /* ignore */ }
+    setAssignTo(""); setReassignReason("");
+    setReassignOpen(true);
+  };
+
+  const doReassign = async () => {
+    if (!assignTo) { toast.error("Choose a consultant"); return; }
+    try {
+      await api.post(`/leads/${lead.lead_id}/reassign`, { consultant_id: assignTo, reason: reassignReason });
+      toast.success("Lead reassigned");
+      setReassignOpen(false);
+      load();
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const track = (kind, target) => {
+    logContact(lead.lead_id, kind, target).then(() => setTimelineKey(k => k + 1));
+  };
+
   const cleanPhone = (lead.phone || "").replace(/\D/g, "");
   const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
   const whatsappLink = `https://wa.me/${waPhone}`;
@@ -185,10 +216,11 @@ export default function LeadDetail() {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <a href={`tel:+91${cleanPhone.slice(-10)}`}><Button size="sm" variant="outline" title="Call" data-testid="qa-call"><Phone size={14} /> Call</Button></a>
-            <a href={whatsappLink} target="_blank" rel="noreferrer"><Button size="sm" style={{ background: "#25D366", color: "white" }} title="WhatsApp" data-testid="qa-whatsapp"><MessageCircle size={14} /> WhatsApp</Button></a>
-            <a href={`sms:+91${cleanPhone.slice(-10)}`}><Button size="sm" variant="outline" title="SMS" data-testid="qa-sms"><MessageSquare size={14} /> SMS</Button></a>
-            {lead.email && <a href={`mailto:${lead.email}?subject=Indian Rounds - ${lead.lead_id}`}><Button size="sm" variant="outline" title="Email" data-testid="qa-email"><Mail size={14} /> Email</Button></a>}
+            <a href={`tel:+91${cleanPhone.slice(-10)}`} onClick={() => track("call", lead.phone)}><Button size="sm" variant="outline" title="Call" data-testid="qa-call"><Phone size={14} /> Call</Button></a>
+            <a href={whatsappLink} target="_blank" rel="noreferrer" onClick={() => track("whatsapp", lead.phone)}><Button size="sm" style={{ background: "#25D366", color: "white" }} title="WhatsApp" data-testid="qa-whatsapp"><MessageCircle size={14} /> WhatsApp</Button></a>
+            <a href={`sms:+91${cleanPhone.slice(-10)}`} onClick={() => track("sms", lead.phone)}><Button size="sm" variant="outline" title="SMS" data-testid="qa-sms"><MessageSquare size={14} /> SMS</Button></a>
+            {lead.email && <a href={`mailto:${lead.email}?subject=Indian Rounds - ${lead.lead_id}`} onClick={() => track("email", lead.email)}><Button size="sm" variant="outline" title="Email" data-testid="qa-email"><Mail size={14} /> Email</Button></a>}
+            {canReassign && <Button size="sm" variant="outline" onClick={openReassign} title="Reassign" data-testid="qa-reassign"><UserCog size={14} /> Reassign</Button>}
           </div>
         </div>
       </Card>
@@ -328,6 +360,40 @@ export default function LeadDetail() {
       <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} />
 
       <LeadNotes leadId={lead.lead_id} />
+
+      <ContactTimeline leadId={lead.lead_id} refreshKey={timelineKey} />
+
+      {/* Reassign Dialog */}
+      <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
+        <DialogContent data-testid="reassign-dialog">
+          <DialogHeader><DialogTitle>Reassign {lead.lead_id}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              Currently owned by <b>{lead.staff_name || "—"}</b> ({lead.staff_code || "—"}).
+            </div>
+            <div>
+              <Label className="label-caps">Assign to</Label>
+              <Select value={assignTo || undefined} onValueChange={setAssignTo}>
+                <SelectTrigger className="mt-1.5" data-testid="reassign-select"><SelectValue placeholder="Choose consultant" /></SelectTrigger>
+                <SelectContent>
+                  {consultants.map(c =>
+                    <SelectItem key={c.id} value={c.id}>{c.name} · {c.consultant_code || "??"}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="label-caps">Reason (optional)</Label>
+              <Input className="mt-1.5" value={reassignReason} onChange={(e) => setReassignReason(e.target.value)}
+                     placeholder="e.g. Karuva on leave, escalation..." data-testid="reassign-reason" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReassignOpen(false)}>Cancel</Button>
+            <Button onClick={doReassign} style={{ background: "#106EBE" }} data-testid="reassign-save">Reassign</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Mail Dialog */}
       <Dialog open={mailOpen} onOpenChange={setMailOpen}>
