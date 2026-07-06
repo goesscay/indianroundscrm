@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
-import { Search, Download } from "lucide-react";
+import { Search, Download, Phone, MessageCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const INR = (n) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
@@ -109,13 +109,35 @@ export default function LeadList() {
               {!loading && leads.length === 0 && (
                 <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-12">No leads yet. Create one to get started.</TableCell></TableRow>
               )}
-              {leads.map((l) => (
+              {leads.map((l) => {
+                const digits = (l.phone || "").replace(/\D/g, "");
+                const tenDigit = digits.slice(-10);
+                const waPhone = tenDigit.length === 10 ? `91${tenDigit}` : digits;
+                return (
                 <TableRow key={l.lead_id} className="cursor-pointer hover:bg-secondary/50"
                           onClick={() => nav(`/leads/${l.lead_id}`)}
                           data-testid={`lead-row-${l.lead_id}`}>
                   <TableCell className="font-mono font-semibold">{l.lead_id}</TableCell>
                   <TableCell className="font-medium">{l.customer_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{l.phone}</TableCell>
+                  <TableCell className="text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs">{l.phone}</span>
+                      {tenDigit.length === 10 && (
+                        <>
+                          <a href={`tel:+91${tenDigit}`} title="Call"
+                             className="p-1 rounded hover:bg-[#106EBE]/10 text-[#106EBE]"
+                             data-testid={`row-call-${l.lead_id}`}>
+                            <Phone size={13} />
+                          </a>
+                          <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" title="WhatsApp"
+                             className="p-1 rounded hover:bg-emerald-100 text-emerald-600"
+                             data-testid={`row-wa-${l.lead_id}`}>
+                            <MessageCircle size={13} />
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{l.destination}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">{(l.travel_date || "").slice(0, 10)}</TableCell>
                   <TableCell><StatusPill status={l.lead_status} /></TableCell>
@@ -125,7 +147,8 @@ export default function LeadList() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{l.staff_name}</TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>
