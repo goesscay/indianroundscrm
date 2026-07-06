@@ -1,89 +1,702 @@
-from fastapi import FastAPI, APIRouter
+"""Indian Rounds Travel CRM - Main FastAPI application."""
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+from pathlib import Path
+load_dotenv(Path(__file__).parent / '.env')
+
 import os
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
 from datetime import datetime, timezone
+from typing import Optional, List
+from bson import ObjectId
 
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Query
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, EmailStr, Field
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+from auth import (
+    hash_password, verify_password, create_access_token, create_refresh_token,
+    set_auth_cookies, clear_auth_cookies, get_current_user, require_roles, seed_admin
+)
+from ai_service import generate_itinerary, recommend_quote
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ir-crm")
 
-# Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(title="Indian Rounds CRM")
+mongo_client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+db = mongo_client[os.environ["DB_NAME"]]
+app.state.db = db
 
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
-
-
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
-
-# Include the router in the main app
-app.include_router(api_router)
-
+frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=[frontend_url, "http://localhost:3000"],
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+api = APIRouter(prefix="/api")
+
+
+# =================== Helpers ===================
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def oid(id_str: str) -> ObjectId:
+    try:
+        return ObjectId(id_str)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+
+def clean_doc(doc: dict) -> dict:
+    if not doc:
+        return doc
+    doc["id"] = str(doc["_id"])
+    del doc["_id"]
+    doc.pop("password_hash", None)
+    return doc
+
+
+async def log_activity(user: dict, action: str, entity: str, entity_id: str = "",
+                       old_value: Optional[dict] = None, new_value: Optional[dict] = None):
+    await db.activity_log.insert_one({
+        "user_id": user["id"], "user_email": user["email"], "user_name": user.get("name"),
+        "action": action, "entity": entity, "entity_id": entity_id,
+        "old_value": old_value, "new_value": new_value,
+        "timestamp": now_iso(),
+    })
+
+
+async def generate_lead_id() -> str:
+    now = datetime.now(timezone.utc)
+    month = f"{now.month:02d}"
+    year = now.year
+    prefix = f"IR{month}"
+    counter_key = f"lead_seq_{year}_{month}"
+    result = await db.counters.find_one_and_update(
+        {"_id": counter_key},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True,
+    )
+    seq = result["seq"] if result else 1
+    return f"{prefix}{seq:03d}"
+
+
+# =================== Models ===================
+class LoginBody(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: str  # 'admin' | 'sales' | 'operations'
+    staff_code: str = ""
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    staff_code: Optional[str] = None
+    active: Optional[bool] = None
+    password: Optional[str] = None
+
+
+class LeadCreate(BaseModel):
+    customer_name: str
+    phone: str
+    email: str = ""
+    lead_date: str = ""  # ISO date
+    travel_date: str = ""
+    destination: str
+    hotel_category: str = ""
+    meal_plan: str = ""
+    package_type: str = ""
+    budget: str = ""
+    adults: int = 1
+    children: int = 0
+    child_ages: str = ""
+    rooms: int = 1
+    room_type: str = ""
+    departure_from: str = ""
+    special_requests: str = ""
+    lead_source: str = ""
+
+
+class LeadUpdate(BaseModel):
+    customer_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    travel_date: Optional[str] = None
+    destination: Optional[str] = None
+    hotel_category: Optional[str] = None
+    meal_plan: Optional[str] = None
+    package_type: Optional[str] = None
+    budget: Optional[str] = None
+    adults: Optional[int] = None
+    children: Optional[int] = None
+    child_ages: Optional[str] = None
+    rooms: Optional[int] = None
+    room_type: Optional[str] = None
+    departure_from: Optional[str] = None
+    special_requests: Optional[str] = None
+    lead_status: Optional[str] = None
+    remarks: Optional[str] = None
+    supplier_quote_amount: Optional[float] = None
+    selling_amount: Optional[float] = None
+    quote_received: Optional[bool] = None
+    quote_received_date: Optional[str] = None
+    quote_sent_to_customer: Optional[bool] = None
+    quote_sent_date: Optional[str] = None
+    booking_status: Optional[str] = None
+    booking_amount_received: Optional[float] = None
+    follow_up_date: Optional[str] = None
+    payment_status: Optional[str] = None
+
+
+class SupplierCreate(BaseModel):
+    name: str
+    email: EmailStr
+    phone: str = ""
+    destination: str = ""
+    country: str = ""
+
+
+class MasterItem(BaseModel):
+    category: str  # e.g. 'destination','hotel_category','meal_plan','package_type','room_type','departure_city','payment_mode','lead_source'
+    value: str
+
+
+class SupplierEmailSend(BaseModel):
+    lead_id: str
+    supplier_ids: List[str]
+    cc: List[str] = []
+    bcc: List[str] = []
+    subject: str
+    body: str
+
+
+class AIItineraryReq(BaseModel):
+    destination: str
+    days: int = 5
+    budget: str = ""
+    package_type: str = "Family"
+    adults: int = 2
+    children: int = 0
+    hotel_category: str = "4 Star"
+    meal_plan: str = "AP"
+
+
+class AIQuoteReq(BaseModel):
+    destination: str
+    budget: str = ""
+    hotel_category: str = "4 Star"
+    adults: int = 2
+    children: int = 0
+    days: int = 5
+
+
+# =================== Auth Routes ===================
+@api.post("/auth/login")
+async def login(body: LoginBody, response: Response):
+    email = body.email.lower()
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.get("active", True):
+        raise HTTPException(status_code=403, detail="Account disabled")
+    uid = str(user["_id"])
+    access = create_access_token(uid, email, user["role"])
+    refresh = create_refresh_token(uid)
+    set_auth_cookies(response, access, refresh)
+    return {
+        "id": uid, "email": email, "name": user.get("name"),
+        "role": user["role"], "staff_code": user.get("staff_code", ""),
+        "access_token": access,
+    }
+
+
+@api.post("/auth/logout")
+async def logout(response: Response, user=Depends(get_current_user)):
+    clear_auth_cookies(response)
+    return {"success": True}
+
+
+@api.get("/auth/me")
+async def me(user=Depends(get_current_user)):
+    return user
+
+
+# =================== Users (Admin) ===================
+@api.get("/users")
+async def list_users(user=Depends(require_roles("admin"))):
+    users = await db.users.find({}).to_list(1000)
+    return [clean_doc(u) for u in users]
+
+
+@api.post("/users")
+async def create_user(body: UserCreate, user=Depends(require_roles("admin"))):
+    email = body.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email already exists")
+    if body.role not in ("admin", "sales", "operations"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+    doc = {
+        "email": email, "password_hash": hash_password(body.password),
+        "name": body.name, "role": body.role, "staff_code": body.staff_code,
+        "active": True, "created_at": now_iso(),
+    }
+    r = await db.users.insert_one(doc)
+    await log_activity(user, "create_user", "user", str(r.inserted_id), None, {"email": email, "role": body.role})
+    doc["_id"] = r.inserted_id
+    return clean_doc(doc)
+
+
+@api.patch("/users/{uid}")
+async def update_user(uid: str, body: UserUpdate, user=Depends(require_roles("admin"))):
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if "password" in updates:
+        updates["password_hash"] = hash_password(updates.pop("password"))
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    result = await db.users.update_one({"_id": oid(uid)}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    await log_activity(user, "update_user", "user", uid, None, updates)
+    doc = await db.users.find_one({"_id": oid(uid)})
+    return clean_doc(doc)
+
+
+@api.delete("/users/{uid}")
+async def delete_user(uid: str, user=Depends(require_roles("admin"))):
+    if uid == user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    r = await db.users.delete_one({"_id": oid(uid)})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    await log_activity(user, "delete_user", "user", uid)
+    return {"success": True}
+
+
+# =================== Leads ===================
+def _lead_filter_for_user(user: dict) -> dict:
+    if user["role"] == "sales":
+        return {"staff_id": user["id"]}
+    return {}
+
+
+def _calc_derived(lead: dict) -> dict:
+    supp = lead.get("supplier_quote_amount") or 0
+    sell = lead.get("selling_amount") or 0
+    lead["profit"] = float(sell) - float(supp) if supp or sell else 0
+    smd = lead.get("supplier_mail_date")
+    if smd:
+        try:
+            d = datetime.fromisoformat(smd.replace("Z", "+00:00"))
+            lead["quote_pending_days"] = (datetime.now(timezone.utc) - d).days
+        except Exception:
+            lead["quote_pending_days"] = 0
+    else:
+        lead["quote_pending_days"] = 0
+    return lead
+
+
+@api.post("/leads")
+async def create_lead(body: LeadCreate, user=Depends(require_roles("sales", "admin", "operations"))):
+    lead_id = await generate_lead_id()
+    doc = body.model_dump()
+    doc.update({
+        "lead_id": lead_id,
+        "lead_date": doc.get("lead_date") or now_iso(),
+        "staff_id": user["id"],
+        "staff_name": user.get("name", ""),
+        "staff_code": user.get("staff_code", ""),
+        "lead_status": "New Lead",
+        "mail_status": "Not Sent",
+        "supplier_mail_date": None,
+        "remarks": "",
+        "supplier_quote_amount": 0,
+        "selling_amount": 0,
+        "quote_received": False,
+        "quote_received_date": None,
+        "quote_sent_to_customer": False,
+        "quote_sent_date": None,
+        "booking_status": "",
+        "booking_amount_received": 0,
+        "follow_up_date": None,
+        "payment_status": "",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "updated_by": user["email"],
+    })
+    r = await db.leads.insert_one(doc)
+    await log_activity(user, "create_lead", "lead", lead_id, None, {"customer": body.customer_name, "destination": body.destination})
+    doc["_id"] = r.inserted_id
+    return _calc_derived(clean_doc(doc))
+
+
+@api.get("/leads")
+async def list_leads(
+    user=Depends(get_current_user),
+    q: str = "",
+    status: str = "",
+    destination: str = "",
+    staff_id: str = "",
+    booking_status: str = "",
+    limit: int = 500,
+):
+    query = _lead_filter_for_user(user)
+    if staff_id and user["role"] in ("admin", "operations"):
+        query["staff_id"] = staff_id
+    if status:
+        query["lead_status"] = status
+    if destination:
+        query["destination"] = destination
+    if booking_status:
+        query["booking_status"] = booking_status
+    if q:
+        query["$or"] = [
+            {"lead_id": {"$regex": q, "$options": "i"}},
+            {"customer_name": {"$regex": q, "$options": "i"}},
+            {"phone": {"$regex": q, "$options": "i"}},
+            {"destination": {"$regex": q, "$options": "i"}},
+            {"email": {"$regex": q, "$options": "i"}},
+        ]
+    leads = await db.leads.find(query).sort("created_at", -1).limit(limit).to_list(limit)
+    return [_calc_derived(clean_doc(l)) for l in leads]
+
+
+@api.get("/leads/{lead_id}")
+async def get_lead(lead_id: str, user=Depends(get_current_user)):
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if user["role"] == "sales" and lead.get("staff_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return _calc_derived(clean_doc(lead))
+
+
+@api.patch("/leads/{lead_id}")
+async def update_lead(lead_id: str, body: LeadUpdate, user=Depends(get_current_user)):
+    existing = await db.leads.find_one({"lead_id": lead_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if user["role"] == "sales" and existing.get("staff_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+
+    # Sales can only update limited fields
+    if user["role"] == "sales":
+        sales_allowed = {"customer_name", "phone", "email", "travel_date", "destination",
+                         "hotel_category", "meal_plan", "package_type", "budget",
+                         "adults", "children", "child_ages", "rooms", "room_type",
+                         "departure_from", "special_requests", "lead_status",
+                         "remarks", "follow_up_date", "booking_status"}
+        updates = {k: v for k, v in updates.items() if k in sales_allowed}
+
+    updates["updated_at"] = now_iso()
+    updates["updated_by"] = user["email"]
+    await db.leads.update_one({"lead_id": lead_id}, {"$set": updates})
+    await log_activity(user, "update_lead", "lead", lead_id, None, updates)
+    doc = await db.leads.find_one({"lead_id": lead_id})
+    return _calc_derived(clean_doc(doc))
+
+
+@api.delete("/leads/{lead_id}")
+async def delete_lead(lead_id: str, user=Depends(require_roles("admin"))):
+    r = await db.leads.delete_one({"lead_id": lead_id})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    await log_activity(user, "delete_lead", "lead", lead_id)
+    return {"success": True}
+
+
+# =================== Suppliers ===================
+@api.get("/suppliers")
+async def list_suppliers(user=Depends(get_current_user)):
+    docs = await db.suppliers.find({}).sort("name", 1).to_list(1000)
+    return [clean_doc(d) for d in docs]
+
+
+@api.post("/suppliers")
+async def create_supplier(body: SupplierCreate, user=Depends(require_roles("admin", "operations"))):
+    doc = body.model_dump()
+    doc["email"] = doc["email"].lower()
+    doc["created_at"] = now_iso()
+    r = await db.suppliers.insert_one(doc)
+    doc["_id"] = r.inserted_id
+    await log_activity(user, "create_supplier", "supplier", str(r.inserted_id), None, {"name": body.name})
+    return clean_doc(doc)
+
+
+@api.delete("/suppliers/{sid}")
+async def delete_supplier(sid: str, user=Depends(require_roles("admin", "operations"))):
+    await db.suppliers.delete_one({"_id": oid(sid)})
+    await log_activity(user, "delete_supplier", "supplier", sid)
+    return {"success": True}
+
+
+# =================== Supplier Email ===================
+@api.post("/supplier-mail/send")
+async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles("admin", "operations"))):
+    lead = await db.leads.find_one({"lead_id": body.lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    suppliers = []
+    for sid in body.supplier_ids:
+        s = await db.suppliers.find_one({"_id": oid(sid)})
+        if s:
+            suppliers.append({"id": str(s["_id"]), "name": s["name"], "email": s["email"]})
+
+    if not suppliers:
+        raise HTTPException(status_code=400, detail="No valid suppliers selected")
+
+    mail_doc = {
+        "lead_id": body.lead_id,
+        "to_suppliers": suppliers,
+        "cc": body.cc,
+        "bcc": body.bcc,
+        "subject": body.subject,
+        "body": body.body,
+        "sent_by": user["email"],
+        "sent_at": now_iso(),
+        "status": "simulated_sent",  # NOTE: MOCKED - not actually sending email
+    }
+    r = await db.mail_history.insert_one(mail_doc)
+
+    supplier_names = ", ".join(s["name"] for s in suppliers)
+    await db.leads.update_one(
+        {"lead_id": body.lead_id},
+        {"$set": {
+            "mail_status": "Sent",
+            "supplier_mail_date": now_iso(),
+            "supplier_name": supplier_names,
+            "lead_status": "Supplier Mail Sent" if lead.get("lead_status") == "New Lead" else lead.get("lead_status"),
+            "updated_at": now_iso(),
+            "updated_by": user["email"],
+        }}
+    )
+    await log_activity(user, "send_supplier_mail", "lead", body.lead_id, None, {"suppliers": supplier_names})
+    mail_doc["_id"] = r.inserted_id
+    return clean_doc(mail_doc)
+
+
+@api.get("/supplier-mail/{lead_id}")
+async def mail_history(lead_id: str, user=Depends(get_current_user)):
+    docs = await db.mail_history.find({"lead_id": lead_id}).sort("sent_at", -1).to_list(200)
+    return [clean_doc(d) for d in docs]
+
+
+# =================== Master Data ===================
+@api.get("/master")
+async def list_master(category: str = "", user=Depends(get_current_user)):
+    query = {"category": category} if category else {}
+    docs = await db.master.find(query).to_list(2000)
+    return [clean_doc(d) for d in docs]
+
+
+@api.post("/master")
+async def add_master(body: MasterItem, user=Depends(require_roles("admin"))):
+    doc = body.model_dump()
+    exists = await db.master.find_one({"category": doc["category"], "value": doc["value"]})
+    if exists:
+        return clean_doc(exists)
+    doc["created_at"] = now_iso()
+    r = await db.master.insert_one(doc)
+    doc["_id"] = r.inserted_id
+    await log_activity(user, "add_master", "master", str(r.inserted_id), None, doc)
+    return clean_doc(doc)
+
+
+@api.delete("/master/{mid}")
+async def delete_master(mid: str, user=Depends(require_roles("admin"))):
+    await db.master.delete_one({"_id": oid(mid)})
+    return {"success": True}
+
+
+# =================== Dashboard ===================
+@api.get("/dashboard/stats")
+async def dashboard_stats(user=Depends(get_current_user)):
+    base = _lead_filter_for_user(user)
+    now = datetime.now(timezone.utc)
+    today_iso = now.strftime("%Y-%m-%d")
+    month_prefix = now.strftime("%Y-%m")
+
+    leads = await db.leads.find(base).to_list(5000)
+    total = len(leads)
+    today_leads = sum(1 for l in leads if (l.get("created_at") or "").startswith(today_iso))
+    month_leads = sum(1 for l in leads if (l.get("created_at") or "").startswith(month_prefix))
+    booked = sum(1 for l in leads if l.get("booking_status") == "Booked")
+    cancelled = sum(1 for l in leads if l.get("lead_status") == "Cancelled")
+    quote_pending = sum(1 for l in leads if l.get("mail_status") == "Sent" and not l.get("quote_received"))
+    revenue = sum(float(l.get("selling_amount") or 0) for l in leads if l.get("booking_status") == "Booked")
+    profit = sum(float(l.get("selling_amount") or 0) - float(l.get("supplier_quote_amount") or 0)
+                 for l in leads if l.get("booking_status") == "Booked")
+    followups_today = sum(1 for l in leads if (l.get("follow_up_date") or "").startswith(today_iso))
+    pending_payments = sum(1 for l in leads if l.get("booking_status") == "Booked" and l.get("payment_status") != "Paid")
+
+    # By-status counts for chart
+    status_counts = {}
+    for l in leads:
+        s = l.get("lead_status") or "Unknown"
+        status_counts[s] = status_counts.get(s, 0) + 1
+
+    # Monthly sales (last 6 months)
+    monthly = {}
+    for l in leads:
+        ca = l.get("created_at") or ""
+        if len(ca) >= 7:
+            key = ca[:7]
+            monthly.setdefault(key, {"leads": 0, "revenue": 0, "profit": 0})
+            monthly[key]["leads"] += 1
+            if l.get("booking_status") == "Booked":
+                monthly[key]["revenue"] += float(l.get("selling_amount") or 0)
+                monthly[key]["profit"] += float(l.get("selling_amount") or 0) - float(l.get("supplier_quote_amount") or 0)
+    monthly_list = sorted([{"month": k, **v} for k, v in monthly.items()], key=lambda x: x["month"])[-6:]
+
+    # Top destinations
+    dest_counts = {}
+    for l in leads:
+        d = l.get("destination") or "Unknown"
+        dest_counts[d] = dest_counts.get(d, 0) + 1
+    top_destinations = sorted([{"destination": k, "count": v} for k, v in dest_counts.items()], key=lambda x: -x["count"])[:5]
+
+    return {
+        "total_leads": total,
+        "today_leads": today_leads,
+        "month_leads": month_leads,
+        "booked": booked,
+        "cancelled": cancelled,
+        "quote_pending": quote_pending,
+        "revenue": revenue,
+        "profit": profit,
+        "followups_today": followups_today,
+        "pending_payments": pending_payments,
+        "status_counts": status_counts,
+        "monthly": monthly_list,
+        "top_destinations": top_destinations,
+    }
+
+
+@api.get("/dashboard/leaderboard")
+async def leaderboard(user=Depends(require_roles("admin"))):
+    leads = await db.leads.find({}).to_list(10000)
+    by_staff = {}
+    for l in leads:
+        sid = l.get("staff_id") or "unknown"
+        by_staff.setdefault(sid, {"staff_id": sid, "staff_name": l.get("staff_name", ""),
+                                   "leads": 0, "booked": 0, "revenue": 0})
+        by_staff[sid]["leads"] += 1
+        if l.get("booking_status") == "Booked":
+            by_staff[sid]["booked"] += 1
+            by_staff[sid]["revenue"] += float(l.get("selling_amount") or 0)
+    ranked = sorted(by_staff.values(), key=lambda x: -x["revenue"])
+    for r in ranked:
+        r["conversion_rate"] = round((r["booked"] / r["leads"]) * 100, 1) if r["leads"] else 0
+    return ranked
+
+
+# =================== Activity Log ===================
+@api.get("/activity")
+async def activity_log(user=Depends(require_roles("admin")), limit: int = 200):
+    docs = await db.activity_log.find({}).sort("timestamp", -1).limit(limit).to_list(limit)
+    return [clean_doc(d) for d in docs]
+
+
+# =================== AI ===================
+@api.post("/ai/itinerary")
+async def ai_itinerary(body: AIItineraryReq, user=Depends(get_current_user)):
+    try:
+        content = await generate_itinerary(
+            body.destination, body.days, body.budget, body.package_type,
+            body.adults, body.children, body.hotel_category, body.meal_plan
+        )
+        return {"content": content}
+    except Exception as e:
+        logger.exception("itinerary error")
+        raise HTTPException(status_code=500, detail=f"AI error: {e}")
+
+
+@api.post("/ai/quote-recommend")
+async def ai_quote(body: AIQuoteReq, user=Depends(get_current_user)):
+    try:
+        content = await recommend_quote(
+            body.destination, body.budget, body.hotel_category,
+            body.adults, body.children, body.days
+        )
+        return {"content": content}
+    except Exception as e:
+        logger.exception("quote recommend error")
+        raise HTTPException(status_code=500, detail=f"AI error: {e}")
+
+
+# =================== Seed Master Defaults ===================
+DEFAULT_MASTER = {
+    "destination": ["Bali", "Dubai", "Maldives", "Thailand", "Singapore", "Kashmir", "Kerala", "Goa", "Andaman"],
+    "hotel_category": ["3 Star", "4 Star", "5 Star", "Villa / Resort", "Boutique"],
+    "meal_plan": ["CP", "MAP", "AP", "EP"],
+    "package_type": ["Solo", "Couple", "Family", "Honeymoon", "Group"],
+    "room_type": ["Single", "Double", "Twin", "Triple", "Suite"],
+    "departure_city": ["Mumbai", "Delhi", "Bangalore", "Chennai", "Kolkata", "Hyderabad"],
+    "payment_mode": ["Bank Transfer", "UPI", "Card", "Cash"],
+    "lead_source": ["Website", "Referral", "Instagram", "Facebook", "Walk-in", "WhatsApp"],
+}
+
+DEFAULT_SUPPLIERS = [
+    {"name": "Wanderlust Holidays", "email": "sales@wanderlust.demo", "phone": "+91-9876543210", "destination": "Bali", "country": "Indonesia"},
+    {"name": "SunSand Tours", "email": "quotes@sunsand.demo", "phone": "+91-9876543211", "destination": "Maldives", "country": "Maldives"},
+    {"name": "Emirates Travel Partners", "email": "b2b@emiratestravel.demo", "phone": "+971-501234567", "destination": "Dubai", "country": "UAE"},
+    {"name": "Andaman Blue", "email": "hello@andamanblue.demo", "phone": "+91-9876543212", "destination": "Andaman", "country": "India"},
+]
+
+
+async def seed_master(db):
+    for category, values in DEFAULT_MASTER.items():
+        for v in values:
+            await db.master.update_one(
+                {"category": category, "value": v},
+                {"$setOnInsert": {"category": category, "value": v, "created_at": now_iso()}},
+                upsert=True,
+            )
+    for s in DEFAULT_SUPPLIERS:
+        await db.suppliers.update_one(
+            {"email": s["email"]},
+            {"$setOnInsert": {**s, "created_at": now_iso()}},
+            upsert=True,
+        )
+
+
+# =================== Startup ===================
+@app.on_event("startup")
+async def startup():
+    await db.users.create_index("email", unique=True)
+    await db.leads.create_index("lead_id", unique=True)
+    await db.leads.create_index("staff_id")
+    await db.suppliers.create_index("email", unique=True)
+    await db.master.create_index([("category", 1), ("value", 1)], unique=True)
+    await db.activity_log.create_index("timestamp")
+    await seed_admin(db)
+    await seed_master(db)
+    logger.info("Indian Rounds CRM ready")
+
 
 @app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+async def shutdown():
+    mongo_client.close()
+
+
+@api.get("/")
+async def root():
+    return {"service": "Indian Rounds CRM", "status": "ok"}
+
+
+app.include_router(api)
