@@ -219,6 +219,8 @@ class LeadUpdate(BaseModel):
     booking_amount_received: Optional[float] = None
     follow_up_date: Optional[str] = None
     payment_status: Optional[str] = None
+    quote_type: Optional[str] = None  # 'nrsq' | 'rsq'
+    package_selected: Optional[str] = None  # predefined package name for NRSQ
 
 
 class SupplierCreate(BaseModel):
@@ -591,7 +593,9 @@ async def update_lead(lead_id: str, body: LeadUpdate, user=Depends(get_current_u
                          "hotel_category", "meal_plan", "package_type", "budget",
                          "adults", "children", "child_ages", "rooms", "room_type",
                          "departure_from", "special_requests", "lead_status",
-                         "remarks", "follow_up_date", "booking_status"}
+                         "remarks", "follow_up_date", "booking_status",
+                         "selling_amount", "quote_type", "package_selected",
+                         "quote_sent_to_customer", "quote_sent_date"}
         updates = {k: v for k, v in updates.items() if k in sales_allowed}
 
     updates["updated_at"] = now_iso()

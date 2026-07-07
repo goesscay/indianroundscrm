@@ -76,6 +76,10 @@ export default function LeadDetail() {
   };
 
   const openMail = async () => {
+    // Mark this lead as RSQ (Request Supplier Quotation) on first mail open
+    if (lead.quote_type !== "rsq") {
+      try { await api.patch(`/leads/${lead.lead_id}`, { quote_type: "rsq" }); } catch { /* ignore */ }
+    }
     const { data } = await api.get("/suppliers");
     setSuppliers(data);
     setSubject(`Travel Enquiry - ${lead.lead_id} - ${lead.destination}`);
@@ -86,6 +90,23 @@ export default function LeadDetail() {
       setMailPreviewHtml(p.data.html || "");
     } catch { /* ignore */ }
     setMailOpen(true);
+  };
+
+  const saveNrsq = async () => {
+    if (!nrsqForm.selling_amount) { toast.error("Selling amount required"); return; }
+    try {
+      await api.patch(`/leads/${lead.lead_id}`, {
+        quote_type: "nrsq",
+        package_selected: nrsqForm.package_selected,
+        selling_amount: Number(nrsqForm.selling_amount),
+        quote_sent_to_customer: true,
+        quote_sent_date: new Date().toISOString(),
+        lead_status: "Quote Sent to Customer",
+      });
+      toast.success("NRSQ quote generated & lead marked 'Quote Sent to Customer'");
+      setNrsqOpen(false);
+      load();
+    } catch (e) { toast.error(formatApiError(e)); }
   };
 
   const send = async () => {
@@ -177,24 +198,39 @@ export default function LeadDetail() {
             {lead.customer_name} · {lead.destination} · Travel {(lead.travel_date || "").slice(0, 10)}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {canOps && (
-            <Button onClick={openMail} className="h-11" style={{ background: "#106EBE" }} data-testid="send-mail-btn">
-              <Mail size={16} /> Supplier Mail
+          <div className="flex gap-2 flex-wrap">
+            {canOps && !lead.quote_type && (
+              <>
+                <Button onClick={() => setNrsqOpen(true)} className="h-11" style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
+                  ⚡ NRSQ
+                </Button>
+                <Button onClick={openMail} className="h-11" style={{ background: "#106EBE" }} data-testid="rsq-btn" title="Request Supplier Quotation — sends email + tracks replies">
+                  <Mail size={16} /> RSQ
+                </Button>
+              </>
+            )}
+            {canOps && lead.quote_type === "nrsq" && (
+              <Button onClick={() => setNrsqOpen(true)} variant="outline" className="h-11" data-testid="nrsq-edit-btn">
+                ⚡ Edit NRSQ Quote
+              </Button>
+            )}
+            {canOps && lead.quote_type === "rsq" && (
+              <Button onClick={openMail} className="h-11" style={{ background: "#106EBE" }} data-testid="send-mail-btn">
+                <Mail size={16} /> Supplier Mail
+              </Button>
+            )}
+            <a href={whatsappLink} target="_blank" rel="noreferrer" onClick={() => track("whatsapp", lead.phone)}>
+              <Button variant="outline" className="h-11" data-testid="whatsapp-btn">
+                <MessageCircle size={16} /> WhatsApp
+              </Button>
+            </a>
+            <Button variant="outline" className="h-11" onClick={() => runAI("itinerary")} data-testid="ai-itinerary-btn">
+              <Sparkles size={16} /> AI Itinerary
             </Button>
-          )}
-          <a href={whatsappLink} target="_blank" rel="noreferrer">
-            <Button variant="outline" className="h-11" data-testid="whatsapp-btn">
-              <MessageCircle size={16} /> WhatsApp
+            <Button variant="outline" className="h-11" onClick={() => runAI("quote")} data-testid="ai-quote-btn">
+              <Sparkles size={16} /> AI Quote
             </Button>
-          </a>
-          <Button variant="outline" className="h-11" onClick={() => runAI("itinerary")} data-testid="ai-itinerary-btn">
-            <Sparkles size={16} /> AI Itinerary
-          </Button>
-          <Button variant="outline" className="h-11" onClick={() => runAI("quote")} data-testid="ai-quote-btn">
-            <Sparkles size={16} /> AI Quote
-          </Button>
-        </div>
+          </div>
       </div>
 
       <Card className="p-4 rounded-lg border-l-4 border-l-[#106EBE]" data-testid="contact-panel">
@@ -357,11 +393,92 @@ export default function LeadDetail() {
         </Card>
       </div>
 
-      <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} />
+      {lead.quote_type === "rsq" && <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} />}
+
+      {!lead.quote_type && (
+        <Card className="p-6 rounded-lg lg:col-span-3 border-2 border-dashed" data-testid="quote-choice-card">
+          <div className="text-center py-4">
+            <div className="label-caps">Quotation Method</div>
+            <h3 className="font-display text-xl font-bold mt-1">Choose how to generate this customer's quote</h3>
+            <p className="text-sm text-muted-foreground mt-2 max-w-2xl mx-auto">
+              For pre-packaged trips with fixed pricing, use <b>NRSQ</b>. For customized itineraries or live supplier pricing, use <b>RSQ</b>.
+            </p>
+            <div className="flex justify-center gap-3 mt-4 flex-wrap">
+              <Button onClick={() => setNrsqOpen(true)} className="h-11 px-6" style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-cta">
+                ⚡ NRSQ — Instant Quote
+              </Button>
+              <Button onClick={openMail} className="h-11 px-6" style={{ background: "#106EBE" }} data-testid="rsq-cta">
+                <Mail size={16} /> RSQ — Request Supplier
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {lead.quote_type === "nrsq" && (
+        <Card className="p-6 rounded-lg lg:col-span-3" data-testid="nrsq-summary">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <div className="label-caps flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-[#0FFCBE] text-[#024a37] rounded font-bold">NRSQ</span>
+                No Requirement Supplier Quotation
+              </div>
+              <h3 className="font-display text-xl font-bold mt-1">
+                {lead.package_selected || "Custom package"} · ₹{(lead.selling_amount || 0).toLocaleString("en-IN")}
+              </h3>
+              <div className="text-sm text-muted-foreground mt-1">
+                Quote generated from internal pricing — no supplier email sent.
+                {lead.quote_sent_date && ` · Sent on ${lead.quote_sent_date.slice(0, 10)}`}
+              </div>
+            </div>
+            <Button variant="outline" onClick={() => { setNrsqForm({ package_selected: lead.package_selected || "", selling_amount: lead.selling_amount || "" }); setNrsqOpen(true); }} data-testid="nrsq-edit">
+              Edit Quote
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <LeadNotes leadId={lead.lead_id} />
 
       <ContactTimeline leadId={lead.lead_id} refreshKey={timelineKey} />
+
+      {/* NRSQ Dialog */}
+      <Dialog open={nrsqOpen} onOpenChange={setNrsqOpen}>
+        <DialogContent data-testid="nrsq-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-[#0FFCBE] text-[#024a37] rounded text-xs font-bold">NRSQ</span>
+              Generate Instant Quote
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-xs text-muted-foreground p-3 rounded-md bg-secondary/50">
+              Use predefined packages / internal pricing. No supplier email will be sent.
+              Lead status auto-updates to "Quote Sent to Customer".
+            </div>
+            <div>
+              <Label className="label-caps">Package Name</Label>
+              <Input className="mt-1.5" value={nrsqForm.package_selected}
+                     onChange={(e) => setNrsqForm({ ...nrsqForm, package_selected: e.target.value })}
+                     placeholder="e.g. Bali Honeymoon 5N/6D · Villa · AP"
+                     data-testid="nrsq-package" />
+            </div>
+            <div>
+              <Label className="label-caps">Selling Amount (₹) *</Label>
+              <Input type="number" className="mt-1.5" value={nrsqForm.selling_amount}
+                     onChange={(e) => setNrsqForm({ ...nrsqForm, selling_amount: e.target.value })}
+                     placeholder="e.g. 95000"
+                     data-testid="nrsq-amount" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNrsqOpen(false)}>Cancel</Button>
+            <Button onClick={saveNrsq} style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-save">
+              Generate Quote & Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reassign Dialog */}
       <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
