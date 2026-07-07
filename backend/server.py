@@ -62,6 +62,17 @@ def clean_doc(doc: dict) -> dict:
     return doc
 
 
+def _safe_json(v):
+    """Recursively convert ObjectId → str so responses are JSON-serializable."""
+    if isinstance(v, ObjectId):
+        return str(v)
+    if isinstance(v, list):
+        return [_safe_json(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _safe_json(x) for k, x in v.items()}
+    return v
+
+
 async def log_activity(user: dict, action: str, entity: str, entity_id: str = "",
                        old_value: Optional[dict] = None, new_value: Optional[dict] = None):
     await db.activity_log.insert_one({
@@ -1204,7 +1215,7 @@ async def leaderboard(user=Depends(require_roles("admin"))):
 @api.get("/activity")
 async def activity_log(user=Depends(require_roles("admin")), limit: int = 200):
     docs = await db.activity_log.find({}).sort("timestamp", -1).limit(limit).to_list(limit)
-    return [clean_doc(d) for d in docs]
+    return [_safe_json(clean_doc(d)) for d in docs]
 
 
 # =================== AI ===================
