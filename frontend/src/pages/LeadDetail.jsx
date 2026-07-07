@@ -41,6 +41,8 @@ export default function LeadDetail() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiContent, setAiContent] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [nrsqOpen, setNrsqOpen] = useState(false);
+  const [nrsqForm, setNrsqForm] = useState({ package_selected: "", selling_amount: "" });
 
   const load = async () => {
     try {
