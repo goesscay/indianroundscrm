@@ -429,17 +429,20 @@ export default function LeadDetail() {
                 placeholder="Leave blank to use default: 'Please share your best quotation for the travel requirement detailed below.'" />
               <div className="text-[11px] text-muted-foreground mt-1">Trip / accommodation / guest tables are auto-generated from lead data in the branded HTML template.</div>
             </div>
-            <details className="border border-border rounded-md">
-              <summary className="cursor-pointer text-sm font-semibold px-3 py-2 hover:bg-secondary/40">Preview email</summary>
-              <div className="p-3 border-t border-border">
+            <div className="border border-border rounded-md">
+              <div className="px-3 py-2 border-b border-border bg-secondary/40 flex items-center justify-between">
+                <span className="text-sm font-semibold">📧 Email preview — this is exactly what suppliers receive</span>
+                <span className="label-caps">live · updates as you type</span>
+              </div>
+              <div className="p-2 bg-slate-50">
                 <iframe
                   title="mail-preview"
-                  className="w-full h-[500px] border border-border rounded-md bg-white"
+                  className="w-full h-[600px] border border-border rounded-md bg-white"
                   srcDoc={mailPreviewHtml}
                   data-testid="mail-preview-iframe"
                 />
               </div>
-            </details>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMailOpen(false)}>Cancel</Button>

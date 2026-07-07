@@ -35,9 +35,9 @@ export default function Login() {
            style={{ background: "linear-gradient(135deg, #106EBE 0%, #0d5aa0 60%, #024a37 100%)" }}
            data-testid="login-brand-panel">
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-14 h-14 rounded-md flex items-center justify-center overflow-hidden" style={{ background: "#01265c" }}>
+          <div className="w-16 h-16 rounded-md flex items-center justify-center overflow-hidden bg-white shadow-md">
             <img src="https://customer-assets.emergentagent.com/job_journey-crm-hub-1/artifacts/i3r285or_Indian%20rounds_logo.png"
-                 alt="Indian Rounds" className="w-12 h-12 object-contain" />
+                 alt="Indian Rounds" className="w-full h-full object-contain p-1.5" />
           </div>
           <div className="text-white">
             <div className="font-display font-black text-xl leading-none tracking-tight">INDIAN ROUNDS</div>

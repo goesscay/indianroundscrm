@@ -61,9 +61,9 @@ export default function Layout({ children }) {
       <aside className="hidden md:flex md:w-64 flex-col border-r border-border bg-card" data-testid="sidebar">
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-md flex items-center justify-center overflow-hidden" style={{ background: "#01265c" }}>
+            <div className="w-12 h-12 rounded-md flex items-center justify-center overflow-hidden bg-white border border-border shadow-sm">
               <img src="https://customer-assets.emergentagent.com/job_journey-crm-hub-1/artifacts/i3r285or_Indian%20rounds_logo.png"
-                   alt="IR" className="w-9 h-9 object-contain" />
+                   alt="IR" className="w-full h-full object-contain p-1" />
             </div>
             <div>
               <div className="font-display text-lg font-black tracking-tight text-foreground leading-none">INDIAN ROUNDS</div>
