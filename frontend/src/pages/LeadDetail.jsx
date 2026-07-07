@@ -88,8 +88,12 @@ export default function LeadDetail() {
   const createRsqRequest = async () => {
     // Sales path — creates RSQ request and notifies Ops, no mail dialog
     try {
-      await api.post("/rsq-requests", { lead_id: lead.lead_id, note: "" });
-      toast.success("RSQ raised — Operations Team notified ✅");
+      const { data } = await api.post("/rsq-requests", { lead_id: lead.lead_id, note: "" });
+      if (data?.already_exists) {
+        toast.info("RSQ already raised — Operations Team is on it");
+      } else {
+        toast.success("RSQ raised — Operations Team notified ✅");
+      }
       load();
     } catch (e) { toast.error(formatApiError(e)); }
   };
