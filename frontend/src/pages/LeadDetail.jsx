@@ -68,6 +68,7 @@ export default function LeadDetail() {
   }, [body, mailOpen, lead, leadId]);
 
   const canOps = user.role === "operations" || user.role === "admin";
+  const canQuote = user.role === "sales" || user.role === "operations" || user.role === "admin";
 
   const update = async (patch) => {
     try {
@@ -201,7 +202,7 @@ export default function LeadDetail() {
           </p>
         </div>
           <div className="flex gap-2 flex-wrap">
-            {canOps && !lead.quote_type && (
+            {canQuote && !lead.quote_type && (
               <>
                 <Button onClick={() => setNrsqOpen(true)} className="h-11" style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
                   ⚡ NRSQ
@@ -211,12 +212,12 @@ export default function LeadDetail() {
                 </Button>
               </>
             )}
-            {canOps && lead.quote_type === "nrsq" && (
+            {canQuote && lead.quote_type === "nrsq" && (
               <Button onClick={() => setNrsqOpen(true)} variant="outline" className="h-11" data-testid="nrsq-edit-btn">
                 ⚡ Edit NRSQ Quote
               </Button>
             )}
-            {canOps && lead.quote_type === "rsq" && (
+            {canQuote && lead.quote_type === "rsq" && (
               <Button onClick={openMail} className="h-11" style={{ background: "#106EBE" }} data-testid="send-mail-btn">
                 <Mail size={16} /> Supplier Mail
               </Button>
