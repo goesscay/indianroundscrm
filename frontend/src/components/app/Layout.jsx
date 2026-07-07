@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, PlusCircle, Truck, Database,
-  Activity, LogOut, Sparkles, Mail, Calendar, Bell
+  Activity, LogOut, Sparkles, Mail, Calendar, Bell, Inbox
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ const NAV = {
     { to: "/leads", label: "All Leads", icon: ClipboardList, testId: "nav-leads" },
     { to: "/leads/new", label: "New Lead", icon: PlusCircle, testId: "nav-new-lead" },
     { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar" },
+    { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard" },
     { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers" },
     { to: "/users", label: "Users", icon: Users, testId: "nav-users" },
     { to: "/master", label: "Master Data", icon: Database, testId: "nav-master" },
@@ -26,6 +27,7 @@ const NAV = {
     { to: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard" },
     { to: "/leads", label: "All Leads", icon: ClipboardList, testId: "nav-leads" },
     { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar" },
+    { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard" },
     { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers" },
     { to: "/ai", label: "AI Assistant", icon: Sparkles, testId: "nav-ai" },
   ],

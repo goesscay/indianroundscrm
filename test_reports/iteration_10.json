@@ -1,0 +1,56 @@
+{
+  "summary": "Full E2E validation of RSQ workflow overhaul PASSED. Backend (13/13) + Frontend (all critical assertions) succeed. Sales users can raise RSQ requests but cannot open supplier mail composer, cannot GET /api/rsq-requests (403), cannot POST /api/supplier-mail/send or GET preview (403), and cannot see nav-supplier-dashboard/nav-suppliers in the sidebar; direct navigation to /supplier-dashboard is blocked by ProtectedRoute and redirects to '/'. Ops/Admin can access the new Supplier Dashboard with all 4 lanes (new, pending_reply, response_received, completed), each populated correctly with rsq-card-{lead_id} entries; refresh button works; clicking a card navigates to /leads/{lead_id}. Notifications endpoint returns kind='rsq_created' items and the bell popover surfaces the RSQ-raised entries to Ops. Lane transitions verified end-to-end via API: sales creates → 'new'; ops send-mail → 'pending_reply' and lead.rsq_status='pending_reply'; PATCH lead-suppliers with reply_received=true → 'response_received'; PATCH leads with lead_status='Quote Sent to Customer' → 'completed' and lead.rsq_status='completed'. DOM checks confirm rsq-waiting-ops uses .animate-pulse (amber) and rsq-pending-reply uses .animate-ping (red).",
+  "tested_scope": ["backend", "frontend"],
+  "passed": [
+    "Backend RBAC: POST /api/rsq-requests accepts sales+ops+admin (200 for sales+ops+admin)",
+    "Backend RBAC: GET /api/rsq-requests returns 403 for sales, 200 with 4 lanes for ops+admin",
+    "Backend RBAC: POST /api/supplier-mail/send and GET /api/supplier-mail/preview/{lead_id} return 403 for sales, non-403 for ops",
+    "Backend: Sales create RSQ writes rsq_requests row with requested_by=sales@indianrounds.com, status='new', and updates lead.quote_type='rsq', lead.rsq_status='new'",
+    "Backend: Ops sends supplier mail → rsq_requests.status='pending_reply', lead.rsq_status='pending_reply' (verified via GET after send)",
+    "Backend: Supplier PATCH with reply_received=true moves lead into 'response_received' lane and removes from 'pending_reply'",
+    "Backend: PATCH lead lead_status='Quote Sent to Customer' moves lead into 'completed' lane, lead.rsq_status='completed'",
+    "Frontend Sales: click rsq-btn on fresh lead — mail-dialog does NOT open; toast 'RSQ raised — Operations Team notified' shows; on reload rsq-waiting-ops amber badge with .animate-pulse dot renders; backend confirms lead.quote_type='rsq' + rsq_status='new'",
+    "Frontend Sales sidebar: nav-supplier-dashboard=0 and nav-suppliers=0; direct nav to /supplier-dashboard redirects sales to '/' (lane-new count=0)",
+    "Frontend Ops bell: bell-btn present, popover contains 'RSQ raised' entries; /api/notifications returns list containing kind='rsq_created' (3 rsq_created items seen)",
+    "Frontend Ops LeadDetail: send-mail-btn visible on rsq-typed lead; sending mail via API flips indicator to rsq-pending-reply with .animate-ping red dot ('Awaiting supplier reply')",
+    "Frontend Ops SupplierDashboard: nav-supplier-dashboard clickable; /supplier-dashboard renders lane-new, lane-pending_reply, lane-response_received, lane-completed; 4 rsq-card-{lead_id} cards seen (IRRK07001..07004); refresh-btn clickable; clicking rsq-card navigates to /leads/{lead_id}",
+    "Regression: Iteration 9 confirmed NRSQ flow still functional; iteration 10 spot-checked LeadDetail top-bar/pipeline/reassign/WhatsApp still render for ops"
+  ],
+  "failed": [],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Ops Dashboard (Operations Dashboard)", "issues": ["Pre-existing React hydration warning: '<a> cannot be a descendant of <a>' — Dashboard.jsx line 207 nests <a href='tel:+91...'> and <a href='https://wa.me/...'> inside a <Link to='/leads/...'> (which renders as <a>). Not introduced by this iteration but should be fixed for a11y/hydration cleanliness. Suggested fix: wrap the inner tel/wa links in a <span onClick={e=>e.stopPropagation()}> plus <button> instead of nested anchors, OR move the phone/chat icons outside the outer <Link>."]},
+      {"screen": "Dashboard (all roles)", "issues": ["Pre-existing Recharts warning 'width(-1) and height(-1)' still logged on first render — legacy noise, no functional impact."]}
+    ]
+  },
+  "critical_code_review_comments": [
+    "server.py line 803 create_rsq_request: if an existing rsq_requests row is in ('new','pending_reply','response_received') the endpoint returns the existing row with 'already_exists':True but DOES NOT re-log activity or notify Ops. This is fine for idempotency, but sales users repeatedly clicking rsq-btn will silently no-op which the frontend then still shows as a success toast — consider surfacing 'already raised' distinction in the toast for clarity.",
+    "server.py line 809: sales staff_id ownership check works for direct sales flow, but admin/ops bypass this. That's intentional. Good.",
+    "server.py line 842: list_rsq_requests groups by lane using in-memory filter after loading up to 1000 docs — fine for current scale but should switch to per-lane Mongo aggregation once rsq_requests > 5k rows.",
+    "server.py line 611-612: lead PATCH auto-marks rsq_status='completed' when lead moves to Quote-Sent/Booking/Closed — correct. However there is no rsq_status='new' auto-revert if lead_status is moved back to 'New Lead' (unlikely but not enforced). Acceptable.",
+    "LeadDetail.jsx line 237/242: rsq-waiting-ops and rsq-pending-reply spans use .animate-pulse and .animate-ping respectively — matches spec. Good.",
+    "SupplierDashboard.jsx (NEW): 30s auto-refresh is enabled but there is no visible loading indicator during refresh — minor UX polish opportunity."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_rsq_workflow.py",
+    "/app/backend/tests/test_nrsq_rsq.py",
+    "/app/test_reports/pytest/rsq_workflow_results.xml"
+  ],
+  "action_items": [
+    "(Cosmetic/optional) Fix Dashboard.jsx line 207 nested-anchor hydration warning by replacing inner <a href='tel:'>/<a href='https://wa.me/'> with <button onClick> + stopPropagation OR restructure so the tel/wa icons are siblings (not descendants) of the <Link>.",
+    "(Optional) Consider surfacing 'RSQ already raised' distinction in the sales-side toast when create_rsq_request returns already_exists:true, so repeat-click doesn't look like a fresh submission."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_rsq_workflow.py (NEW)"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% for RSQ workflow assertions"},
+  "test_credentials": "admin@indianrounds.com/admin123, sales@indianrounds.com/sales123, ops@indianrounds.com/ops123 — all working.",
+  "seed_data_creation": "Tests use existing fresh leads (no quote_type). RSQ rows created for IRRK07001 (sales-raised, then sent by ops → pending_reply), plus 3 pre-existing carry-overs (IRRK07002, 07003, 07004) from previous iterations. rsq_requests collection also has completed entries (IRRK07004). Test package/note strings prefixed with 'TEST'.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "RSQ workflow is fully green end-to-end. Only outstanding items are cosmetic: (1) pre-existing Dashboard <a>-in-<a> hydration warning, (2) optional 'already raised' toast distinction. Backend regression suite at /app/backend/tests/ has test_rsq_workflow.py (RSQ) and test_nrsq_rsq.py (NRSQ+RSQ persistence). Both green.",
+  "rca of the issue": "N/A — no bugs found in the new RSQ workflow. The one design_issue on Dashboard.jsx is pre-existing and orthogonal to this iteration."
+}

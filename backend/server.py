@@ -221,6 +221,7 @@ class LeadUpdate(BaseModel):
     payment_status: Optional[str] = None
     quote_type: Optional[str] = None  # 'nrsq' | 'rsq'
     package_selected: Optional[str] = None  # predefined package name for NRSQ
+    rsq_status: Optional[str] = None  # 'new' | 'pending_reply' | 'response_received' | 'completed'
 
 
 class SupplierCreate(BaseModel):
@@ -601,6 +602,14 @@ async def update_lead(lead_id: str, body: LeadUpdate, user=Depends(get_current_u
     updates["updated_at"] = now_iso()
     updates["updated_by"] = user["email"]
     await db.leads.update_one({"lead_id": lead_id}, {"$set": updates})
+    # RSQ lane → completed when lead reaches terminal customer-facing status
+    _completed_statuses = {"Quote Sent to Customer", "Booked", "Payment Received",
+                            "Travel Completed", "Closed", "Cancelled"}
+    if updates.get("lead_status") in _completed_statuses:
+        rsq = await db.rsq_requests.find_one({"lead_id": lead_id})
+        if rsq and rsq.get("status") != "completed":
+            await _upsert_rsq_request(lead_id, {"status": "completed", "completed_at": now_iso()})
+            await db.leads.update_one({"lead_id": lead_id}, {"$set": {"rsq_status": "completed"}})
     await log_activity(user, "update_lead", "lead", lead_id, None, updates)
     doc = await db.leads.find_one({"lead_id": lead_id})
     return _calc_derived(clean_doc(doc))
@@ -728,6 +737,9 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
         }}
     )
     await log_activity(user, "send_supplier_mail", "lead", body.lead_id, None, {"suppliers": supplier_names, "status": send_result.get("status"), "provider": send_result.get("provider")})
+    # RSQ lane transition: new → pending_reply
+    await _upsert_rsq_request(body.lead_id, {"status": "pending_reply", "sent_at": now_iso()})
+    await db.leads.update_one({"lead_id": body.lead_id}, {"$set": {"rsq_status": "pending_reply"}})
     mail_doc["_id"] = r.inserted_id
     return {**clean_doc(mail_doc), "send_result": send_result}
 
@@ -745,6 +757,101 @@ async def preview_supplier_mail(lead_id: str, intro: str = "", user=Depends(requ
 async def mail_history(lead_id: str, user=Depends(get_current_user)):
     docs = await db.mail_history.find({"lead_id": lead_id}).sort("sent_at", -1).to_list(200)
     return [clean_doc(d) for d in docs]
+
+
+# =================== RSQ Requests (Supplier Quotation Requests) ===================
+# Workflow:
+#   Sales creates RSQ request         -> status = "new"        (pending Ops to send mail)
+#   Ops sends supplier mail           -> status = "pending_reply"
+#   Any supplier replies              -> status = "response_received"
+#   Lead moves to Quote Sent/Closed   -> status = "completed"
+
+RSQ_LANES = ("new", "pending_reply", "response_received", "completed")
+
+
+class RsqRequestCreate(BaseModel):
+    lead_id: str
+    note: Optional[str] = ""
+
+
+async def _upsert_rsq_request(lead_id: str, patch: dict):
+    """Idempotent update of rsq_requests row for a lead."""
+    patch = {**patch, "updated_at": now_iso()}
+    await db.rsq_requests.update_one(
+        {"lead_id": lead_id}, {"$set": patch, "$setOnInsert": {"created_at": now_iso()}}, upsert=True
+    )
+
+
+async def _enrich_rsq(row: dict) -> dict:
+    """Attach lead + staff info for dashboard cards."""
+    row = clean_doc(row)
+    lead = await db.leads.find_one({"lead_id": row["lead_id"]})
+    if lead:
+        row["customer_name"] = lead.get("customer_name")
+        row["destination"] = lead.get("destination")
+        row["staff_name"] = lead.get("staff_name")
+        row["travel_date"] = lead.get("travel_date")
+        row["lead_status"] = lead.get("lead_status")
+    # supplier reply count
+    trackers = await db.lead_suppliers.find({"lead_id": row["lead_id"]}).to_list(50)
+    row["supplier_count"] = len(trackers)
+    row["reply_count"] = sum(1 for t in trackers if t.get("reply_received"))
+    return row
+
+
+@api.post("/rsq-requests")
+async def create_rsq_request(body: RsqRequestCreate, user=Depends(require_roles("admin", "operations", "sales"))):
+    """Sales creates an RSQ request; Ops team is notified. Does NOT send email."""
+    lead = await db.leads.find_one({"lead_id": body.lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    # Sales can only raise RSQ on own leads
+    if user["role"] == "sales" and lead.get("staff_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Not your lead")
+
+    # Prevent duplicate active RSQ (unless previously completed — allow reopening)
+    existing = await db.rsq_requests.find_one({"lead_id": body.lead_id})
+    if existing and existing.get("status") in ("new", "pending_reply", "response_received"):
+        return {**clean_doc(existing), "already_exists": True}
+
+    await _upsert_rsq_request(body.lead_id, {
+        "status": "new",
+        "requested_by": user["email"],
+        "requested_by_name": user.get("name") or user["email"],
+        "requested_at": now_iso(),
+        "note": body.note or "",
+        "sent_at": None,
+        "first_reply_at": None,
+        "completed_at": None,
+    })
+    await db.leads.update_one(
+        {"lead_id": body.lead_id},
+        {"$set": {"quote_type": "rsq", "rsq_status": "new", "updated_at": now_iso()}}
+    )
+    await log_activity(user, "create_rsq_request", "lead", body.lead_id, None, {"note": body.note})
+
+    doc = await db.rsq_requests.find_one({"lead_id": body.lead_id})
+    return await _enrich_rsq(doc)
+
+
+@api.get("/rsq-requests")
+async def list_rsq_requests(user=Depends(require_roles("admin", "operations"))):
+    """All RSQ requests grouped by status lane."""
+    docs = await db.rsq_requests.find({}).sort("updated_at", -1).to_list(1000)
+    enriched = [await _enrich_rsq(d) for d in docs]
+    return {lane: [r for r in enriched if r.get("status") == lane] for lane in RSQ_LANES}
+
+
+@api.get("/rsq-requests/{lead_id}")
+async def get_rsq_request(lead_id: str, user=Depends(get_current_user)):
+    doc = await db.rsq_requests.find_one({"lead_id": lead_id})
+    if not doc:
+        return None
+    if user["role"] == "sales":
+        lead = await db.leads.find_one({"lead_id": lead_id})
+        if not lead or lead.get("staff_id") != user["id"]:
+            raise HTTPException(status_code=403, detail="Not your lead")
+    return await _enrich_rsq(doc)
 
 
 # =================== Supplier Response Tracker ===================
@@ -787,6 +894,14 @@ async def update_lead_supplier(tracker_id: str, body: SupplierResponseUpdate,
     updates["updated_by"] = user["email"]
     await db.lead_suppliers.update_one({"_id": oid(tracker_id)}, {"$set": updates})
     await log_activity(user, "update_supplier_response", "lead_supplier", tracker_id, None, updates)
+    # RSQ lane transition: pending_reply → response_received when any tracker gets reply_received
+    if updates.get("reply_received") or updates.get("status") == "Quote Received":
+        lead_id = existing.get("lead_id")
+        if lead_id:
+            rsq = await db.rsq_requests.find_one({"lead_id": lead_id})
+            if rsq and rsq.get("status") in ("new", "pending_reply"):
+                await _upsert_rsq_request(lead_id, {"status": "response_received", "first_reply_at": now_iso()})
+                await db.leads.update_one({"lead_id": lead_id}, {"$set": {"rsq_status": "response_received"}})
     return clean_doc(await db.lead_suppliers.find_one({"_id": oid(tracker_id)}))
 
 
@@ -914,6 +1029,19 @@ async def notifications(user=Depends(get_current_user)):
     alerts = []
 
     if user["role"] in ("admin", "operations"):
+        # New RSQ requests awaiting Ops to send supplier mail
+        new_rsq = await db.rsq_requests.find({"status": "new"}).sort("requested_at", -1).limit(15).to_list(15)
+        for r in new_rsq:
+            lead = await db.leads.find_one({"lead_id": r["lead_id"]})
+            alerts.append({
+                "kind": "rsq_created",
+                "icon": "📨",
+                "title": f"New RSQ from {r.get('requested_by_name') or r.get('requested_by')}",
+                "detail": f"Lead {r['lead_id']} · {lead.get('customer_name') if lead else ''} · {lead.get('destination') if lead else ''}",
+                "lead_id": r["lead_id"],
+                "timestamp": r.get("requested_at"),
+            })
+
         # New replies received in last 24h
         recent = await db.lead_suppliers.find({
             "reply_received": True,
@@ -991,12 +1119,23 @@ async def resend_webhook(request: Request):
         if from_email:
             supp = await db.suppliers.find_one({"email": {"$regex": f"^{from_email}$", "$options": "i"}})
             if supp:
+                # Find affected lead ids first so we can transition RSQ lane
+                affected = await db.lead_suppliers.find(
+                    {"supplier_id": str(supp["_id"]), "reply_received": False}
+                ).to_list(200)
                 await db.lead_suppliers.update_many(
                     {"supplier_id": str(supp["_id"]), "reply_received": False},
                     {"$set": {"reply_received": True, "reply_date": now_iso(),
                               "status": "Awaiting Quote", "last_update": now_iso(),
                               "inbound_snippet": (data.get("text") or "")[:500]}}
                 )
+                for row in affected:
+                    lid = row.get("lead_id")
+                    if not lid: continue
+                    rsq = await db.rsq_requests.find_one({"lead_id": lid})
+                    if rsq and rsq.get("status") in ("new", "pending_reply"):
+                        await _upsert_rsq_request(lid, {"status": "response_received", "first_reply_at": now_iso()})
+                        await db.leads.update_one({"lead_id": lid}, {"$set": {"rsq_status": "response_received"}})
     return {"ok": True}
 
 

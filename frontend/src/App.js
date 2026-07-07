@@ -16,6 +16,7 @@ import MasterData from "@/pages/MasterData";
 import ActivityLog from "@/pages/ActivityLog";
 import AIAssistant from "@/pages/AIAssistant";
 import CalendarView from "@/pages/CalendarView";
+import SupplierDashboard from "@/pages/SupplierDashboard";
 import AuthCallback from "@/pages/AuthCallback";
 import { useLocation } from "react-router-dom";
 
@@ -57,6 +58,11 @@ function RouterInner() {
           <Route path="/suppliers" element={
             <ProtectedRoute roles={["admin", "operations"]}>
               <Layout><Suppliers /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/supplier-dashboard" element={
+            <ProtectedRoute roles={["admin", "operations"]}>
+              <Layout><SupplierDashboard /></Layout>
             </ProtectedRoute>
           } />
           <Route path="/users" element={

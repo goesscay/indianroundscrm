@@ -67,7 +67,7 @@ export default function LeadDetail() {
   };
 
   const openMail = async () => {
-    // Mark this lead as RSQ (Request Supplier Quotation) on first mail open
+    // Ops/Admin only path — sales uses createRsqRequest() instead
     if (lead.quote_type !== "rsq") {
       try { await api.patch(`/leads/${lead.lead_id}`, { quote_type: "rsq" }); } catch { /* ignore */ }
     }
@@ -83,6 +83,15 @@ export default function LeadDetail() {
       if (p.data.subject) setSubject(p.data.subject);
     } catch { /* ignore */ }
     setMailOpen(true);
+  };
+
+  const createRsqRequest = async () => {
+    // Sales path — creates RSQ request and notifies Ops, no mail dialog
+    try {
+      await api.post("/rsq-requests", { lead_id: lead.lead_id, note: "" });
+      toast.success("RSQ raised — Operations Team notified ✅");
+      load();
+    } catch (e) { toast.error(formatApiError(e)); }
   };
 
   const copyMail = async () => {
@@ -209,7 +218,7 @@ export default function LeadDetail() {
                 <Button onClick={() => setNrsqOpen(true)} className="h-11" style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
                   ⚡ NRSQ
                 </Button>
-                <Button onClick={openMail} className="h-11" style={{ background: "#106EBE" }} data-testid="rsq-btn" title="Request Supplier Quotation — sends email + tracks replies">
+                <Button onClick={canOps ? openMail : createRsqRequest} className="h-11" style={{ background: "#106EBE" }} data-testid="rsq-btn" title={canOps ? "Compose supplier email now" : "Request Ops team to fetch supplier quotes"}>
                   <Mail size={16} /> RSQ
                 </Button>
               </>
@@ -219,10 +228,20 @@ export default function LeadDetail() {
                 ⚡ Edit NRSQ Quote
               </Button>
             )}
-            {canQuote && lead.quote_type === "rsq" && (
+            {canOps && lead.quote_type === "rsq" && (
               <Button onClick={openMail} className="h-11" style={{ background: "#106EBE" }} data-testid="send-mail-btn">
                 <Mail size={16} /> Supplier Mail
               </Button>
+            )}
+            {!canOps && lead.quote_type === "rsq" && lead.rsq_status === "new" && (
+              <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold" data-testid="rsq-waiting-ops">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> Awaiting Ops to send mail
+              </span>
+            )}
+            {lead.rsq_status === "pending_reply" && (
+              <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-red-300 bg-red-50 text-red-800 text-xs font-semibold" data-testid="rsq-pending-reply">
+                <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" /> Awaiting supplier reply
+              </span>
             )}
             <a href={whatsappLink} target="_blank" rel="noreferrer" onClick={() => track("whatsapp", lead.phone)}>
               <Button variant="outline" className="h-11" data-testid="whatsapp-btn">
@@ -412,8 +431,8 @@ export default function LeadDetail() {
               <Button onClick={() => setNrsqOpen(true)} className="h-11 px-6" style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-cta">
                 ⚡ NRSQ — Instant Quote
               </Button>
-              <Button onClick={openMail} className="h-11 px-6" style={{ background: "#106EBE" }} data-testid="rsq-cta">
-                <Mail size={16} /> RSQ — Request Supplier
+              <Button onClick={canOps ? openMail : createRsqRequest} className="h-11 px-6" style={{ background: "#106EBE" }} data-testid="rsq-cta">
+                <Mail size={16} /> {canOps ? "RSQ — Compose Supplier Mail" : "RSQ — Request Ops Team"}
               </Button>
             </div>
           </div>
