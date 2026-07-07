@@ -19,7 +19,7 @@ from auth import (
     set_auth_cookies, clear_auth_cookies, get_current_user, require_roles, seed_admin
 )
 from ai_service import generate_itinerary, recommend_quote
-from email_service import send_email as send_email_service, render_supplier_rfq_html
+from email_service import send_email as send_email_service, render_supplier_rfq_text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ir-crm")
@@ -656,11 +656,14 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
     if not suppliers:
         raise HTTPException(status_code=400, detail="No valid suppliers selected")
 
+    # Auto-fill body from lead if empty (defensive)
+    mail_body = (body.body or "").strip() or render_supplier_rfq_text(lead)
+
     # Attempt real send via Resend (falls back to simulation if unconfigured)
     send_result = await send_email_service(
         to=[s["email"] for s in suppliers],
         subject=body.subject,
-        body=body.body,
+        body=mail_body,
         cc=body.cc,
         bcc=body.bcc,
     )
@@ -671,7 +674,7 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
         "cc": body.cc,
         "bcc": body.bcc,
         "subject": body.subject,
-        "body": body.body,
+        "body": mail_body,
         "sent_by": user["email"],
         "sent_at": now_iso(),
         "status": send_result.get("status", "unknown"),
@@ -731,12 +734,11 @@ async def send_supplier_mail(body: SupplierEmailSend, user=Depends(require_roles
 
 @api.get("/supplier-mail/preview/{lead_id}")
 async def preview_supplier_mail(lead_id: str, intro: str = "", user=Depends(require_roles("admin", "operations"))):
-    from email_service import render_supplier_rfq_html
     lead = await db.leads.find_one({"lead_id": lead_id})
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-    return {"html": render_supplier_rfq_html(lead, intro_text=intro),
-            "subject": f"Travel Enquiry - {lead.get('lead_id')} - {lead.get('destination')}"}
+    return {"text": render_supplier_rfq_text(lead, intro_text=intro),
+            "subject": f"Trip Enquiry - {lead.get('lead_id')} - {lead.get('destination')}"}
 
 
 @api.get("/supplier-mail/{lead_id}")

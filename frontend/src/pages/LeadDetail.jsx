@@ -32,7 +32,7 @@ export default function LeadDetail() {
   const [cc, setCc] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [mailPreviewHtml, setMailPreviewHtml] = useState("");
+  const [mailPreviewText, setMailPreviewText] = useState("");
   const [timelineKey, setTimelineKey] = useState(0);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [consultants, setConsultants] = useState([]);
@@ -55,18 +55,6 @@ export default function LeadDetail() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [leadId]);
 
-  // Refresh mail preview when intro body changes
-  useEffect(() => {
-    if (!mailOpen || !lead) return;
-    const t = setTimeout(async () => {
-      try {
-        const p = await api.get(`/supplier-mail/preview/${lead.lead_id}`, { params: { intro: body } });
-        setMailPreviewHtml(p.data.html || "");
-      } catch { /* ignore */ }
-    }, 400);
-    return () => clearTimeout(t);
-  }, [body, mailOpen, lead, leadId]);
-
   const canOps = user.role === "operations" || user.role === "admin";
   const canQuote = user.role === "sales" || user.role === "operations" || user.role === "admin";
 
@@ -85,14 +73,28 @@ export default function LeadDetail() {
     }
     const { data } = await api.get("/suppliers");
     setSuppliers(data);
-    setSubject(`Travel Enquiry - ${lead.lead_id} - ${lead.destination}`);
-    setBody("");
+    setSubject(`Trip Enquiry - ${lead.lead_id} - ${lead.destination}`);
     setSelected({});
     try {
       const p = await api.get(`/supplier-mail/preview/${lead.lead_id}`);
-      setMailPreviewHtml(p.data.html || "");
+      const txt = p.data.text || "";
+      setMailPreviewText(txt);
+      setBody(txt);
+      if (p.data.subject) setSubject(p.data.subject);
     } catch { /* ignore */ }
     setMailOpen(true);
+  };
+
+  const copyMail = async () => {
+    try {
+      await navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+      toast.success("Email copied to clipboard");
+    } catch { toast.error("Copy failed"); }
+  };
+
+  const resetMailBody = () => {
+    setBody(mailPreviewText);
+    toast.info("Reset to default template");
   };
 
   const saveNrsq = async () => {
@@ -544,23 +546,25 @@ export default function LeadDetail() {
               <Input className="mt-1.5" value={subject} onChange={(e) => setSubject(e.target.value)} data-testid="mail-subject" />
             </div>
             <div>
-              <Label className="label-caps">Intro (optional — replaces the default line)</Label>
-              <Textarea rows={3} className="mt-1.5" value={body} onChange={(e) => setBody(e.target.value)} data-testid="mail-body"
-                placeholder="Leave blank to use default: 'Please share your best quotation for the travel requirement detailed below.'" />
-              <div className="text-[11px] text-muted-foreground mt-1">Trip / accommodation / guest tables are auto-generated from lead data in the branded HTML template.</div>
-            </div>
-            <div className="border border-border rounded-md">
-              <div className="px-3 py-2 border-b border-border bg-secondary/40 flex items-center justify-between">
-                <span className="text-sm font-semibold">📧 Email preview — this is exactly what suppliers receive</span>
-                <span className="label-caps">live · updates as you type</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="label-caps">Email body — plain text · fully editable</Label>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={resetMailBody} data-testid="mail-reset">
+                    Reset to template
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={copyMail} data-testid="mail-copy">
+                    <Copy size={14} /> Copy
+                  </Button>
+                </div>
               </div>
-              <div className="p-2 bg-slate-50">
-                <iframe
-                  title="mail-preview"
-                  className="w-full h-[600px] border border-border rounded-md bg-white"
-                  srcDoc={mailPreviewHtml}
-                  data-testid="mail-preview-iframe"
-                />
+              <Textarea rows={22}
+                        className="font-mono text-[13px] leading-relaxed whitespace-pre"
+                        value={body}
+                        onChange={(e) => setBody(e.target.value)}
+                        data-testid="mail-body"
+                        placeholder="Loading template…" />
+              <div className="text-[11px] text-muted-foreground mt-1">
+                Auto-populated from lead data. Edit freely before sending. Blank fields default to N/A.
               </div>
             </div>
           </div>
