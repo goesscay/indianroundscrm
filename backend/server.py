@@ -1213,9 +1213,42 @@ async def leaderboard(user=Depends(require_roles("admin"))):
 
 # =================== Activity Log ===================
 @api.get("/activity")
-async def activity_log(user=Depends(require_roles("admin")), limit: int = 200):
-    docs = await db.activity_log.find({}).sort("timestamp", -1).limit(limit).to_list(limit)
+async def activity_log(
+    user=Depends(require_roles("admin")),
+    limit: int = 500,
+    user_email: str = "",
+    action: str = "",
+    entity: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    q: str = "",
+):
+    query = {}
+    if user_email: query["user_email"] = user_email
+    if action: query["action"] = action
+    if entity: query["entity"] = entity
+    if date_from or date_to:
+        rng = {}
+        if date_from: rng["$gte"] = date_from
+        if date_to:   rng["$lte"] = date_to + "T23:59:59"
+        query["timestamp"] = rng
+    if q:
+        query["$or"] = [
+            {"entity_id": {"$regex": q, "$options": "i"}},
+            {"user_name": {"$regex": q, "$options": "i"}},
+            {"user_email": {"$regex": q, "$options": "i"}},
+        ]
+    docs = await db.activity_log.find(query).sort("timestamp", -1).limit(limit).to_list(limit)
     return [_safe_json(clean_doc(d)) for d in docs]
+
+
+@api.get("/activity/facets")
+async def activity_facets(user=Depends(require_roles("admin"))):
+    """Distinct values for filter dropdowns."""
+    actions = await db.activity_log.distinct("action")
+    entities = await db.activity_log.distinct("entity")
+    users = await db.activity_log.distinct("user_email")
+    return {"actions": sorted(actions), "entities": sorted(entities), "users": sorted(users)}
 
 
 # =================== AI ===================
