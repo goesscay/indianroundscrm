@@ -1,0 +1,35 @@
+{
+  "summary": "Verified passport 'Enter Manually' bug fix on Sales /leads/new. All 4 UI flows PASSED. Backend persistence confirmed via admin API for the 3 created leads (IRKA07013 manual, IRKA07014 preset, IRKA07015 switch).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "primary_bug_manual_input_appears": true,
+    "primary_bug_reason_persisted": "IRKA07013 passport_reason='lost my passport last week' ✓",
+    "regression_preset_hides_manual_input": true,
+    "regression_preset_persisted": "IRKA07014 passport_reason='Passport Not Applied' ✓",
+    "regression_switch_preset_to_other_clears": true,
+    "regression_switch_other_to_preset_hides": true,
+    "regression_switch_second_other_empty": true,
+    "regression_switch_persisted": "IRKA07015 passport_reason='test switch reason' ✓",
+    "regression_yes_hides_section": true,
+    "regression_reno_clears_placeholder": true,
+    "regression_reno_other_empty_no_ghost": true
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "LeadForm.jsx line 527: onChange still calls setCustomReason(v) which is now redundant since the Input value is bound to f.passport_reason. Consider removing setCustomReason to reduce state duplication (customReason state is only used as a fallback at line 223 which is also no longer needed since f.passport_reason holds the value).",
+    "Line 76: customReason state is largely vestigial after this refactor - could be cleaned up."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only test)", "frontend": "100%"},
+  "test_credentials": "sales@indianrounds.com/sales123, admin@indianrounds.com/admin123 - both work",
+  "seed_data_creation": "Created 3 TEST leads: IRKA07013, IRKA07014, IRKA07015 (Sales user; auto-allocated to Karuva as expected behavior per prior iteration_11 note)",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Passport manual entry bug is fully fixed. Radix Select options are clickable via page.get_by_role('option', name=..., exact=True). Note there's a duplicated locator issue with plain get_by_text due to native <option> mirror in DOM — use role=option instead. Sales user is redirected to /leads (not lead detail) when destination auto-allocates to another consultant — intentional."
+}

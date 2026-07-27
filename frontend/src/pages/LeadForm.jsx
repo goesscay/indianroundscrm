@@ -74,6 +74,7 @@ export default function LeadForm() {
   const [blockDialog, setBlockDialog] = useState(null);
   const [customCity, setCustomCity] = useState("");
   const [customReason, setCustomReason] = useState("");
+  const [otherReason, setOtherReason] = useState(false);
 
   const cleanPhone = (raw) => (raw || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "");
   const validPhone = (raw) => {
@@ -190,9 +191,16 @@ export default function LeadForm() {
       passport_available: val,
       passport_reason: val === false ? p.passport_reason : "",
     }));
+    if (val !== false) setOtherReason(false);
   };
   const setReason = (v) => {
-    if (v === "__other__") { setF(p => ({ ...p, passport_reason: "" })); return; }
+    if (v === "__other__") {
+      setOtherReason(true);
+      setF(p => ({ ...p, passport_reason: "" }));
+      setCustomReason("");
+      return;
+    }
+    setOtherReason(false);
     setF(p => ({ ...p, passport_reason: v }));
     setCustomReason("");
   };
@@ -258,7 +266,10 @@ export default function LeadForm() {
 
   const kids = useMemo(() => Number(f.children) || 0, [f.children]);
   const reasonIsPreset = PASSPORT_REASONS.includes(f.passport_reason);
-  const reasonSelectValue = f.passport_reason ? (reasonIsPreset ? f.passport_reason : "__other__") : undefined;
+  const showManualReasonInput = otherReason || (f.passport_reason && !reasonIsPreset);
+  const reasonSelectValue = showManualReasonInput
+    ? "__other__"
+    : (reasonIsPreset ? f.passport_reason : undefined);
 
   return (
     <div className="space-y-6" data-testid="new-lead-page">
@@ -508,12 +519,14 @@ export default function LeadForm() {
                   </SelectContent>
                 </Select>
               </div>
-              {(reasonSelectValue === "__other__" || (!reasonIsPreset && f.passport_reason)) && (
+              {showManualReasonInput && (
                 <div>
                   <Label className="label-caps">Enter reason</Label>
-                  <Input className="mt-1.5" value={customReason || (reasonIsPreset ? "" : f.passport_reason)}
-                         onChange={e => { setCustomReason(e.target.value); setF(p => ({ ...p, passport_reason: e.target.value })); }}
-                         placeholder="Custom reason…" data-testid="f-passport-reason-custom" />
+                  <Input className="mt-1.5"
+                         value={f.passport_reason}
+                         onChange={e => { const v = e.target.value; setCustomReason(v); setF(p => ({ ...p, passport_reason: v })); }}
+                         placeholder="Custom reason…"
+                         data-testid="f-passport-reason-custom" />
                 </div>
               )}
             </div>
