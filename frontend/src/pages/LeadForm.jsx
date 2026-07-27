@@ -73,7 +73,6 @@ export default function LeadForm() {
   const [phoneErr, setPhoneErr] = useState("");
   const [blockDialog, setBlockDialog] = useState(null);
   const [customCity, setCustomCity] = useState("");
-  const [customReason, setCustomReason] = useState("");
   const [otherReason, setOtherReason] = useState(false);
 
   const cleanPhone = (raw) => (raw || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "");
@@ -197,12 +196,10 @@ export default function LeadForm() {
     if (v === "__other__") {
       setOtherReason(true);
       setF(p => ({ ...p, passport_reason: "" }));
-      setCustomReason("");
       return;
     }
     setOtherReason(false);
     setF(p => ({ ...p, passport_reason: v }));
-    setCustomReason("");
   };
 
   const submit = async (e, force = false) => {
@@ -220,7 +217,7 @@ export default function LeadForm() {
     setBusy(true);
     try {
       const passportReason = f.passport_available === false
-        ? (f.passport_reason || customReason || "").trim()
+        ? (f.passport_reason || "").trim()
         : "";
       const payload = {
         ...f,
@@ -524,7 +521,7 @@ export default function LeadForm() {
                   <Label className="label-caps">Enter reason</Label>
                   <Input className="mt-1.5"
                          value={f.passport_reason}
-                         onChange={e => { const v = e.target.value; setCustomReason(v); setF(p => ({ ...p, passport_reason: v })); }}
+                         onChange={e => setF(p => ({ ...p, passport_reason: e.target.value }))}
                          placeholder="Custom reason…"
                          data-testid="f-passport-reason-custom" />
                 </div>
