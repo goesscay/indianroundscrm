@@ -1,7 +1,7 @@
 # Indian Rounds (IR) — Travel Lead Management CRM
 
 ## Problem Statement
-Enterprise-grade Travel CRM with 3 roles. Auto-generated Lead IDs, controlled supplier email workflow (RSQ) & instant packaged quoting (NRSQ), pipeline, dashboards, master data, audit log, AI itinerary/quote suggestions.
+Enterprise-grade Travel CRM with 3 roles (Sales / Operations / Admin). Auto-generated Lead IDs, smart destination-aware lead form, controlled supplier email workflow (RSQ) & instant packaged quoting (NRSQ), dashboards, master data, audit log, AI itinerary/quote suggestions.
 
 ## Architecture
 - Frontend: React 19 + Tailwind + shadcn/ui + Recharts + lucide-react
@@ -13,39 +13,43 @@ Enterprise-grade Travel CRM with 3 roles. Auto-generated Lead IDs, controlled su
 ## Completed
 - JWT + Google auth + 3 seeded users
 - Lead CRUD + auto-ID + duplicate detection + destination allocation
-- Role-based dashboards, KPIs, charts, calendar view
+- Role-based dashboards + KPIs + charts + calendar view
 - Suppliers / Users / Master Data / Activity Log
-- AI Assistant
-- PWA + Contact Timeline + Follow-up countdowns + Notes
-- NRSQ vs RSQ quote-type workflow with `canQuote` gate
-- Plain-text supplier RFQ email with editable body + Copy + Reset
-- **Supplier Mail Builder & RSQ workflow overhaul** (2026-02):
-  - Sales role CANNOT open mail composer or view supplier lists / supplier dashboard
-  - Sales RSQ button creates an RSQ request record (POST /api/rsq-requests) — Ops team notified via in-app bell
-  - Lead detail shows amber `Awaiting Ops to send mail` pulse badge (animate-pulse) while status=`new`
-  - Ops+Admin retain full mail composer; after send → red `Awaiting supplier reply` ping badge (animate-ping) until any reply
-  - **New page `/supplier-dashboard`** (Ops+Admin only): 4 lanes — New Requests / Pending Supplier Replies / Responses Received / Completed — with auto-refresh every 30s, card counts, and click-through to lead detail
-  - Automatic lane transitions: new → pending_reply (on mail send) → response_received (on supplier reply) → completed (on Quote Sent to Customer / Booked / Closed / Cancelled)
-  - Notifications endpoint extended with `rsq_created` alerts for Ops+Admin
-  - Sidebar hides Supplier Dashboard + Suppliers links from Sales role
-  - Sales-side idempotent RSQ (repeat clicks show "already raised" info toast)
+- AI Assistant + PWA + Contact Timeline + Follow-up countdowns + Notes
+- NRSQ vs RSQ quote-type workflow with `canQuote` role gate (sales/ops/admin)
+- Plain-text Supplier RFQ email (Trip Enquiry subject; UPPERCASE headings; N/A defaults; editable + Copy + Reset)
+- Supplier Mail Builder & RSQ workflow overhaul: sales raises RSQ request → Ops sends mail → blinking pulse/ping indicators → auto lane transitions
+- `/supplier-dashboard` (Ops+Admin): 4-lane kanban with auto-refresh, notification bell alerts
+- **Smart Lead Form** (2026-02):
+  - Travel Start Date + No.of Days → auto-calc Trip End Date + `3N / 4D` duration label (nights = days-1)
+  - Destination → smart city load with 16 preseeded destinations (Thailand, Bali, Dubai, Singapore, Malaysia, Sri Lanka, Vietnam, Maldives, Europe, Kashmir, Kerala, Goa, Andaman, Rajasthan, Himachal, Uttarakhand)
+  - Multi-city stay selection with optional per-city nights + `+ Other / Manual Entry` free-text
+  - Live "Bangkok 2N + Pattaya 1N" stay summary + non-blocking mismatch warning
+  - Passport Yes / No with 6 preset reasons (Not Applied / In Progress / Expired / Renewal / Will Apply Later / Other) + custom entry
+  - All new fields auto-populate the RSQ plain-text email (TRIP DETAILS with Trip End + Duration lines, STAY DETAILS block, PASSPORT block)
+  - Admin can add / remove / reorder cities per destination via Master Data → Destination → Cities Mapping editor
+  - Backend endpoints: GET /api/destination-cities, GET /:destination, PUT /:destination (admin)
+  - Sales redirect to /leads (instead of forbidden lead detail) when auto-allocated to another consultant
 
-## Backlog
+## Backlog / Roadmap
 - P1: Customer Quotation PDF + Email Customer flow
 - P1: Deeper AI hook — package + pricing suggestion inside NRSQ dialog
 - P2: Attach documents to RSQ (Resend attachments)
 - P2: Automated overdue reminder scheduler
 - P2: Excel/PDF export for dashboard reports
-- P2: Refactor `server.py` into routers
-- P2: Fix pre-existing Dashboard.jsx nested-anchor hydration warning (tel:/wa.me: inside <Link>)
+- P2: Refactor server.py (~1600 lines) into routers
+- P2: Fix pre-existing Dashboard.jsx nested-anchor hydration warning
 - P2: Radix Dialog aria-describedby a11y warnings
-- P3: Loading indicator on Supplier Dashboard 30s auto-refresh
+- P3: One-time migration to backfill duration/end_date for legacy leads (currently shows "—")
 
 ## Test Credentials
-See `/app/memory/test_credentials.md`
+See /app/memory/test_credentials.md
 
-## Update — 2026-02 iteration 10
-- [x] Backend: new endpoints `POST/GET /api/rsq-requests`, `GET /api/rsq-requests/{lead_id}`; `rsq_requests` collection; hooks in send_supplier_mail, update_supplier_response, webhook inbound reply, lead PATCH to auto-transition lanes; extended notifications with `rsq_created`
-- [x] Frontend: `SupplierDashboard.jsx` (4-lane kanban, auto-refresh, cards link to lead detail); `LeadDetail.jsx` splits RSQ button between sales (creates request) vs ops (opens composer); pulse/ping badges for `rsq_status`
-- [x] Layout: `nav-supplier-dashboard` added for admin+ops; hidden from sales; sales also loses `nav-suppliers`
-- [x] Tested end-to-end via testing_agent_v3 iteration_10 → Backend 13/13 + Frontend 100% for RSQ workflow. `test_rsq_workflow.py` added.
+## Update — 2026-02 iteration 11
+- [x] Backend: LeadCreate/LeadUpdate extended (duration_days, stay_cities, passport_available, passport_reason); _compute_trip_fields auto-derives trip_end_date, duration_label, stay_summary; destination-cities endpoints + seed of 16 destinations
+- [x] Backend: render_supplier_rfq_text now includes Trip End Date, Duration, STAY DETAILS block, PASSPORT block
+- [x] Frontend: LeadForm.jsx full rewrite with smart destination-aware city picker, per-city nights, custom entry, passport Y/N with reason flow, live duration calc
+- [x] Frontend: LeadDetail.jsx KV rows for Trip End Date, Duration, Stay Cities, Passport (visible to Sales + Ops)
+- [x] Frontend: MasterData.jsx adds DestinationCitiesEditor (Admin only)
+- [x] UX fix: Sales redirected to /leads (not lead detail) when created lead is auto-allocated to another consultant
+- [x] Tested via testing_agent iteration_11 → Backend 9/9 + Frontend 100% pass; `test_smart_lead_form.py` added

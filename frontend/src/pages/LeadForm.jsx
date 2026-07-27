@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Plus, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const F = ({ label, required, children, testId }) => (
@@ -30,24 +31,49 @@ function SelectMaster({ options, value, onChange, placeholder, testId }) {
   );
 }
 
+const PASSPORT_REASONS = [
+  "Passport Not Applied",
+  "Passport Application in Progress",
+  "Passport Expired",
+  "Passport Renewal in Progress",
+  "Customer Will Apply Later",
+];
+
 const EMPTY = {
-  customer_name: "", phone: "", email: "", travel_date: "", destination: "",
-  hotel_category: "", meal_plan: "", package_type: "", budget: "",
+  customer_name: "", phone: "", email: "", travel_date: "", duration_days: "",
+  destination: "", hotel_category: "", meal_plan: "", package_type: "", budget: "",
   adults: 2, children: 0, child_ages_arr: [], rooms: 1, room_type: "",
   departure_from: "", special_requests: "", lead_source: "",
+  stay_cities: [],   // [{city, nights}]
+  passport_available: null,  // true / false / null
+  passport_reason: "",
+};
+
+// Format ISO date + N days later
+const addDaysISO = (isoDate, days) => {
+  if (!isoDate || !days) return "";
+  try {
+    const d = new Date(isoDate);
+    if (isNaN(d)) return "";
+    d.setDate(d.getDate() + (Number(days) - 1));
+    return d.toISOString().slice(0, 10);
+  } catch { return ""; }
 };
 
 export default function LeadForm() {
   const nav = useNavigate();
   const { user } = useAuth();
   const [master, setMaster] = useState({});
+  const [destCities, setDestCities] = useState({});
   const [f, setF] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [ageErrors, setAgeErrors] = useState({});
   const [duplicates, setDuplicates] = useState([]);
   const [dupBusy, setDupBusy] = useState(false);
   const [phoneErr, setPhoneErr] = useState("");
-  const [blockDialog, setBlockDialog] = useState(null); // { message, existing }
+  const [blockDialog, setBlockDialog] = useState(null);
+  const [customCity, setCustomCity] = useState("");
+  const [customReason, setCustomReason] = useState("");
 
   const cleanPhone = (raw) => (raw || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "");
   const validPhone = (raw) => {
@@ -59,13 +85,16 @@ export default function LeadForm() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await api.get("/master");
-      const grouped = data.reduce((acc, m) => { (acc[m.category] = acc[m.category] || []).push(m.value); return acc; }, {});
+      const [m, dc] = await Promise.all([
+        api.get("/master"),
+        api.get("/destination-cities"),
+      ]);
+      const grouped = m.data.reduce((acc, x) => { (acc[x.category] = acc[x.category] || []).push(x.value); return acc; }, {});
       setMaster(grouped);
+      setDestCities(dc.data || {});
     })();
   }, []);
 
-  // Sync child_ages_arr length with children count
   useEffect(() => {
     setF((p) => {
       const n = Math.max(0, Math.min(10, Number(p.children) || 0));
@@ -75,7 +104,6 @@ export default function LeadForm() {
     });
   }, [f.children]);
 
-  // Duplicate detection debounced
   useEffect(() => {
     const p = (f.phone || "").trim();
     const e = (f.email || "").trim();
@@ -122,6 +150,53 @@ export default function LeadForm() {
     return ok;
   };
 
+  // ------- Derived values -------
+  const nights = f.duration_days ? Math.max(0, Number(f.duration_days) - 1) : 0;
+  const durationLabel = f.duration_days ? `${nights}N / ${Number(f.duration_days)}D` : "";
+  const tripEndDate = addDaysISO(f.travel_date, f.duration_days);
+  const availableCities = destCities[f.destination] || [];
+  const staySummary = (f.stay_cities || []).map(sc => sc.nights ? `${sc.city} ${sc.nights}N` : sc.city).join(" + ");
+  const totalStayNights = (f.stay_cities || []).reduce((s, sc) => s + (Number(sc.nights) || 0), 0);
+  const nightsMismatch = f.duration_days && totalStayNights > 0 && totalStayNights !== nights;
+
+  // ------- City handlers -------
+  const toggleCity = (city, checked) => {
+    setF(p => {
+      const rest = p.stay_cities.filter(sc => sc.city !== city);
+      return { ...p, stay_cities: checked ? [...rest, { city, nights: null }] : rest };
+    });
+  };
+  const setCityNights = (city, nights) => {
+    setF(p => ({
+      ...p,
+      stay_cities: p.stay_cities.map(sc => sc.city === city ? { ...sc, nights: nights ? Number(nights) : null } : sc),
+    }));
+  };
+  const addCustomCity = () => {
+    const v = customCity.trim();
+    if (!v) return;
+    if (f.stay_cities.some(sc => sc.city.toLowerCase() === v.toLowerCase())) { toast.info("City already added"); return; }
+    setF(p => ({ ...p, stay_cities: [...p.stay_cities, { city: v, nights: null }] }));
+    setCustomCity("");
+  };
+  const removeCity = (city) => {
+    setF(p => ({ ...p, stay_cities: p.stay_cities.filter(sc => sc.city !== city) }));
+  };
+
+  // ------- Passport handlers -------
+  const setPassport = (val) => {
+    setF(p => ({
+      ...p,
+      passport_available: val,
+      passport_reason: val === false ? p.passport_reason : "",
+    }));
+  };
+  const setReason = (v) => {
+    if (v === "__other__") { setF(p => ({ ...p, passport_reason: "" })); return; }
+    setF(p => ({ ...p, passport_reason: v }));
+    setCustomReason("");
+  };
+
   const submit = async (e, force = false) => {
     if (e) e.preventDefault();
     const pErr = validPhone(f.phone);
@@ -136,19 +211,33 @@ export default function LeadForm() {
     }
     setBusy(true);
     try {
+      const passportReason = f.passport_available === false
+        ? (f.passport_reason || customReason || "").trim()
+        : "";
       const payload = {
         ...f,
         phone: cleanPhone(f.phone),
         adults: Number(f.adults),
         children: Number(f.children),
         rooms: Number(f.rooms),
+        duration_days: f.duration_days ? Number(f.duration_days) : null,
         child_ages: f.child_ages_arr.join(", "),
+        stay_cities: f.stay_cities.filter(sc => sc.city && sc.city.trim())
+                                  .map(sc => ({ city: sc.city.trim(), nights: sc.nights || null })),
+        passport_available: f.passport_available,
+        passport_reason: passportReason,
       };
       delete payload.child_ages_arr;
       const url = force ? "/leads?force=true" : "/leads";
       const { data } = await api.post(url, payload);
-      toast.success(`Lead ${data.lead_id} created`);
-      nav(`/leads/${data.lead_id}`);
+      // If the destination was auto-allocated to a different sales consultant, sales won't see the lead in their list
+      if (user.role === "sales" && data.staff_id && data.staff_id !== user.id) {
+        toast.success(`Lead ${data.lead_id} created — assigned to ${data.staff_name || "another consultant"}`);
+        nav("/leads");
+      } else {
+        toast.success(`Lead ${data.lead_id} created`);
+        nav(`/leads/${data.lead_id}`);
+      }
     } catch (err) {
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 409 && detail?.existing) {
@@ -168,6 +257,8 @@ export default function LeadForm() {
   };
 
   const kids = useMemo(() => Number(f.children) || 0, [f.children]);
+  const reasonIsPreset = PASSPORT_REASONS.includes(f.passport_reason);
+  const reasonSelectValue = f.passport_reason ? (reasonIsPreset ? f.passport_reason : "__other__") : undefined;
 
   return (
     <div className="space-y-6" data-testid="new-lead-page">
@@ -184,6 +275,7 @@ export default function LeadForm() {
       </div>
 
       <form onSubmit={submit} className="space-y-6">
+        {/* Customer */}
         <Card className="p-6 rounded-lg">
           <h3 className="font-display text-xl font-bold mb-4">Customer</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -203,7 +295,6 @@ export default function LeadForm() {
             <F label="Email"><Input type="email" value={f.email} onChange={set("email")} data-testid="f-email" /></F>
             <F label="Lead Source"><SelectMaster options={master.lead_source} value={f.lead_source} onChange={set("lead_source")} placeholder="Website / Instagram…" testId="f-lead-source" /></F>
             <F label="Departure From"><SelectMaster options={master.departure_city} value={f.departure_from} onChange={set("departure_from")} placeholder="City" testId="f-departure" /></F>
-            <F label="Travel Date"><Input type="date" value={f.travel_date} onChange={set("travel_date")} data-testid="f-travel-date" /></F>
           </div>
           {duplicates.length > 0 && (
             <div className="mt-4 p-4 rounded-md border border-amber-300 bg-amber-50" data-testid="duplicate-warning">
@@ -223,10 +314,33 @@ export default function LeadForm() {
           {dupBusy && <div className="text-xs text-muted-foreground mt-2">Checking for duplicates…</div>}
         </Card>
 
+        {/* Trip */}
         <Card className="p-6 rounded-lg">
           <h3 className="font-display text-xl font-bold mb-4">Trip</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <F label="Destination" required><SelectMaster options={master.destination} value={f.destination} onChange={set("destination")} placeholder="Choose destination" testId="f-destination" /></F>
+            <F label="Destination" required>
+              <SelectMaster options={master.destination} value={f.destination}
+                            onChange={(v) => setF(p => ({ ...p, destination: v, stay_cities: [] }))}
+                            placeholder="Choose destination" testId="f-destination" />
+            </F>
+            <F label="Travel Start Date">
+              <Input type="date" value={f.travel_date} onChange={set("travel_date")} data-testid="f-travel-date" />
+            </F>
+            <F label="No. of Days">
+              <Input type="number" min="1" max="90" value={f.duration_days}
+                     onChange={(e) => set("duration_days")(e.target.value.replace(/\D/g, ""))}
+                     placeholder="e.g. 4" data-testid="f-days" />
+            </F>
+            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 rounded-md bg-secondary/40 border border-border" data-testid="trip-derived">
+              <div>
+                <div className="label-caps">Trip End Date (auto)</div>
+                <div className="mt-1 font-display text-lg font-bold" data-testid="derived-end-date">{tripEndDate || "—"}</div>
+              </div>
+              <div>
+                <div className="label-caps">Duration (auto)</div>
+                <div className="mt-1 font-display text-lg font-bold" data-testid="derived-duration">{durationLabel || "—"}</div>
+              </div>
+            </div>
             <F label="Package Type"><SelectMaster options={master.package_type} value={f.package_type} onChange={set("package_type")} placeholder="Family / Honeymoon…" testId="f-package-type" /></F>
             <F label="Hotel Category"><SelectMaster options={master.hotel_category} value={f.hotel_category} onChange={set("hotel_category")} placeholder="4 Star, Villa…" testId="f-hotel-cat" /></F>
             <F label="Meal Plan"><SelectMaster options={master.meal_plan} value={f.meal_plan} onChange={set("meal_plan")} placeholder="CP / MAP / AP…" testId="f-meal-plan" /></F>
@@ -235,6 +349,94 @@ export default function LeadForm() {
           </div>
         </Card>
 
+        {/* Stay Cities */}
+        {f.destination && (
+          <Card className="p-6 rounded-lg" data-testid="stay-cities-card">
+            <div className="flex items-end justify-between flex-wrap gap-3 mb-1">
+              <div>
+                <h3 className="font-display text-xl font-bold">Which city / area will you stay in?</h3>
+                <p className="text-xs text-muted-foreground mt-1">Pick one or more cities for {f.destination}. Nights per city is optional.</p>
+              </div>
+              {staySummary && (
+                <div className="text-right">
+                  <div className="label-caps">Stay summary</div>
+                  <div className="font-display font-bold" data-testid="stay-summary">{staySummary}</div>
+                </div>
+              )}
+            </div>
+
+            {availableCities.length === 0 && (
+              <div className="text-xs text-muted-foreground mt-3 py-3 px-4 rounded-md border border-dashed border-border">
+                No preset cities for {f.destination} yet. Admin can add cities from Master Data → Destination Cities. Use the manual entry below.
+              </div>
+            )}
+
+            {availableCities.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 mt-3">
+                {availableCities.map(city => {
+                  const sel = f.stay_cities.find(sc => sc.city === city);
+                  return (
+                    <label key={city}
+                           className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${sel ? "border-[#106EBE] bg-[#106EBE]/5" : "border-border hover:bg-secondary/40"}`}
+                           data-testid={`f-city-${city}`}>
+                      <Checkbox checked={!!sel} onCheckedChange={(v) => toggleCity(city, !!v)} />
+                      <span className="flex-1 text-sm font-medium">{city}</span>
+                      {sel && (
+                        <Input
+                          type="number" min="1" max="30"
+                          value={sel.nights || ""}
+                          onChange={(e) => setCityNights(city, e.target.value)}
+                          onClick={(e) => e.preventDefault()}
+                          placeholder="N"
+                          className="h-7 w-14 text-xs"
+                          data-testid={`f-city-nights-${city}`}
+                        />
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Custom city input */}
+            <div className="mt-4">
+              <Label className="label-caps">+ Other / Manual Entry</Label>
+              <div className="flex gap-2 mt-1.5">
+                <Input value={customCity} onChange={e => setCustomCity(e.target.value)}
+                       onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addCustomCity())}
+                       placeholder="Type a city not in the list…" data-testid="f-custom-city" />
+                <Button type="button" onClick={addCustomCity} variant="outline" data-testid="f-add-custom-city">
+                  <Plus size={14} /> Add
+                </Button>
+              </div>
+            </div>
+
+            {/* Chips of custom cities (not in preset list) */}
+            {f.stay_cities.filter(sc => !availableCities.includes(sc.city)).length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3" data-testid="f-custom-city-chips">
+                {f.stay_cities.filter(sc => !availableCities.includes(sc.city)).map(sc => (
+                  <span key={sc.city} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#106EBE]/10 text-sm border border-[#106EBE]/30">
+                    <span className="font-medium">{sc.city}</span>
+                    <Input type="number" min="1" max="30" value={sc.nights || ""}
+                           onChange={(e) => setCityNights(sc.city, e.target.value)}
+                           placeholder="N" className="h-6 w-12 text-xs" />
+                    <button type="button" onClick={() => removeCity(sc.city)} className="text-muted-foreground hover:text-destructive"><X size={12} /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {nightsMismatch && (
+              <div className="mt-4 p-3 rounded-md border border-amber-300 bg-amber-50 text-xs text-amber-900" data-testid="stay-mismatch-warning">
+                <AlertTriangle size={12} className="inline -mt-0.5 mr-1" />
+                Stay nights ({totalStayNights}N) do not match the selected trip duration ({nights}N).
+                Please check the details. You can still save — this is a warning only.
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Guests */}
         <Card className="p-6 rounded-lg">
           <h3 className="font-display text-xl font-bold mb-4">Guests</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -271,6 +473,49 @@ export default function LeadForm() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Passport */}
+        <Card className="p-6 rounded-lg" data-testid="passport-card">
+          <h3 className="font-display text-xl font-bold mb-1">Passport Available?</h3>
+          <p className="text-xs text-muted-foreground mb-4">Required for international travel processing.</p>
+          <div className="flex gap-3 flex-wrap">
+            <button type="button" onClick={() => setPassport(true)}
+                    className={`px-6 h-11 rounded-md border font-semibold text-sm transition-colors ${f.passport_available === true ? "bg-emerald-500 text-white border-emerald-500" : "bg-white border-border hover:bg-secondary"}`}
+                    data-testid="f-passport-yes">
+              YES
+            </button>
+            <button type="button" onClick={() => setPassport(false)}
+                    className={`px-6 h-11 rounded-md border font-semibold text-sm transition-colors ${f.passport_available === false ? "bg-red-500 text-white border-red-500" : "bg-white border-border hover:bg-secondary"}`}
+                    data-testid="f-passport-no">
+              NO
+            </button>
+          </div>
+
+          {f.passport_available === false && (
+            <div className="mt-5 space-y-3" data-testid="passport-reason-section">
+              <div>
+                <Label className="label-caps">Why is passport not available?</Label>
+                <Select value={reasonSelectValue} onValueChange={setReason}>
+                  <SelectTrigger className="h-10 mt-1.5" data-testid="f-passport-reason-select">
+                    <SelectValue placeholder="Choose a reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PASSPORT_REASONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    <SelectItem value="__other__">+ Other / Enter Manually</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {(reasonSelectValue === "__other__" || (!reasonIsPreset && f.passport_reason)) && (
+                <div>
+                  <Label className="label-caps">Enter reason</Label>
+                  <Input className="mt-1.5" value={customReason || (reasonIsPreset ? "" : f.passport_reason)}
+                         onChange={e => { setCustomReason(e.target.value); setF(p => ({ ...p, passport_reason: e.target.value })); }}
+                         placeholder="Custom reason…" data-testid="f-passport-reason-custom" />
+                </div>
+              )}
             </div>
           )}
         </Card>

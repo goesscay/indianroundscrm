@@ -5,8 +5,8 @@ load_dotenv(Path(__file__).parent / '.env')
 
 import os
 import logging
-from datetime import datetime, timezone
-from typing import Optional, List
+from datetime import datetime, timezone, timedelta
+from typing import Optional, List, Dict, Any
 from bson import ObjectId
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Query
@@ -130,12 +130,18 @@ class DestinationAllocation(BaseModel):
     consultant_id: str
 
 
+class StayCity(BaseModel):
+    city: str
+    nights: Optional[int] = None
+
+
 class LeadCreate(BaseModel):
     customer_name: str
     phone: str
     email: str = ""
     lead_date: str = ""  # ISO date
     travel_date: str = ""
+    duration_days: Optional[int] = None
     destination: str
     hotel_category: str = ""
     meal_plan: str = ""
@@ -149,6 +155,9 @@ class LeadCreate(BaseModel):
     departure_from: str = ""
     special_requests: str = ""
     lead_source: str = ""
+    stay_cities: List[StayCity] = []
+    passport_available: Optional[bool] = None
+    passport_reason: str = ""
 
     @field_validator("phone")
     @classmethod
@@ -195,6 +204,7 @@ class LeadUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     travel_date: Optional[str] = None
+    duration_days: Optional[int] = None
     destination: Optional[str] = None
     hotel_category: Optional[str] = None
     meal_plan: Optional[str] = None
@@ -207,6 +217,9 @@ class LeadUpdate(BaseModel):
     room_type: Optional[str] = None
     departure_from: Optional[str] = None
     special_requests: Optional[str] = None
+    stay_cities: Optional[List[StayCity]] = None
+    passport_available: Optional[bool] = None
+    passport_reason: Optional[str] = None
     lead_status: Optional[str] = None
     remarks: Optional[str] = None
     supplier_quote_amount: Optional[float] = None
@@ -456,6 +469,36 @@ def _lead_filter_for_user(user: dict) -> dict:
     return {}
 
 
+def _compute_trip_fields(data: dict) -> dict:
+    """Auto-derive trip_end_date, duration_label, stay_summary from user input.
+    Nights = days - 1. duration_label format: '3N / 4D'."""
+    days = data.get("duration_days")
+    travel_date = (data.get("travel_date") or "").strip()
+    if days and int(days) > 0 and travel_date:
+        try:
+            d = int(days)
+            start = datetime.fromisoformat(travel_date[:10])
+            end = start + timedelta(days=max(0, d - 1))
+            data["trip_end_date"] = end.strftime("%Y-%m-%d")
+            data["duration_label"] = f"{max(0, d - 1)}N / {d}D"
+        except Exception:
+            pass
+    cities = data.get("stay_cities") or []
+    if cities:
+        parts = []
+        for c in cities:
+            if isinstance(c, dict):
+                name = (c.get("city") or "").strip()
+                nights = c.get("nights")
+            else:  # StayCity Pydantic
+                name = getattr(c, "city", "").strip()
+                nights = getattr(c, "nights", None)
+            if not name: continue
+            parts.append(f"{name} {nights}N" if nights else name)
+        data["stay_summary"] = " + ".join(parts) if parts else ""
+    return data
+
+
 def _calc_derived(lead: dict) -> dict:
     supp = lead.get("supplier_quote_amount") or 0
     sell = lead.get("selling_amount") or 0
@@ -507,6 +550,10 @@ async def create_lead(body: LeadCreate, force: bool = False,
     consultant_code = (owner.get("consultant_code") or owner.get("staff_code") or "XX")[:2].upper()
     lead_id = await generate_lead_id(consultant_code)
     doc = body.model_dump()
+    # Serialize stay_cities Pydantic → dict
+    if doc.get("stay_cities"):
+        doc["stay_cities"] = [c if isinstance(c, dict) else c.model_dump() for c in doc["stay_cities"]]
+    doc = _compute_trip_fields(doc)
     doc.update({
         "lead_id": lead_id,
         "lead_date": doc.get("lead_date") or now_iso(),
@@ -590,14 +637,28 @@ async def update_lead(lead_id: str, body: LeadUpdate, user=Depends(get_current_u
 
     # Sales can only update limited fields
     if user["role"] == "sales":
-        sales_allowed = {"customer_name", "phone", "email", "travel_date", "destination",
+        sales_allowed = {"customer_name", "phone", "email", "travel_date", "duration_days", "destination",
                          "hotel_category", "meal_plan", "package_type", "budget",
                          "adults", "children", "child_ages", "rooms", "room_type",
                          "departure_from", "special_requests", "lead_status",
                          "remarks", "follow_up_date", "booking_status",
                          "selling_amount", "quote_type", "package_selected",
-                         "quote_sent_to_customer", "quote_sent_date"}
+                         "quote_sent_to_customer", "quote_sent_date",
+                         "stay_cities", "passport_available", "passport_reason"}
         updates = {k: v for k, v in updates.items() if k in sales_allowed}
+
+    # Serialize StayCity Pydantic objects → dicts and auto-compute derived fields
+    if "stay_cities" in updates and updates["stay_cities"] is not None:
+        updates["stay_cities"] = [
+            c if isinstance(c, dict) else c.model_dump()
+            for c in updates["stay_cities"]
+        ]
+    if any(k in updates for k in ("travel_date", "duration_days", "stay_cities")):
+        merged = {**existing, **updates}
+        derived = _compute_trip_fields(merged)
+        for k in ("trip_end_date", "duration_label", "stay_summary"):
+            if k in derived:
+                updates[k] = derived[k]
 
     updates["updated_at"] = now_iso()
     updates["updated_by"] = user["email"]
@@ -1020,6 +1081,37 @@ async def delete_master(mid: str, user=Depends(require_roles("admin"))):
     return {"success": True}
 
 
+# =================== Destination → Cities Mapping ===================
+class DestinationCitiesUpdate(BaseModel):
+    cities: List[str]
+
+
+@api.get("/destination-cities")
+async def list_destination_cities(user=Depends(get_current_user)):
+    """Return {destination: [city1, city2, ...]} for all destinations."""
+    docs = await db.destination_cities.find({}).sort("destination", 1).to_list(200)
+    return {d["destination"]: d.get("cities", []) for d in docs}
+
+
+@api.get("/destination-cities/{destination}")
+async def get_destination_cities(destination: str, user=Depends(get_current_user)):
+    doc = await db.destination_cities.find_one({"destination": destination})
+    return {"destination": destination, "cities": (doc or {}).get("cities", [])}
+
+
+@api.put("/destination-cities/{destination}")
+async def set_destination_cities(destination: str, body: DestinationCitiesUpdate,
+                                 user=Depends(require_roles("admin"))):
+    cities = [c.strip() for c in body.cities if c and c.strip()]
+    await db.destination_cities.update_one(
+        {"destination": destination},
+        {"$set": {"destination": destination, "cities": cities, "updated_at": now_iso()}},
+        upsert=True,
+    )
+    await log_activity(user, "set_destination_cities", "destination_cities", destination, None, {"cities": cities})
+    return {"destination": destination, "cities": cities}
+
+
 # =================== Dashboard ===================
 @api.get("/notifications")
 async def notifications(user=Depends(get_current_user)):
@@ -1188,7 +1280,7 @@ async def upcoming_followups(user=Depends(get_current_user), hours: int = 72):
     now = datetime.now(timezone.utc)
     horizon = now + __import__("datetime").timedelta(hours=hours)
     query = _lead_filter_for_user(user)
-    query["follow_up_date"] = {"$exists": True, "$ne": None, "$ne": ""}
+    query["follow_up_date"] = {"$exists": True, "$nin": [None, ""]}
     leads = await db.leads.find(query).to_list(2000)
     result = []
     for l in leads:  # noqa: E741
@@ -1443,6 +1535,26 @@ DEFAULT_SUPPLIERS = [
 ]
 
 
+DEFAULT_DESTINATION_CITIES = {
+    "Thailand": ["Bangkok", "Chiang Mai", "Chiang Rai", "Ayutthaya", "Sukhothai", "Phuket", "Krabi", "Ko Samui", "Pattaya", "Hua Hin"],
+    "Bali": ["Kuta", "Seminyak", "Ubud", "Nusa Dua", "Uluwatu", "Sanur", "Canggu", "Nusa Penida"],
+    "Dubai": ["Downtown Dubai", "Dubai Marina", "Palm Jumeirah", "Jumeirah", "Deira", "Business Bay", "JBR"],
+    "Singapore": ["Marina Bay", "Sentosa", "Orchard", "Chinatown", "Little India", "Clarke Quay"],
+    "Malaysia": ["Kuala Lumpur", "Langkawi", "Penang", "Kota Kinabalu", "Malacca", "Genting Highlands"],
+    "Sri Lanka": ["Colombo", "Kandy", "Nuwara Eliya", "Bentota", "Galle", "Ella", "Sigiriya", "Yala"],
+    "Vietnam": ["Ho Chi Minh City", "Hanoi", "Halong Bay", "Da Nang", "Hoi An", "Nha Trang", "Phu Quoc"],
+    "Maldives": ["Male", "North Male Atoll", "South Male Atoll", "Ari Atoll", "Baa Atoll"],
+    "Europe": ["Paris", "London", "Amsterdam", "Zurich", "Rome", "Venice", "Barcelona", "Prague", "Vienna", "Interlaken"],
+    "Kashmir": ["Srinagar", "Gulmarg", "Pahalgam", "Sonmarg", "Leh", "Nubra Valley"],
+    "Kerala": ["Kochi", "Munnar", "Thekkady", "Alleppey", "Kumarakom", "Kovalam", "Wayanad"],
+    "Goa": ["North Goa", "South Goa", "Panaji", "Calangute", "Baga", "Palolem", "Anjuna"],
+    "Andaman": ["Port Blair", "Havelock", "Neil Island", "Ross Island", "Baratang"],
+    "Rajasthan": ["Jaipur", "Udaipur", "Jodhpur", "Jaisalmer", "Pushkar", "Mount Abu", "Bikaner"],
+    "Himachal": ["Shimla", "Manali", "Dharamshala", "McLeodganj", "Kasol", "Spiti", "Dalhousie", "Kufri"],
+    "Uttarakhand": ["Rishikesh", "Haridwar", "Mussoorie", "Nainital", "Auli", "Jim Corbett", "Kedarnath", "Badrinath"],
+}
+
+
 async def seed_master(db):
     for category, values in DEFAULT_MASTER.items():
         for v in values:
@@ -1455,6 +1567,18 @@ async def seed_master(db):
         await db.suppliers.update_one(
             {"email": s["email"]},
             {"$setOnInsert": {**s, "created_at": now_iso()}},
+            upsert=True,
+        )
+    for dest, cities in DEFAULT_DESTINATION_CITIES.items():
+        await db.destination_cities.update_one(
+            {"destination": dest},
+            {"$setOnInsert": {"destination": dest, "cities": cities, "created_at": now_iso()}},
+            upsert=True,
+        )
+        # Also make sure destination master entry exists
+        await db.master.update_one(
+            {"category": "destination", "value": dest},
+            {"$setOnInsert": {"category": "destination", "value": dest, "created_at": now_iso()}},
             upsert=True,
         )
 

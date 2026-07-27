@@ -298,6 +298,13 @@ export default function LeadDetail() {
             <KV label="Email" value={lead.email || "—"} />
             <KV label="Destination" value={lead.destination} />
             <KV label="Travel Date" value={(lead.travel_date || "").slice(0, 10) || "—"} />
+            <KV label="Trip End Date" value={(lead.trip_end_date || "").slice(0, 10) || "—"} />
+            <KV label="Duration" value={lead.duration_label || (lead.duration_days ? `${lead.duration_days}D` : "—")} />
+            <KV label="Stay Cities" value={lead.stay_summary || "—"} full />
+            <KV label="Passport" value={
+              lead.passport_available === true ? "Yes" :
+              lead.passport_available === false ? `No · ${lead.passport_reason || "—"}` : "—"
+            } />
             <KV label="Package Type" value={lead.package_type || "—"} />
             <KV label="Hotel Category" value={lead.hotel_category || "—"} />
             <KV label="Meal Plan" value={lead.meal_plan || "—"} />

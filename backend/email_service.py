@@ -31,6 +31,8 @@ def render_supplier_rfq_text(lead: dict, intro_text: str = "") -> str:
     lead_id       = _v(lead.get("lead_id"))
     destination   = _v(lead.get("destination"))
     travel_date   = _fmt_date(lead.get("travel_date") or "")
+    trip_end      = _fmt_date(lead.get("trip_end_date") or "")
+    duration      = _v(lead.get("duration_label"))
     package_type  = _v(lead.get("package_type"))
     hotel_cat     = _v(lead.get("hotel_category"))
     meal_plan     = _v(lead.get("meal_plan"))
@@ -41,6 +43,25 @@ def render_supplier_rfq_text(lead: dict, intro_text: str = "") -> str:
     children      = _v(children_raw)
     child_age     = (lead.get("child_ages") or "").strip() or "Nil"
     special       = (lead.get("special_requests") or "").strip() or "Nil"
+
+    # Stay cities block
+    stay_lines: List[str] = []
+    for c in (lead.get("stay_cities") or []):
+        if not isinstance(c, dict): continue
+        name = (c.get("city") or "").strip()
+        if not name: continue
+        n = c.get("nights")
+        stay_lines.append(f"{name:<14}: {n} Night{'s' if (n or 0) != 1 else ''}" if n else f"{name:<14}: —")
+
+    # Passport
+    pp_avail = lead.get("passport_available")
+    if pp_avail is True:
+        passport_val, passport_reason = "Yes", ""
+    elif pp_avail is False:
+        passport_val = "No"
+        passport_reason = (lead.get("passport_reason") or "").strip() or "N/A"
+    else:
+        passport_val, passport_reason = "N/A", ""
 
     intro = (intro_text or "").strip() or "Please share your best quotation for the travel requirement below."
 
@@ -55,7 +76,15 @@ def render_supplier_rfq_text(lead: dict, intro_text: str = "") -> str:
         f"Lead ID       : {lead_id}",
         f"Destination   : {destination}",
         f"Travel Date   : {travel_date}",
+        f"Trip End Date : {trip_end}",
+        f"Duration      : {duration}",
         f"Package Type  : {package_type}",
+    ]
+
+    if stay_lines:
+        lines += ["", "STAY DETAILS"] + stay_lines
+
+    lines += [
         "",
         "ACCOMMODATION",
         f"Hotel Category: {hotel_cat}",
@@ -67,6 +96,14 @@ def render_supplier_rfq_text(lead: dict, intro_text: str = "") -> str:
         f"Adults        : {adults}",
         f"Children      : {children}",
         f"Child Age     : {child_age}",
+        "",
+        "PASSPORT",
+        f"Passport      : {passport_val}",
+    ]
+    if passport_reason:
+        lines.append(f"Reason        : {passport_reason}")
+
+    lines += [
         "",
         "SPECIAL REQUESTS",
         special,
