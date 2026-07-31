@@ -16,7 +16,8 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
-    set_auth_cookies, clear_auth_cookies, get_current_user, require_roles, seed_admin
+    set_auth_cookies, clear_auth_cookies, get_current_user, require_roles, seed_admin,
+    validate_password_policy, LOCKOUT_MAX_ATTEMPTS, LOCKOUT_MINUTES, VALID_ACCOUNT_STATUSES,
 )
 from ai_service import generate_itinerary, recommend_quote
 from email_service import send_email as send_email_service, render_supplier_rfq_text
@@ -81,6 +82,27 @@ async def log_activity(user: dict, action: str, entity: str, entity_id: str = ""
         "old_value": old_value, "new_value": new_value,
         "timestamp": now_iso(),
     })
+
+
+async def log_security(user: dict, event: str, request: Optional[Request] = None,
+                       extra: Optional[dict] = None):
+    """Append a security audit event."""
+    ip = ""
+    ua = ""
+    if request is not None:
+        ip = (request.client.host if request.client else "") or request.headers.get("x-forwarded-for", "")
+        ua = request.headers.get("user-agent", "")
+    doc = {
+        "user_id": str(user.get("_id") or user.get("id") or ""),
+        "user_email": user.get("email"),
+        "user_name": user.get("name"),
+        "event": event,
+        "ip": ip[:64],
+        "user_agent": ua[:200],
+        "extra": extra or {},
+        "timestamp": now_iso(),
+    }
+    await db.security_audit_log.insert_one(doc)
 
 
 async def generate_lead_id(consultant_code: str = "") -> str:
@@ -320,44 +342,251 @@ async def google_callback(request: Request, response: Response):
     if not user.get("active", True):
         raise HTTPException(status_code=403, detail="Account disabled")
     uid = str(user["_id"])
-    access = create_access_token(uid, email, user["role"])
-    refresh = create_refresh_token(uid)
+    tv = user.get("token_version", 0)
+    access = create_access_token(uid, email, user["role"], tv)
+    refresh = create_refresh_token(uid, tv)
     set_auth_cookies(response, access, refresh)
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login_at": now_iso()}})
+    await log_security(user, "login_google", request)
     return {
         "id": uid, "email": email, "name": user.get("name") or data.get("name"),
         "role": user["role"], "staff_code": user.get("staff_code", ""),
+        "account_status": user.get("account_status", "active"),
+        "password_reset_required": user.get("account_status") == "password_reset_required",
         "access_token": access,
     }
 
 
 @api.post("/auth/login")
-async def login(body: LoginBody, response: Response):
+async def login(body: LoginBody, request: Request, response: Response):
     email = body.email.lower()
     user = await db.users.find_one({"email": email})
-    if not user or not verify_password(body.password, user["password_hash"]):
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    if not user.get("active", True):
-        raise HTTPException(status_code=403, detail="Account disabled")
+
+    # Lockout window check
+    lu = user.get("locked_until")
+    if lu:
+        try:
+            lu_dt = datetime.fromisoformat(lu.replace("Z", "+00:00")) if isinstance(lu, str) else lu
+            if lu_dt > datetime.now(timezone.utc):
+                mins = int((lu_dt - datetime.now(timezone.utc)).total_seconds() / 60) + 1
+                await log_security(user, "login_blocked_locked", request)
+                raise HTTPException(status_code=423, detail=f"Account locked. Try again in {mins} minute(s) or contact your administrator.")
+            # Lock expired — auto-unlock
+            await db.users.update_one({"_id": user["_id"]}, {"$set": {"locked_until": None, "failed_login_attempts": 0}})
+        except HTTPException: raise
+        except Exception: pass
+
+    status = user.get("account_status", "active")
+    if status == "inactive":
+        raise HTTPException(status_code=403, detail="Your account is inactive. Contact admin.")
+    if status == "suspended":
+        raise HTTPException(status_code=403, detail="Your account is suspended. Contact admin.")
+
+    if not verify_password(body.password, user["password_hash"]):
+        # Increment failed attempts
+        attempts = int(user.get("failed_login_attempts", 0)) + 1
+        upd = {"failed_login_attempts": attempts}
+        if attempts >= LOCKOUT_MAX_ATTEMPTS:
+            upd["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)).isoformat()
+            upd["account_status"] = "locked"
+            await db.users.update_one({"_id": user["_id"]}, {"$set": upd})
+            await log_security(user, "login_locked", request, {"attempts": attempts})
+            raise HTTPException(status_code=423, detail=f"Too many unsuccessful login attempts. Account locked for {LOCKOUT_MINUTES} minutes.")
+        await db.users.update_one({"_id": user["_id"]}, {"$set": upd})
+        await log_security(user, "login_failed", request, {"attempts": attempts})
+        raise HTTPException(status_code=401, detail=f"Invalid email or password. {LOCKOUT_MAX_ATTEMPTS - attempts} attempt(s) remaining.")
+
+    # Successful password — clear attempts
     uid = str(user["_id"])
-    access = create_access_token(uid, email, user["role"])
-    refresh = create_refresh_token(uid)
+    tv = user.get("token_version", 0)
+    access = create_access_token(uid, email, user["role"], tv)
+    refresh = create_refresh_token(uid, tv)
     set_auth_cookies(response, access, refresh)
+    await db.users.update_one({"_id": user["_id"]}, {
+        "$set": {"failed_login_attempts": 0, "locked_until": None, "last_login_at": now_iso()}
+    })
+    await log_security(user, "login_success", request)
     return {
         "id": uid, "email": email, "name": user.get("name"),
         "role": user["role"], "staff_code": user.get("staff_code", ""),
+        "account_status": user.get("account_status", "active"),
+        "password_reset_required": user.get("account_status") == "password_reset_required",
         "access_token": access,
     }
 
 
+@api.post("/auth/refresh")
+async def refresh_session(request: Request, response: Response):
+    """Extend session — rotate access token using refresh cookie."""
+    rt = request.cookies.get("refresh_token")
+    if not rt:
+        raise HTTPException(status_code=401, detail="No refresh token")
+    import jwt as _jwt
+    try:
+        payload = _jwt.decode(rt, os.environ["JWT_SECRET"], algorithms=["HS256"])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid refresh token type")
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        if payload.get("tv", 0) != user.get("token_version", 0):
+            raise HTTPException(status_code=401, detail="Session revoked")
+        if user.get("account_status") in ("inactive", "suspended", "locked"):
+            raise HTTPException(status_code=403, detail=f"Account {user['account_status']}")
+        tv = user.get("token_version", 0)
+        access = create_access_token(str(user["_id"]), user["email"], user["role"], tv)
+        new_refresh = create_refresh_token(str(user["_id"]), tv)
+        set_auth_cookies(response, access, new_refresh)
+        return {"success": True}
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+
+class ChangePasswordBody(BaseModel):
+    current_password: Optional[str] = ""  # may be empty when forced-reset flow
+    new_password: str
+    confirm_password: str
+
+
+@api.post("/auth/change-password")
+async def change_password(body: ChangePasswordBody, request: Request, response: Response,
+                          user=Depends(get_current_user)):
+    if body.new_password != body.confirm_password:
+        raise HTTPException(status_code=400, detail="New password and confirmation do not match.")
+    validate_password_policy(body.new_password)
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])})
+    is_forced = doc.get("account_status") == "password_reset_required"
+    # Current-password check is required unless in forced-reset mode
+    if not is_forced:
+        if not body.current_password or not verify_password(body.current_password, doc["password_hash"]):
+            raise HTTPException(status_code=401, detail="Current password is incorrect.")
+    if verify_password(body.new_password, doc["password_hash"]):
+        raise HTTPException(status_code=400, detail="New password must be different from the current password.")
+    new_tv = int(doc.get("token_version", 0)) + 1
+    await db.users.update_one(
+        {"_id": doc["_id"]},
+        {"$set": {
+            "password_hash": hash_password(body.new_password),
+            "token_version": new_tv,
+            "account_status": "active",
+            "failed_login_attempts": 0,
+            "locked_until": None,
+            "password_changed_at": now_iso(),
+        }},
+    )
+    # Issue fresh tokens so the current session survives the token_version bump
+    access = create_access_token(user["id"], user["email"], user["role"], new_tv)
+    refresh = create_refresh_token(user["id"], new_tv)
+    set_auth_cookies(response, access, refresh)
+    await log_security(user, "password_changed", request, {"forced": is_forced})
+    return {"success": True, "message": "Password changed successfully."}
+
+
 @api.post("/auth/logout")
-async def logout(response: Response, user=Depends(get_current_user)):
+async def logout(request: Request, response: Response, user=Depends(get_current_user)):
     clear_auth_cookies(response)
+    await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": {"last_logout_at": now_iso()}})
+    await log_security(user, "logout", request)
     return {"success": True}
 
 
 @api.get("/auth/me")
 async def me(user=Depends(get_current_user)):
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if doc:
+        user["account_status"] = doc.get("account_status", "active")
+        user["password_reset_required"] = doc.get("account_status") == "password_reset_required"
+        user["last_login_at"] = doc.get("last_login_at")
+        user["mobile"] = doc.get("mobile") or doc.get("phone", "")
     return user
+
+
+class ForceResetBody(BaseModel):
+    reason: Optional[str] = ""
+
+
+@api.post("/users/{uid}/force-reset")
+async def admin_force_reset(uid: str, body: ForceResetBody, request: Request,
+                            user=Depends(require_roles("admin"))):
+    """Admin force-reset — bumps token_version (kicks all sessions) and marks status password_reset_required."""
+    doc = await db.users.find_one({"_id": oid(uid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    new_tv = int(doc.get("token_version", 0)) + 1
+    await db.users.update_one({"_id": oid(uid)}, {"$set": {
+        "account_status": "password_reset_required",
+        "token_version": new_tv,
+        "failed_login_attempts": 0, "locked_until": None,
+    }})
+    await log_security(user, "admin_force_reset", request,
+                       {"target_user": doc["email"], "reason": body.reason})
+    await log_activity(user, "admin_force_reset", "user", uid, None, {"reason": body.reason})
+    return {"success": True}
+
+
+@api.post("/users/{uid}/unlock")
+async def admin_unlock(uid: str, request: Request, user=Depends(require_roles("admin"))):
+    doc = await db.users.find_one({"_id": oid(uid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.users.update_one({"_id": oid(uid)}, {"$set": {
+        "failed_login_attempts": 0, "locked_until": None,
+        "account_status": "active" if doc.get("account_status") == "locked" else doc.get("account_status", "active"),
+    }})
+    await log_security(user, "admin_unlock", request, {"target_user": doc["email"]})
+    return {"success": True}
+
+
+class StatusUpdateBody(BaseModel):
+    account_status: str
+
+
+@api.post("/users/{uid}/status")
+async def admin_set_status(uid: str, body: StatusUpdateBody, request: Request,
+                           user=Depends(require_roles("admin"))):
+    if body.account_status not in VALID_ACCOUNT_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {sorted(VALID_ACCOUNT_STATUSES)}")
+    doc = await db.users.find_one({"_id": oid(uid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    if str(doc["_id"]) == user["id"] and body.account_status != "active":
+        raise HTTPException(status_code=400, detail="You cannot deactivate/suspend yourself.")
+    upd = {"account_status": body.account_status}
+    # Deactivating / suspending → invalidate sessions
+    if body.account_status in ("inactive", "suspended"):
+        upd["token_version"] = int(doc.get("token_version", 0)) + 1
+    await db.users.update_one({"_id": oid(uid)}, {"$set": upd})
+    await log_security(user, "admin_status_change", request,
+                       {"target_user": doc["email"], "new_status": body.account_status})
+    return {"success": True}
+
+
+@api.post("/users/{uid}/logout")
+async def admin_logout_user(uid: str, request: Request, user=Depends(require_roles("admin"))):
+    """Invalidate all active sessions for a specific user by bumping token_version."""
+    doc = await db.users.find_one({"_id": oid(uid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.users.update_one({"_id": oid(uid)}, {"$set": {
+        "token_version": int(doc.get("token_version", 0)) + 1,
+        "last_logout_at": now_iso(),
+    }})
+    await log_security(user, "admin_session_terminated", request, {"target_user": doc["email"]})
+    return {"success": True}
+
+
+@api.get("/security-audit-log")
+async def security_audit_log_list(user=Depends(require_roles("admin")), limit: int = 500,
+                                   event: str = "", user_email: str = ""):
+    q = {}
+    if event: q["event"] = event
+    if user_email: q["user_email"] = user_email
+    docs = await db.security_audit_log.find(q).sort("timestamp", -1).limit(limit).to_list(limit)
+    return [_safe_json(clean_doc(d)) for d in docs]
 
 
 # =================== Users (Admin) ===================
@@ -374,12 +603,15 @@ async def create_user(body: UserCreate, user=Depends(require_roles("admin"))):
         raise HTTPException(status_code=400, detail="Email already exists")
     if body.role not in ("admin", "sales", "operations"):
         raise HTTPException(status_code=400, detail="Invalid role")
+    validate_password_policy(body.password)
     doc = {
         "email": email, "password_hash": hash_password(body.password),
         "name": body.name, "role": body.role,
         "staff_code": body.staff_code,
         "consultant_code": (body.consultant_code or "").upper()[:2],
         "active": True, "created_at": now_iso(),
+        "account_status": "active", "token_version": 0,
+        "failed_login_attempts": 0, "locked_until": None,
     }
     r = await db.users.insert_one(doc)
     await log_activity(user, "create_user", "user", str(r.inserted_id), None, {"email": email, "role": body.role})
@@ -393,7 +625,12 @@ async def update_user(uid: str, body: UserUpdate, user=Depends(require_roles("ad
     if "consultant_code" in updates:
         updates["consultant_code"] = updates["consultant_code"].upper()[:2]
     if "password" in updates:
+        validate_password_policy(updates["password"])
         updates["password_hash"] = hash_password(updates.pop("password"))
+        # Bump token_version so all prior sessions are invalidated
+        existing = await db.users.find_one({"_id": oid(uid)})
+        updates["token_version"] = int((existing or {}).get("token_version", 0)) + 1
+        updates["password_changed_at"] = now_iso()
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
     result = await db.users.update_one({"_id": oid(uid)}, {"$set": updates})

@@ -1,0 +1,106 @@
+{
+  "summary": "Phase 1 Security & User Account Management E2E validated. Backend: 19/19 tests pass covering password policy, change-password, force-reset, lockout (5-attempt→HTTP 423), status enforcement, admin session termination, refresh, security audit log, and owner seeding. Frontend: Fixed 3 CRITICAL bugs blocking the app entirely + validated Profile page, ChangePassword (non-forced & forced), Users admin controls, and profile-link in sidebar. Sales password ended at 'Ir@2026Safe' with account_status=active as requested.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "critical_bugs_found_and_fixed": [
+    {
+      "id": 1,
+      "severity": "BLOCKER",
+      "file": "/app/frontend/src/App.js",
+      "issue": "AuthProvider was wrapping BrowserRouter, but AuthContext uses useNavigate() which requires a Router ancestor. Result: entire app crashed on load with 'useNavigate() may be used only in the context of a <Router> component' + blank white page.",
+      "fix": "Swapped ordering: <BrowserRouter><AuthProvider>...</AuthProvider></BrowserRouter>",
+      "rca": "Ordering error introduced during Phase 1 rewrite of AuthContext (added useNavigate at line 20)."
+    },
+    {
+      "id": 2,
+      "severity": "HIGH",
+      "file": "/app/frontend/src/App.js",
+      "issue": "Route <ChangePassword forced /> hardcoded the forced prop to true, so users clicking 'Change Password' from Profile page (non-forced flow) got the forced UI with cp-current field hidden. Impossible to change password normally.",
+      "fix": "Removed forced prop from route; ChangePassword derives isForced from user.password_reset_required."
+    },
+    {
+      "id": 3,
+      "severity": "HIGH",
+      "file": "/app/frontend/src/pages/Login.jsx",
+      "issue": "Two independent redirects fought each other: (a) `if (user) return <Navigate to='/' replace />` at line 18 hijacked to `/` immediately after setUser fired, overriding the nav('/change-password') from AuthContext.login(). (b) submit()'s own nav('/') was unconditional. Effect: users flagged password_reset_required were dumped into the dashboard instead of the forced-reset screen.",
+      "fix": "Changed the top-level guard to `<Navigate to={user.password_reset_required ? '/change-password' : '/'} replace />` and made submit() nav respect data?.password_reset_required."
+    },
+    {
+      "id": 4,
+      "severity": "MEDIUM",
+      "file": "/app/frontend/src/components/app/Layout.jsx",
+      "issue": "Missing data-testid='profile-link' on the sidebar user-name area (spec required it). The name area was a plain <div>, not a link to /profile.",
+      "fix": "Converted the user-name/role block into a <Link to='/profile' data-testid='profile-link'>."
+    }
+  ],
+  "frontend_verified_flows": {
+    "profile_link_in_sidebar_navigates_to_profile": true,
+    "profile_page_shows_email_status_last_login": true,
+    "profile_status_pill_shows_active": true,
+    "profile_change_password_link_routes_to_change_password": true,
+    "cp_current_visible_when_non_forced": true,
+    "cp_cancel_returns_to_profile": true,
+    "rule_indicators_red_when_weak": true,
+    "rule_indicators_green_when_strong": true,
+    "confirm_mismatch_warning_shown": true,
+    "cp_submit_disabled_until_rules_pass_and_match": true,
+    "forced_login_redirects_to_change_password": true,
+    "forced_reset_hides_cp_current": true,
+    "forced_reset_shows_amber_banner": true,
+    "forced_submit_redirects_home": true,
+    "users_page_shows_admin_action_buttons_for_all_rows": true,
+    "toast_password_changed_successfully_shown": true
+  },
+  "backend_verified": {
+    "password_policy_rejects_weak": "8/8 weak variants → 400",
+    "change_password_current_pw_check": "wrong current → 401",
+    "change_password_confirm_mismatch": "→ 400",
+    "change_password_same_as_current": "→ 400 'must be different'",
+    "change_password_happy_path": "200 + fresh cookies + old token invalidated + new password logs in",
+    "force_reset": "200 → target account_status=password_reset_required + old bearer invalidated (401 on /auth/me) + user can login (prr=true) + can change with empty current + status flips to active",
+    "failed_login_lockout": "5th failure → 423 + account_status=locked; 6th correct pw still 423; admin unlock → 200; correct login works",
+    "status_enforcement_suspended": "login → 403 'Your account is suspended'; existing token → 401/403 (tv bumped)",
+    "status_enforcement_inactive": "login → 403 'Your account is inactive'",
+    "status_invalid_value": "→ 400",
+    "admin_logout_user": "target token → 401 on /auth/me; target can re-login",
+    "refresh_session": "200 + fresh cookies",
+    "security_audit_log": "returned events include login_success/login_failed/login_locked/admin_force_reset/admin_status_change/admin_session_terminated/admin_unlock/password_changed (>=5 kinds observed)",
+    "non_admin_forbidden_on_admin_endpoints": "sales → 403 on /users and /security-audit-log",
+    "owner_seeded": "omnamasiviya73@gmail.com present as admin/active"
+  },
+  "not_directly_tested": [
+    "inactivity-modal visual (verified via code inspection at AuthContext.jsx line 101 — data-testid exists, appears at warnTimerRef fire; not triggerable within reasonable test time as spec allows)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_auth_security.py",
+    "/app/test_reports/pytest/auth_security.xml"
+  ],
+  "action_items": [
+    "None required for retest — all critical bugs fixed & verified. Main agent may optionally: (1) remove pytest.mark.order (unused/no plugin), (2) address minor code-review items below."
+  ],
+  "critical_code_review_comments": [
+    "AuthContext.jsx line 91 also calls nav('/change-password') — now redundant with the Login.jsx guard fix. Not harmful but consider centralising in one place.",
+    "server.py: /users/{uid}/unlock does not bump token_version — arguably safe (only clears lock, doesn't re-authorise). But consider whether unlocking a still-active session should invalidate anything. Currently OK.",
+    "ChangePassword.jsx handles both forced and non-forced via one page — the forced route in App.js should also pass a redirect target; currently forced submit navigates to '/'.",
+    "Route /change-password now works because ChangePassword auto-derives forced from user.password_reset_required. If user directly navigates while forced, redirect is not automatic — but this is fine since /login flow catches it.",
+    "backend/server.py file is 1890 lines — approaching monolith threshold. Recommend splitting into routers/{auth,users,leads,suppliers,security}.py for maintainability."
+  ],
+  "updated_files": [
+    "/app/frontend/src/App.js (BrowserRouter/AuthProvider ordering + remove hardcoded `forced` prop)",
+    "/app/frontend/src/pages/Login.jsx (redirect guard + submit nav respect password_reset_required)",
+    "/app/frontend/src/components/app/Layout.jsx (added profile-link)",
+    "/app/backend/tests/test_auth_security.py (new — 19 tests)",
+    "/app/memory/test_credentials.md (sales password → Ir@2026Safe)"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% of testable flows"},
+  "test_credentials": "admin@indianrounds.com/admin123 (legacy), sales@indianrounds.com/Ir@2026Safe (UPDATED), ops@indianrounds.com/ops123 (legacy), omnamasiviya73@gmail.com/Ir@2026Owner (owner)",
+  "seed_data_creation": "test_failed_login_lockout creates & deletes test_lockme@example.com within the test",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Sales password is now 'Ir@2026Safe' (not the legacy sales123). Fixed 3 blocker/high frontend bugs in this iteration — verify no regressions. Backend endpoints for Phase 1 security are stable & fully covered by /app/backend/tests/test_auth_security.py — run it with `REACT_APP_BACKEND_URL=<url> pytest -o addopts='' backend/tests/test_auth_security.py`. Use `pytest.mark.order` is a no-op (plugin not installed) — can be removed. inactivity-modal is code-only verified; if time-based test needed, mock setTimeout.",
+  "rca_of_the_issue": "Phase 1 rewrite introduced useNavigate() in AuthContext but did not update App.js to wrap AuthProvider with BrowserRouter. Additionally the /change-password route was hardcoded to forced mode and Login.jsx did not distinguish password_reset_required from a normal login. All three bugs together made the app either crash entirely or route users incorrectly. Fixes preserve backward compatibility for legacy accounts and correctly enforce the forced-reset UX."
+}

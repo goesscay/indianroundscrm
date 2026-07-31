@@ -15,14 +15,14 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={user.password_reset_required ? "/change-password" : "/"} replace />;
 
   const submit = async (e) => {
     e.preventDefault();
     setErr(""); setLoading(true);
     try {
-      await login(email.trim().toLowerCase(), password);
-      nav("/");
+      const data = await login(email.trim().toLowerCase(), password);
+      nav(data?.password_reset_required ? "/change-password" : "/");
     } catch (e) {
       setErr(formatApiError(e));
     } finally { setLoading(false); }

@@ -17,6 +17,8 @@ import ActivityLog from "@/pages/ActivityLog";
 import AIAssistant from "@/pages/AIAssistant";
 import CalendarView from "@/pages/CalendarView";
 import SupplierDashboard from "@/pages/SupplierDashboard";
+import Profile from "@/pages/Profile";
+import ChangePassword from "@/pages/ChangePassword";
 import AuthCallback from "@/pages/AuthCallback";
 import { useLocation } from "react-router-dom";
 
@@ -28,12 +30,12 @@ const Shell = ({ children }) => (
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <RouterInner />
         <Toaster position="top-right" richColors />
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
@@ -82,6 +84,10 @@ function RouterInner() {
           } />
           <Route path="/ai" element={<Shell><AIAssistant /></Shell>} />
           <Route path="/calendar" element={<Shell><CalendarView /></Shell>} />
+          <Route path="/profile" element={<Shell><Profile /></Shell>} />
+          <Route path="/change-password" element={
+            <ProtectedRoute><ChangePassword /></ProtectedRoute>
+          } />
         </Routes>
   );
 }

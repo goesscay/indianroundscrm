@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -96,10 +96,10 @@ export default function Layout({ children }) {
         </nav>
         <div className="p-3 border-t border-border">
           <div className="px-3 pb-2 flex items-center justify-between">
-            <div className="min-w-0">
+            <Link to="/profile" className="min-w-0 hover:opacity-80" data-testid="profile-link">
               <div className="text-sm font-semibold truncate">{user.name || user.email}</div>
               <div className="label-caps mt-0.5">{user.role}</div>
-            </div>
+            </Link>
             <Popover>
               <PopoverTrigger asChild>
                 <button className="relative p-1.5 rounded-md hover:bg-secondary" data-testid="bell-btn">
