@@ -19,6 +19,9 @@ import CalendarView from "@/pages/CalendarView";
 import SupplierDashboard from "@/pages/SupplierDashboard";
 import Profile from "@/pages/Profile";
 import ChangePassword from "@/pages/ChangePassword";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import SecurityLog from "@/pages/SecurityLog";
 import AuthCallback from "@/pages/AuthCallback";
 import { useLocation } from "react-router-dom";
 
@@ -49,6 +52,8 @@ function RouterInner() {
   return (
     <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/" element={<Shell><Dashboard /></Shell>} />
           <Route path="/leads" element={<Shell><LeadList /></Shell>} />
           <Route path="/leads/new" element={
@@ -80,6 +85,11 @@ function RouterInner() {
           <Route path="/activity" element={
             <ProtectedRoute roles={["admin"]}>
               <Layout><ActivityLog /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/security-log" element={
+            <ProtectedRoute roles={["admin"]}>
+              <Layout><SecurityLog /></Layout>
             </ProtectedRoute>
           } />
           <Route path="/ai" element={<Shell><AIAssistant /></Shell>} />

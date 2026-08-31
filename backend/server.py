@@ -18,9 +18,11 @@ from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     set_auth_cookies, clear_auth_cookies, get_current_user, require_roles, seed_admin,
     validate_password_policy, LOCKOUT_MAX_ATTEMPTS, LOCKOUT_MINUTES, VALID_ACCOUNT_STATUSES,
+    new_jti,
 )
 from ai_service import generate_itinerary, recommend_quote
-from email_service import send_email as send_email_service, render_supplier_rfq_text
+from email_service import send_email as send_email_service, render_supplier_rfq_text, send_password_reset_email
+import secrets as _secrets
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ir-crm")
@@ -343,10 +345,12 @@ async def google_callback(request: Request, response: Response):
         raise HTTPException(status_code=403, detail="Account disabled")
     uid = str(user["_id"])
     tv = user.get("token_version", 0)
-    access = create_access_token(uid, email, user["role"], tv)
-    refresh = create_refresh_token(uid, tv)
+    jti = new_jti()
+    access = create_access_token(uid, email, user["role"], tv, jti)
+    refresh = create_refresh_token(uid, tv, jti)
     set_auth_cookies(response, access, refresh)
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login_at": now_iso()}})
+    await _create_session_row(uid, jti, request)
     await log_security(user, "login_google", request)
     return {
         "id": uid, "email": email, "name": user.get("name") or data.get("name"),
@@ -398,15 +402,17 @@ async def login(body: LoginBody, request: Request, response: Response):
         await log_security(user, "login_failed", request, {"attempts": attempts})
         raise HTTPException(status_code=401, detail=f"Invalid email or password. {LOCKOUT_MAX_ATTEMPTS - attempts} attempt(s) remaining.")
 
-    # Successful password — clear attempts
+    # Successful password — clear attempts + create session
     uid = str(user["_id"])
     tv = user.get("token_version", 0)
-    access = create_access_token(uid, email, user["role"], tv)
-    refresh = create_refresh_token(uid, tv)
+    jti = new_jti()
+    access = create_access_token(uid, email, user["role"], tv, jti)
+    refresh = create_refresh_token(uid, tv, jti)
     set_auth_cookies(response, access, refresh)
     await db.users.update_one({"_id": user["_id"]}, {
         "$set": {"failed_login_attempts": 0, "locked_until": None, "last_login_at": now_iso()}
     })
+    await _create_session_row(uid, jti, request)
     await log_security(user, "login_success", request)
     return {
         "id": uid, "email": email, "name": user.get("name"),
@@ -436,9 +442,15 @@ async def refresh_session(request: Request, response: Response):
         if user.get("account_status") in ("inactive", "suspended", "locked"):
             raise HTTPException(status_code=403, detail=f"Account {user['account_status']}")
         tv = user.get("token_version", 0)
-        access = create_access_token(str(user["_id"]), user["email"], user["role"], tv)
-        new_refresh = create_refresh_token(str(user["_id"]), tv)
+        # Rotate jti: revoke old, create new
+        old_jti = payload.get("jti")
+        new_j = new_jti()
+        if old_jti:
+            await db.sessions.update_one({"jti": old_jti}, {"$set": {"revoked": True, "revoked_at": now_iso(), "revoke_reason": "rotated_on_refresh"}})
+        access = create_access_token(str(user["_id"]), user["email"], user["role"], tv, new_j)
+        new_refresh = create_refresh_token(str(user["_id"]), tv, new_j)
         set_auth_cookies(response, access, new_refresh)
+        await _create_session_row(str(user["_id"]), new_j, request)
         return {"success": True}
     except _jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
@@ -490,8 +502,217 @@ async def change_password(body: ChangePasswordBody, request: Request, response: 
 async def logout(request: Request, response: Response, user=Depends(get_current_user)):
     clear_auth_cookies(response)
     await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": {"last_logout_at": now_iso()}})
+    # Revoke current session row if jti present in cookie/token
+    token = request.cookies.get("access_token") or (request.headers.get("Authorization", "")[7:] if request.headers.get("Authorization", "").startswith("Bearer ") else "")
+    if token:
+        try:
+            import jwt as _jwt
+            payload = _jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"], options={"verify_exp": False})
+            jti = payload.get("jti")
+            if jti:
+                await db.sessions.update_one({"jti": jti}, {"$set": {"revoked": True, "revoked_at": now_iso(), "revoke_reason": "user_logout"}})
+        except Exception: pass
     await log_security(user, "logout", request)
     return {"success": True}
+
+
+# =================== Sessions Management ===================
+async def _create_session_row(user_id: str, jti: str, request: Optional[Request]):
+    ip = ""
+    ua = ""
+    if request is not None:
+        ip = (request.client.host if request.client else "") or request.headers.get("x-forwarded-for", "")
+        ua = request.headers.get("user-agent", "")
+    # Derive a friendly device name from the UA
+    device = _short_device(ua)
+    await db.sessions.insert_one({
+        "user_id": user_id, "jti": jti, "ip": ip[:64], "user_agent": ua[:250],
+        "device": device, "created_at": now_iso(), "last_active_at": now_iso(),
+        "revoked": False, "revoked_at": None, "revoke_reason": None,
+    })
+
+
+def _short_device(ua: str) -> str:
+    if not ua: return "Unknown device"
+    ua = ua.lower()
+    plat = "Unknown"
+    if "windows" in ua: plat = "Windows"
+    elif "iphone" in ua or "ipad" in ua or "ios" in ua: plat = "iOS"
+    elif "android" in ua: plat = "Android"
+    elif "mac os" in ua or "macintosh" in ua: plat = "macOS"
+    elif "linux" in ua: plat = "Linux"
+    browser = ""
+    if "edg/" in ua: browser = "Edge"
+    elif "chrome" in ua: browser = "Chrome"
+    elif "firefox" in ua: browser = "Firefox"
+    elif "safari" in ua: browser = "Safari"
+    return f"{plat} · {browser}" if browser else plat
+
+
+@api.get("/sessions/mine")
+async def my_sessions(request: Request, user=Depends(get_current_user)):
+    """Current user's active sessions. Marks the current session with is_current=true."""
+    rows = await db.sessions.find({"user_id": user["id"], "revoked": False}).sort("last_active_at", -1).to_list(50)
+    current_jti = ""
+    token = request.cookies.get("access_token") or ""
+    if not token and request.headers.get("Authorization", "").startswith("Bearer "):
+        token = request.headers["Authorization"][7:]
+    if token:
+        try:
+            import jwt as _jwt
+            payload = _jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"], options={"verify_exp": False})
+            current_jti = payload.get("jti") or ""
+        except Exception: pass
+    out = []
+    for r in rows:
+        d = clean_doc(r)
+        d["is_current"] = (d.get("jti") == current_jti)
+        out.append(d)
+    return out
+
+
+@api.post("/sessions/{jti}/revoke")
+async def revoke_session(jti: str, request: Request, user=Depends(get_current_user)):
+    sess = await db.sessions.find_one({"jti": jti})
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if sess["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not your session")
+    await db.sessions.update_one({"jti": jti}, {"$set": {"revoked": True, "revoked_at": now_iso(),
+                                                          "revoke_reason": "user_revoke" if sess["user_id"] == user["id"] else "admin_revoke"}})
+    await log_security(user, "session_revoked", request, {"target_jti": jti})
+    return {"success": True}
+
+
+@api.get("/sessions")
+async def all_sessions(user=Depends(require_roles("admin")), user_id: str = "", active_only: bool = True):
+    """Admin — every session. Filter by user_id + active_only."""
+    q = {}
+    if user_id: q["user_id"] = user_id
+    if active_only: q["revoked"] = False
+    rows = await db.sessions.find(q).sort("last_active_at", -1).limit(500).to_list(500)
+    # Enrich with user email
+    uids = list({r["user_id"] for r in rows if r.get("user_id")})
+    users_map = {}
+    if uids:
+        cursor = db.users.find({"_id": {"$in": [ObjectId(u) for u in uids if len(u) == 24]}})
+        async for u in cursor:
+            users_map[str(u["_id"])] = {"email": u.get("email"), "name": u.get("name"), "role": u.get("role")}
+    out = []
+    for r in rows:
+        d = clean_doc(r)
+        u = users_map.get(d.get("user_id"), {})
+        d["email"] = u.get("email")
+        d["name"] = u.get("name")
+        d["role"] = u.get("role")
+        out.append(d)
+    return out
+
+
+# =================== Forgot / Reset Password ===================
+class ForgotPasswordBody(BaseModel):
+    email: str
+
+
+class ResetPasswordBody(BaseModel):
+    token: str
+    new_password: str
+    confirm_password: str
+
+
+@api.post("/auth/forgot-password")
+async def forgot_password(body: ForgotPasswordBody, request: Request):
+    """Always returns success — never reveal if email exists (no user enumeration)."""
+    email = (body.email or "").strip().lower()
+    generic = {"success": True, "message": "If an account with that email exists, a reset link has been sent."}
+    if not email:
+        return generic
+    user = await db.users.find_one({"email": email})
+    if user:
+        token = _secrets.token_urlsafe(48)
+        await db.password_reset_tokens.insert_one({
+            "token": token,
+            "user_id": str(user["_id"]),
+            "email": email,
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+            "used": False,
+            "created_at": now_iso(),
+        })
+        # Build reset link using app URL (preview or production origin)
+        origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/") or ""
+        if not origin:
+            # Fall back to https + host header (Kubernetes ingress)
+            host = request.headers.get("host", "")
+            origin = f"https://{host}"
+        reset_link = f"{origin}/reset-password/{token}"
+        try:
+            result = await send_password_reset_email(email, user.get("name") or "", reset_link)
+            await log_security(user, "password_reset_requested", request,
+                               {"provider": result.get("provider"), "status": result.get("status")})
+        except Exception as e:
+            await log_security(user, "password_reset_email_failed", request, {"error": str(e)})
+    return generic
+
+
+@api.get("/auth/verify-reset-token/{token}")
+async def verify_reset_token(token: str):
+    doc = await db.password_reset_tokens.find_one({"token": token})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Invalid or unknown reset token")
+    if doc.get("used"):
+        raise HTTPException(status_code=410, detail="This reset link has already been used.")
+    try:
+        exp = doc.get("expires_at", "")
+        exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00")) if isinstance(exp, str) else None
+        if not exp_dt or exp_dt < datetime.now(timezone.utc):
+            raise HTTPException(status_code=410, detail="This reset link has expired. Please request a new one.")
+    except HTTPException: raise
+    except Exception:
+        raise HTTPException(status_code=410, detail="This reset link is malformed or expired.")
+    return {"email": doc.get("email"), "valid": True}
+
+
+@api.post("/auth/reset-password")
+async def reset_password(body: ResetPasswordBody, request: Request):
+    if body.new_password != body.confirm_password:
+        raise HTTPException(status_code=400, detail="New password and confirmation do not match.")
+    validate_password_policy(body.new_password)
+    doc = await db.password_reset_tokens.find_one({"token": body.token})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Invalid reset token")
+    if doc.get("used"):
+        raise HTTPException(status_code=410, detail="This reset link has already been used.")
+    try:
+        exp = doc.get("expires_at", "")
+        exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00")) if isinstance(exp, str) else None
+        if not exp_dt or exp_dt < datetime.now(timezone.utc):
+            raise HTTPException(status_code=410, detail="This reset link has expired.")
+    except HTTPException: raise
+    except Exception:
+        raise HTTPException(status_code=410, detail="This reset link is malformed or expired.")
+
+    user = await db.users.find_one({"_id": ObjectId(doc["user_id"])})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if verify_password(body.new_password, user["password_hash"]):
+        raise HTTPException(status_code=400, detail="New password must be different from the current password.")
+
+    new_tv = int(user.get("token_version", 0)) + 1
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {
+        "password_hash": hash_password(body.new_password),
+        "token_version": new_tv,
+        "account_status": "active",
+        "failed_login_attempts": 0, "locked_until": None,
+        "password_changed_at": now_iso(),
+    }})
+    # Mark all outstanding sessions as revoked
+    await db.sessions.update_many({"user_id": str(user["_id"]), "revoked": False},
+        {"$set": {"revoked": True, "revoked_at": now_iso(), "revoke_reason": "password_reset"}})
+    # Mark token as used
+    await db.password_reset_tokens.update_one({"_id": doc["_id"]},
+        {"$set": {"used": True, "used_at": now_iso()}})
+    await log_security(user, "password_reset_completed", request)
+    return {"success": True, "message": "Password reset. Please log in with your new password."}
 
 
 @api.get("/auth/me")
@@ -567,7 +788,7 @@ async def admin_set_status(uid: str, body: StatusUpdateBody, request: Request,
 
 @api.post("/users/{uid}/logout")
 async def admin_logout_user(uid: str, request: Request, user=Depends(require_roles("admin"))):
-    """Invalidate all active sessions for a specific user by bumping token_version."""
+    """Invalidate all active sessions for a specific user by bumping token_version + revoking session rows."""
     doc = await db.users.find_one({"_id": oid(uid)})
     if not doc:
         raise HTTPException(status_code=404, detail="User not found")
@@ -575,6 +796,8 @@ async def admin_logout_user(uid: str, request: Request, user=Depends(require_rol
         "token_version": int(doc.get("token_version", 0)) + 1,
         "last_logout_at": now_iso(),
     }})
+    await db.sessions.update_many({"user_id": uid, "revoked": False},
+        {"$set": {"revoked": True, "revoked_at": now_iso(), "revoke_reason": "admin_kick_all"}})
     await log_security(user, "admin_session_terminated", request, {"target_user": doc["email"]})
     return {"success": True}
 

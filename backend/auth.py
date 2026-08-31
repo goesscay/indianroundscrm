@@ -1,14 +1,14 @@
 """Auth utilities: JWT + bcrypt + password policy + session invalidation + lockout.
 
-Session invalidation strategy: every user has an incrementing `token_version`. JWTs
-embed `tv`; if it doesn't match the current user's version, the token is rejected.
-Bumping token_version therefore invalidates all outstanding sessions for that user
-(used on password change + admin force reset).
-
-Account status enum: active | inactive | suspended | locked | password_reset_required
+Session model:
+ - token_version on user: bumped on password change / admin force-reset / admin kick-all →
+   invalidates every outstanding JWT for that user.
+ - jti in JWT + `sessions` collection row per active login: allows per-device revocation
+   without kicking every session. Existing tokens without jti remain valid via token_version.
 """
 import os
 import re
+import uuid
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta
@@ -61,21 +61,27 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 # =================== JWT ===================
-def create_access_token(user_id: str, email: str, role: str, tv: int = 0) -> str:
+def new_jti() -> str:
+    return uuid.uuid4().hex
+
+
+def create_access_token(user_id: str, email: str, role: str, tv: int = 0, jti: str = "") -> str:
     payload = {
         "sub": user_id, "email": email, "role": role, "tv": tv,
         "exp": datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_HOURS),
         "type": "access",
     }
+    if jti: payload["jti"] = jti
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: str, tv: int = 0) -> str:
+def create_refresh_token(user_id: str, tv: int = 0, jti: str = "") -> str:
     payload = {
         "sub": user_id, "tv": tv,
         "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_DAYS),
         "type": "refresh",
     }
+    if jti: payload["jti"] = jti
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
@@ -119,6 +125,21 @@ async def get_current_user(request: Request) -> dict:
         current_tv = user.get("token_version", 0)
         if payload.get("tv", 0) != current_tv:
             raise HTTPException(status_code=401, detail="Session revoked. Please log in again.")
+        # Per-session revocation via jti (if present)
+        jti = payload.get("jti")
+        if jti:
+            sess = await db.sessions.find_one({"jti": jti})
+            if sess and sess.get("revoked"):
+                raise HTTPException(status_code=401, detail="This session has been signed out. Please log in again.")
+            # Best-effort activity heartbeat — throttle to once per 60s per session
+            if sess:
+                try:
+                    last = sess.get("last_active_at") or sess.get("created_at")
+                    last_dt = datetime.fromisoformat(last.replace("Z", "+00:00")) if isinstance(last, str) else None
+                    if not last_dt or (datetime.now(timezone.utc) - last_dt).total_seconds() > 60:
+                        await db.sessions.update_one({"jti": jti},
+                            {"$set": {"last_active_at": datetime.now(timezone.utc).isoformat()}})
+                except Exception: pass
         # Account status enforcement
         status = user.get("account_status", "active")
         if status == "inactive":

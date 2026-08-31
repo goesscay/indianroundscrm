@@ -1,4 +1,4 @@
-"""Resend email service — plain-text supplier RFQ template."""
+"""Resend email service — plain-text supplier RFQ template + password reset."""
 import os
 import asyncio
 import logging
@@ -6,6 +6,32 @@ from datetime import datetime
 from typing import List, Optional
 
 logger = logging.getLogger("ir-crm.email")
+
+
+def render_password_reset_text(name: str, reset_link: str) -> str:
+    lines = [
+        f"Hi {name or 'there'},",
+        "",
+        "We received a request to reset the password for your Indian Rounds CRM account.",
+        "",
+        "Click the link below to set a new password. This link is valid for 1 hour and can only be used once.",
+        "",
+        reset_link,
+        "",
+        "If you did not request a password reset, you can safely ignore this email — your password will not change.",
+        "",
+        "For security, we recommend never sharing this link with anyone.",
+        "",
+        "Regards,",
+        "Indian Rounds — CRM Security Team",
+    ]
+    return "\n".join(lines)
+
+
+async def send_password_reset_email(to_email: str, name: str, reset_link: str) -> dict:
+    subject = "Password Reset — Indian Rounds CRM"
+    body = render_password_reset_text(name, reset_link)
+    return await send_email(to=[to_email], subject=subject, body=body)
 
 
 def _fmt_date(iso: str) -> str:

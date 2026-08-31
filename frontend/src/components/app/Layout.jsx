@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, PlusCircle, Truck, Database,
-  Activity, LogOut, Sparkles, Mail, Calendar, Bell, Inbox
+  Activity, LogOut, Sparkles, Mail, Calendar, Bell, Inbox, Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,7 @@ const NAV = {
     { to: "/users", label: "Users", icon: Users, testId: "nav-users" },
     { to: "/master", label: "Master Data", icon: Database, testId: "nav-master" },
     { to: "/activity", label: "Activity Log", icon: Activity, testId: "nav-activity" },
+    { to: "/security-log", label: "Security Log", icon: Shield, testId: "nav-security-log" },
     { to: "/ai", label: "AI Assistant", icon: Sparkles, testId: "nav-ai" },
   ],
   operations: [

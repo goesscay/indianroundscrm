@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useNavigate, Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,6 +105,12 @@ export default function Login() {
             </Button>
           </form>
 
+          <div className="mt-3 text-right">
+            <Link to="/forgot-password" className="text-xs font-semibold text-[#106EBE] hover:underline" data-testid="login-forgot">
+              Forgot password?
+            </Link>
+          </div>
+
           <div className="mt-5 flex items-center gap-3">
             <div className="flex-1 h-px bg-border" />
             <span className="label-caps">or</span>
@@ -138,7 +144,7 @@ export default function Login() {
             <div className="label-caps mb-2">Demo Accounts</div>
             <div className="text-xs text-muted-foreground space-y-1 font-mono">
               <div>admin@indianrounds.com / admin123</div>
-              <div>sales@indianrounds.com / sales123</div>
+              <div>sales@indianrounds.com / Ir@2026Safe</div>
               <div>ops@indianrounds.com / ops123</div>
             </div>
           </div>
