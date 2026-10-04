@@ -1,0 +1,13 @@
+{
+  "short_name": "IR CRM",
+  "name": "Indian Rounds — Travel CRM",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#106EBE",
+  "orientation": "portrait-primary",
+  "description": "Enterprise Travel Lead Management CRM",
+  "icons": [
+    { "src": "/logo.png", "sizes": "any", "type": "image/png" }
+  ]
+}
