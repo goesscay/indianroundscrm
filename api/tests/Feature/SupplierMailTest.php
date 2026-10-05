@@ -426,16 +426,27 @@ class SupplierMailTest extends TestCase
         $this->artisan('mail:test-graph')->expectsOutputToContain('FAIL - not configured')->assertExitCode(1);
         $this->useGraphConfig();
         $bad = false;
-        Http::fake(function (Request $r) use (&$bad) {
+        $jwt = fn (array $roles) => 'h.'.rtrim(strtr(base64_encode(json_encode(['roles' => $roles])), '+/', '-_'), '=').'.s';
+        $roles = ['Mail.Send', 'Mail.ReadWrite'];
+        Http::fake(function (Request $r) use (&$bad, &$roles, $jwt) {
             if (str_contains($r->url(), '/oauth2/')) {
                 return $bad
                     ? Http::response(['error' => 'invalid_client', 'error_description' => 'AADSTS7000215: Invalid client secret'], 401)
-                    : Http::response(['access_token' => 't', 'expires_in' => 3600]);
+                    : Http::response(['access_token' => $jwt($roles), 'expires_in' => 3600]);
             }
 
             return Http::response(['displayName' => 'Inbox', 'totalItemCount' => 12]);
         });
         $this->artisan('mail:test-graph')->expectsOutputToContain('OK - Microsoft Graph mail is working.')->assertExitCode(0);
+
+        // A token without the application permissions (admin consent missing) is reported clearly.
+        $roles = [];
+        Cache::flush();
+        $this->artisan('mail:test-graph')->expectsOutputToContain('admin consent has not been granted')->assertExitCode(1);
+        $roles = ['Mail.Send'];
+        Cache::flush();
+        $this->artisan('mail:test-graph')->expectsOutputToContain('missing Mail.ReadWrite')->assertExitCode(1);
+
         $bad = true;
         Cache::flush();
         $this->artisan('mail:test-graph')->expectsOutputToContain('FAIL')->assertExitCode(1);

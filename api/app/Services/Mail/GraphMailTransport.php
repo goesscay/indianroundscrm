@@ -337,6 +337,21 @@ class GraphMailTransport implements MailTransport
      *
      * @return list<array{step:string,ok:bool,detail:string}>
      */
+    /** @return list<string> the application roles (permissions) in the current access token. */
+    private function tokenRoles(): array
+    {
+        try {
+            $parts = explode('.', $this->token());
+            $payload = $parts[1] ?? '';
+            $json = base64_decode(strtr($payload, '-_', '+/').str_repeat('=', (4 - strlen($payload) % 4) % 4), true);
+            $claims = is_string($json) ? json_decode($json, true) : null;
+
+            return array_values(array_filter((array) ($claims['roles'] ?? []), 'is_string'));
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     public function diagnose(): array
     {
         $steps = [];
@@ -348,6 +363,17 @@ class GraphMailTransport implements MailTransport
 
             return $steps;
         }
+        // Which application permissions did Microsoft actually put in the token? (the token is not printed)
+        $roles = $this->tokenRoles();
+        $hasSend = in_array('Mail.Send', $roles, true);
+        $hasRw = in_array('Mail.ReadWrite', $roles, true);
+        $steps[] = [
+            'step' => 'Token permissions',
+            'ok' => $hasSend && $hasRw,
+            'detail' => $roles
+                ? implode(', ', $roles).(($hasSend && $hasRw) ? '' : ' - missing '.implode(' and ', array_filter([$hasSend ? null : 'Mail.Send', $hasRw ? null : 'Mail.ReadWrite'])))
+                : 'none - admin consent has not been granted, or the permissions were added as Delegated instead of Application',
+        ];
         try {
             $folder = rawurlencode((string) $this->cfg('inbox_folder', 'Inbox'));
             $r = $this->call('GET', $this->userPath("/mailFolders/$folder"), ['$select' => 'displayName,totalItemCount,unreadItemCount']);
