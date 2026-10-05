@@ -13,6 +13,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---- Leads (static paths first so they win over /leads/{lead_id})
     Route::get('/leads/duplicate-check', [LeadController::class, 'duplicateCheck'])->middleware('perm:leads.create');
     Route::get('/leads/calendar', [LeadController::class, 'calendar'])->middleware('perm:calendar.view');
+    Route::get('/leads/filters', [LeadController::class, 'filterOptions']);
     Route::middleware('perm:leads.create')->post('/leads', [LeadController::class, 'store']);
     Route::get('/leads', [LeadController::class, 'index']);
     Route::get('/leads/{lead_id}', [LeadController::class, 'show']);

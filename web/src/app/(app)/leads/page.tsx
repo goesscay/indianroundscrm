@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
-import { formatApiError } from "@/lib/api";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { api, formatApiError } from "@/lib/api";
 import { fetchAll, usePagedList } from "@/lib/usePagedList";
 import { Pagination } from "@/components/ui/pagination";
 import { Card } from "@/components/ui/card";
@@ -11,10 +11,16 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
-import { Search, Download, Phone, MessageCircle } from "lucide-react";
+import { Search, Download, Phone, MessageCircle, X } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import { logContact } from "@/components/app/ContactTimeline";
 import type { Lead } from "@/types";
+
+interface FilterOptions {
+  sources: string[];
+  destinations: string[];
+  owners: { id: string; name: string }[];
+}
 
 const INR = (n: number | undefined | null) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
 
@@ -22,6 +28,10 @@ function LeadList() {
   const [q, setQ] = useState("");
   const [applied, setApplied] = useState("");
   const [status, setStatus] = useState("all");
+  const [source, setSource] = useState("all");
+  const [destination, setDestination] = useState("all");
+  const [owner, setOwner] = useState("all");
+  const [options, setOptions] = useState<FilterOptions>({ sources: [], destinations: [], owners: [] });
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState("");
   const router = useRouter();
@@ -31,11 +41,27 @@ function LeadList() {
     const p: Record<string, string> = {};
     if (applied.trim()) p.q = applied.trim();
     if (status !== "all") p.status = status;
+    if (source !== "all") p.lead_source = source;
+    if (destination !== "all") p.destination = destination;
+    if (owner !== "all") p.staff_id = owner;
     return p;
-  }, [applied, status]);
+  }, [applied, status, source, destination, owner]);
   const { rows: leads, loading, loaded, error, paginationProps } = usePagedList<Lead>("/leads", params);
   const err = error || exportErr;
-  const search = () => setApplied(q);
+
+  // Filter options (sources / destinations / owners) come from the leads this user can see.
+  useEffect(() => {
+    api.get<FilterOptions>("/leads/filters").then(r => setOptions(r.data)).catch(() => { /* filters stay empty */ });
+  }, []);
+
+  // Live search: apply shortly after typing stops (Enter applies immediately).
+  useEffect(() => {
+    const t = setTimeout(() => setApplied(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const activeFilters = (q.trim() ? 1 : 0) + [status, source, destination, owner].filter(v => v !== "all").length;
+  const clearFilters = () => { setQ(""); setApplied(""); setStatus("all"); setSource("all"); setDestination("all"); setOwner("all"); };
 
   // Export ALL rows matching the current filters (legacy un-paged endpoint), not just this page.
   const exportCsv = async () => {
@@ -61,43 +87,72 @@ function LeadList() {
             {can("leads.view_all") ? "All Leads" : "My Leads"}
           </h1>
         </div>
-        <div className="flex gap-2">
-          {can("leads.export") && (
-            <Button variant="outline" onClick={exportCsv} disabled={exporting} data-testid="export-csv">
-              <Download size={16} /> Export CSV
-            </Button>
-          )}
-          {can("leads.create") && (
-            <Button onClick={() => router.push("/leads/new")} data-testid="new-lead-btn">+ New Lead</Button>
-          )}
-        </div>
+        {can("leads.create") && (
+          <Button onClick={() => router.push("/leads/new")} data-testid="new-lead-btn">+ New Lead</Button>
+        )}
       </div>
 
-      <Card className="p-4 rounded-lg">
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && search()}
-              placeholder="Search lead ID, customer, phone, destination…"
-              className="pl-9 h-10"
-              data-testid="search-input"
-            />
-          </div>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-[220px] h-10" data-testid="filter-status">
-              <SelectValue placeholder="All statuses" />
+      <div className="flex flex-wrap gap-3 items-center" data-testid="leads-filters">
+        <div className="relative flex-1 min-w-[220px] max-w-[340px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && setApplied(q)}
+            placeholder="Search lead ID, customer, phone…"
+            className="pl-9 h-10"
+            data-testid="search-input"
+          />
+        </div>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="w-[170px] h-10" data-testid="filter-status">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {LEAD_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={source} onValueChange={setSource}>
+          <SelectTrigger className="w-[160px] h-10" data-testid="filter-source">
+            <SelectValue placeholder="All sources" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sources</SelectItem>
+            {options.sources.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={destination} onValueChange={setDestination}>
+          <SelectTrigger className="w-[180px] h-10" data-testid="filter-destination">
+            <SelectValue placeholder="All destinations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All destinations</SelectItem>
+            {options.destinations.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {can("leads.view_all") && (
+          <Select value={owner} onValueChange={setOwner}>
+            <SelectTrigger className="w-[170px] h-10" data-testid="filter-owner">
+              <SelectValue placeholder="Everyone's" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {LEAD_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              <SelectItem value="all">Everyone&apos;s</SelectItem>
+              {options.owners.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button onClick={search} variant="outline" data-testid="search-btn">Search</Button>
-        </div>
-      </Card>
+        )}
+        {activeFilters > 0 && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="clear-filters">
+            <X size={14} /> Clear filters
+          </Button>
+        )}
+        {can("leads.export") && (
+          <Button variant="outline" className="ml-auto" onClick={exportCsv} disabled={exporting} data-testid="export-csv">
+            <Download size={16} /> Export CSV
+          </Button>
+        )}
+      </div>
 
       <Card className="rounded-lg overflow-hidden">
         <div className="overflow-x-auto">

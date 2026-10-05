@@ -207,6 +207,9 @@ class LeadController extends Controller
         if (($v = (string) $request->query('booking_status', '')) !== '') {
             $q->where('booking_status', $v);
         }
+        if (($v = (string) $request->query('lead_source', '')) !== '') {
+            $q->where('lead_source', $v);
+        }
         if (($s = (string) $request->query('q', '')) !== '') {
             $like = '%'.addcslashes($s, '\\%_').'%';
             $q->where(function ($w) use ($like) {
@@ -222,6 +225,26 @@ class LeadController extends Controller
         $limit = max(1, (int) $request->query('limit', 500));
         return $q->limit($limit)->get()
             ->map(fn (Lead $l) => $l->toApi())->values();
+    }
+
+    /** Distinct values for the leads list filters, scoped to the leads this user can see. */
+    public function filterOptions(Request $request)
+    {
+        $user = $request->user();
+        $base = fn () => self::scopeForUser(Lead::query(), $user);
+        $distinct = fn (string $col) => $base()->whereNotNull($col)->where($col, '!=', '')
+            ->distinct()->orderBy($col)->pluck($col)->values();
+        $owners = $user->hasPermission('leads.view_all')
+            ? $base()->whereNotNull('staff_id')->select('staff_id', 'staff_name')->distinct()
+                ->orderBy('staff_name')->get()
+                ->map(fn ($r) => ['id' => (string) $r->staff_id, 'name' => $r->staff_name])->values()
+            : collect();
+
+        return [
+            'sources' => $distinct('lead_source'),
+            'destinations' => $distinct('destination'),
+            'owners' => $owners,
+        ];
     }
 
     public function store(Request $request)
