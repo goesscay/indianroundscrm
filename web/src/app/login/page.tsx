@@ -38,38 +38,38 @@ export default function Login() {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-background">
       {/* Left brand panel */}
-      <div className="relative hidden lg:flex flex-col justify-between p-12 overflow-hidden bg-black"
+      <div className="relative hidden lg:flex flex-col justify-between p-12 overflow-hidden bg-white border-r border-border"
            data-testid="login-brand-panel">
         <img
           src="/login-bg.jpg" alt=""
-          className="absolute inset-0 w-full h-full object-cover grayscale opacity-60"
+          className="absolute inset-0 w-full h-full object-cover grayscale opacity-[0.28]"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/35 to-black/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/55 to-white/95" />
 
         <div className="relative z-10">
-          <img src="/logo-word.png" alt="Indian Rounds" className="h-9 w-auto" />
+          <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-9 w-auto" />
         </div>
 
-        <div className="relative z-10 text-white">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-white/50 mb-5">Indian Rounds · Travel CRM</div>
+        <div className="relative z-10 text-neutral-950">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-5">Indian Rounds · Travel CRM</div>
           <h1 className="font-display text-5xl xl:text-6xl tracking-tight leading-[1.05]">
             Every enquiry.<br />Every itinerary.<br />
-            <span className="font-serif italic font-normal text-white/80">One CRM.</span>
+            <span className="font-serif italic font-normal text-neutral-500">One CRM.</span>
           </h1>
-          <p className="mt-6 max-w-md text-white/60 text-[15px] leading-relaxed">
+          <p className="mt-6 max-w-md text-neutral-600 text-[15px] leading-relaxed">
             Capture leads, dispatch supplier RFQs in one click, and track bookings from first
             enquiry to travel-completed, with role-based control for Sales, Ops &amp; Admin.
           </p>
         </div>
 
-        <div className="relative z-10 text-[10px] uppercase tracking-[0.3em] text-white/35">Travel beyond borders</div>
+        <div className="relative z-10 text-[10px] uppercase tracking-[0.3em] text-neutral-400">Travel beyond borders</div>
       </div>
 
       {/* Right form */}
       <div className="flex items-center justify-center px-6 py-10 sm:px-10">
         <div className="w-full max-w-[22rem]">
-          <div className="lg:hidden mb-8 inline-block rounded bg-black px-3 py-2">
-            <img src="/logo-word.png" alt="Indian Rounds" className="h-6 w-auto" />
+          <div className="lg:hidden mb-8 inline-block">
+            <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-7 w-auto" />
           </div>
 
           <h2 className="font-display text-[28px] tracking-tight">Sign in</h2>

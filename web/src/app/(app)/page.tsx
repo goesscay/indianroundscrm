@@ -20,7 +20,7 @@ const INR = (n: number | string | null | undefined) => "₹" + (Number(n) || 0).
 
 function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "primary" | "accent" | "amber" | "red" | "orange" }) {
   const tones: Record<string, string> = {
-    primary: "bg-[#0A0A0A] text-white",
+    primary: "bg-[#EFEFEB] text-[#0A0A0A] border border-[#E0E0DA]",
     accent: "bg-[#E5E5E5] text-[#0A0A0A]",
     amber: "bg-amber-100 text-amber-900",
     red: "bg-red-100 text-red-900",
@@ -28,7 +28,7 @@ function Metric({ label, value, tone }: { label: string; value: string | number;
   };
   return (
     <div className={`p-3 rounded-md ${(tone && tones[tone]) || "bg-secondary"}`}>
-      <div className={`label-caps ${tone === "primary" ? "text-white/70!" : "opacity-80"}`}>{label}</div>
+      <div className={`label-caps opacity-80`}>{label}</div>
       <div className="font-display font-black text-2xl tracking-tight mt-1">{value}</div>
     </div>
   );
@@ -46,10 +46,10 @@ interface KpiProps {
 function Kpi({ label, value, icon: Icon, tone = "default", testId, dragHandlers }: KpiProps) {
   const tones: Record<string, string> = {
     default: "bg-card",
-    primary: "bg-[#0A0A0A] text-white",
+    primary: "bg-[#EFEFEB] text-[#0A0A0A] border border-[#E0E0DA]",
     accent: "bg-[#E5E5E5] text-[#0A0A0A]",
   };
-  const isDark = tone === "primary";
+  const isDark = false;
   return (
     <Card
       className={`p-4 rounded-lg border border-border ${tones[tone]} transition-all hover:-translate-y-0.5 hover:shadow-sm relative group cursor-move`}
@@ -217,9 +217,18 @@ export default function Dashboard() {
                   <div className="font-medium text-sm mt-1 truncate">{f.customer_name}</div>
                   <div className="text-xs text-muted-foreground truncate">{f.destination} · {f.lead_status}</div>
                   {ten.length === 10 && (
-                    <div className="flex gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
-                      <a href={`tel:+91${ten}`} className="text-[#0A0A0A] p-1 hover:bg-[#0A0A0A]/10 rounded"><Phone size={13} /></a>
-                      <a href={`https://wa.me/91${ten}`} target="_blank" rel="noreferrer" className="text-emerald-600 p-1 hover:bg-emerald-100 rounded"><MessageCircle size={13} /></a>
+                    <div className="flex gap-1 mt-2">
+                      {/* Not <a>: this card is already a link, and nested anchors are invalid HTML. */}
+                      <span
+                        role="button" tabIndex={0} aria-label="Call"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:+91${ten}`; }}
+                        className="text-[#0A0A0A] p-1 hover:bg-[#0A0A0A]/10 rounded cursor-pointer"
+                      ><Phone size={13} /></span>
+                      <span
+                        role="button" tabIndex={0} aria-label="WhatsApp"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`https://wa.me/91${ten}`, "_blank", "noopener,noreferrer"); }}
+                        className="text-emerald-600 p-1 hover:bg-emerald-100 rounded cursor-pointer"
+                      ><MessageCircle size={13} /></span>
                     </div>
                   )}
                 </Link>

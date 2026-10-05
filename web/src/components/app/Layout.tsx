@@ -120,7 +120,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 (rail ? (
                   <div className="mx-2 my-2 border-t border-sidebar-border first:hidden" />
                 ) : (
-                  <div className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">
+                  <div className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
                     {it.group}
                   </div>
                 ))}
@@ -131,10 +131,10 @@ export default function Layout({ children }: { children: ReactNode }) {
                 className={cn(
                   "group flex items-center rounded text-[13px] font-medium transition-colors",
                   rail ? "justify-center h-9 w-9 mx-auto my-0.5" : "gap-2.5 px-3 py-2",
-                  active ? "bg-white text-black" : "text-white/60 hover:bg-white/10 hover:text-white"
+                  active ? "bg-neutral-900 text-white shadow-sm" : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950"
                 )}
               >
-                <it.icon size={16} className={active ? "text-black" : "text-white/50 group-hover:text-white"} />
+                <it.icon size={16} className={active ? "text-white" : "text-neutral-400 group-hover:text-neutral-900"} />
                 {!rail && it.label}
               </Link>
             </div>
@@ -147,10 +147,10 @@ export default function Layout({ children }: { children: ReactNode }) {
   const bell = (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="relative p-1.5 rounded text-white/70 hover:text-white hover:bg-white/10" data-testid="bell-btn" title="Notifications">
+        <button className="relative p-1.5 rounded text-neutral-500 hover:text-neutral-950 hover:bg-neutral-100" data-testid="bell-btn" title="Notifications">
           <Bell size={16} />
           {alerts.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-white text-black text-[9px] font-bold rounded-sm min-w-[15px] h-[15px] flex items-center justify-center px-1">
+            <span className="absolute -top-0.5 -right-0.5 bg-neutral-900 text-white text-[9px] font-bold rounded-sm min-w-[15px] h-[15px] flex items-center justify-center px-1">
               {alerts.length}
             </span>
           )}
@@ -189,11 +189,11 @@ export default function Layout({ children }: { children: ReactNode }) {
       {rail ? (
         <div className="flex flex-col items-center gap-1">
           <Link href="/profile" title={user.name || user.email} data-testid="profile-link"
-                className="w-8 h-8 rounded bg-white text-black flex items-center justify-center text-[11px] font-bold hover:opacity-80">
+                className="w-8 h-8 rounded bg-neutral-900 text-white flex items-center justify-center text-[11px] font-bold hover:opacity-80">
             {initials}
           </Link>
           {bell}
-          <button onClick={doLogout} title="Logout" className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10" data-testid="logout-btn">
+          <button onClick={doLogout} title="Logout" className="p-1.5 rounded text-neutral-500 hover:text-neutral-950 hover:bg-neutral-100" data-testid="logout-btn">
             <LogOut size={16} />
           </button>
         </div>
@@ -201,17 +201,17 @@ export default function Layout({ children }: { children: ReactNode }) {
         <>
           <div className="flex items-center gap-2.5 px-2 py-2">
             <Link href="/profile" className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80" data-testid="profile-link">
-              <div className="w-8 h-8 shrink-0 rounded bg-white text-black flex items-center justify-center text-[11px] font-bold">{initials}</div>
+              <div className="w-8 h-8 shrink-0 rounded bg-neutral-900 text-white flex items-center justify-center text-[11px] font-bold">{initials}</div>
               <div className="min-w-0">
-                <div className="text-[13px] font-semibold text-white truncate leading-tight">{user.name || user.email}</div>
-                <div className="text-[10px] uppercase tracking-widest text-white/40 mt-0.5">{user.role}</div>
+                <div className="text-[13px] font-semibold text-neutral-900 truncate leading-tight">{user.name || user.email}</div>
+                <div className="text-[10px] uppercase tracking-widest text-neutral-400 mt-0.5">{user.role}</div>
               </div>
             </Link>
             {bell}
           </div>
           <button
             onClick={doLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded text-[13px] font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded text-[13px] font-medium text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100 transition-colors"
             data-testid="logout-btn"
           >
             <LogOut size={16} />
@@ -234,17 +234,17 @@ export default function Layout({ children }: { children: ReactNode }) {
       >
         {collapsed ? (
           <div className="flex flex-col items-center gap-2 pt-4 pb-3 border-b border-sidebar-border">
-            <img src="/logo-mark.png" alt="Indian Rounds" className="w-7 h-auto" />
+            <img src="/logo-mark-dark.png" alt="Indian Rounds" className="w-7 h-auto" />
             <button onClick={toggleCollapsed} title="Expand sidebar" aria-label="Expand sidebar" data-testid="sidebar-toggle"
-                    className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10">
+                    className="p-1.5 rounded text-neutral-500 hover:text-neutral-950 hover:bg-neutral-100">
               <PanelLeftOpen size={16} />
             </button>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2 pl-4 pr-2 h-14 border-b border-sidebar-border">
-            <img src="/logo-word.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left" />
+            <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left" />
             <button onClick={toggleCollapsed} title="Collapse sidebar" aria-label="Collapse sidebar" data-testid="sidebar-toggle"
-                    className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10">
+                    className="p-1.5 rounded text-neutral-500 hover:text-neutral-950 hover:bg-neutral-100">
               <PanelLeftClose size={16} />
             </button>
           </div>
@@ -254,12 +254,12 @@ export default function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 bg-sidebar text-white h-12 px-3 flex items-center justify-between">
-        <button onClick={() => setOpen(true)} className="p-1.5 -ml-1 rounded hover:bg-white/10" aria-label="Open menu" data-testid="mobile-menu-btn">
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 bg-sidebar text-neutral-900 border-b border-sidebar-border h-12 px-3 flex items-center justify-between">
+        <button onClick={() => setOpen(true)} className="p-1.5 -ml-1 rounded hover:bg-neutral-100" aria-label="Open menu" data-testid="mobile-menu-btn">
           <Menu size={20} />
         </button>
-        <img src="/logo-word.png" alt="Indian Rounds" className="h-6 w-auto" />
-        <button onClick={doLogout} className="p-1.5 -mr-1 rounded hover:bg-white/10" aria-label="Logout" data-testid="logout-btn-mobile">
+        <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-6 w-auto" />
+        <button onClick={doLogout} className="p-1.5 -mr-1 rounded hover:bg-neutral-100" aria-label="Logout" data-testid="logout-btn-mobile">
           <LogOut size={18} />
         </button>
       </div>
@@ -267,11 +267,11 @@ export default function Layout({ children }: { children: ReactNode }) {
       {/* Mobile drawer */}
       {open && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
-          <aside className="relative w-64 max-w-[80%] h-full flex flex-col bg-sidebar text-sidebar-foreground shadow-2xl">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <aside className="relative w-64 max-w-[80%] h-full flex flex-col bg-sidebar text-sidebar-foreground shadow-2xl border-r border-sidebar-border">
             <div className="flex items-center justify-between pl-4 pr-2 h-14 border-b border-sidebar-border">
-              <img src="/logo-word.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left" />
-              <button onClick={() => setOpen(false)} className="p-1.5 rounded text-white/70 hover:bg-white/10" aria-label="Close menu">
+              <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left" />
+              <button onClick={() => setOpen(false)} className="p-1.5 rounded text-neutral-500 hover:bg-neutral-100" aria-label="Close menu">
                 <X size={18} />
               </button>
             </div>
