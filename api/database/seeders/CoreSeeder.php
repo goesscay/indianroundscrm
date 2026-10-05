@@ -57,6 +57,20 @@ class CoreSeeder extends Seeder
 
     private function seedUsers(): void
     {
+        // Production: only the env-configured admin is created. No built-in owner, no demo accounts.
+        if (app()->isProduction()) {
+            $email = strtolower((string) env('ADMIN_EMAIL'));
+            $password = (string) env('ADMIN_PASSWORD');
+            if ($email === '' || $password === '') {
+                throw new \RuntimeException('Set ADMIN_EMAIL and ADMIN_PASSWORD before seeding in production.');
+            }
+            if (! User::where('email', $email)->exists()) {
+                User::create(['email' => $email, 'password' => $password, 'name' => 'Admin', 'role' => 'admin', 'staff_code' => 'ADM001']);
+            }
+
+            return;
+        }
+
         // OWNER - real developer account, always admin + active.
         $owner = User::where('email', 'omnamasiviya73@gmail.com')->first();
         if (! $owner) {
@@ -95,8 +109,10 @@ class CoreSeeder extends Seeder
                 Master::firstOrCreate(['category' => $category, 'value' => $v]);
             }
         }
-        foreach (self::DEFAULT_SUPPLIERS as $s) {
-            Supplier::firstOrCreate(['email' => $s['email']], $s);
+        if (! app()->isProduction()) {
+            foreach (self::DEFAULT_SUPPLIERS as $s) {
+                Supplier::firstOrCreate(['email' => $s['email']], $s);
+            }
         }
         foreach (self::DEFAULT_DESTINATION_CITIES as $dest => $cities) {
             $dc = DestinationCity::firstOrCreate(['destination' => $dest]);
