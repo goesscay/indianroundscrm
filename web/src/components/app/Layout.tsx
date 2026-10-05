@@ -11,7 +11,7 @@ import { useChatUnread } from "@/context/ChatUnreadContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  Calendar, Bell, Inbox, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, MessageSquare,
+  Calendar, Bell, Inbox, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Notification, Role } from "@/types";
@@ -169,7 +169,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 max-h-96 overflow-y-auto p-0" side="right" align="end" data-testid="bell-popover">
+      <PopoverContent className="w-80 max-h-96 overflow-y-auto p-0" side="bottom" align="end" sideOffset={8} data-testid="bell-popover">
         <div className="p-3 border-b border-border">
           <div className="font-display font-bold">Notifications</div>
           <div className="text-xs text-muted-foreground">Auto-refreshes every 30s</div>
@@ -197,42 +197,50 @@ export default function Layout({ children }: { children: ReactNode }) {
     </Popover>
   );
 
-  const renderUser = (rail: boolean) => (
-    <div className="p-2 border-t border-sidebar-border">
-      {rail ? (
-        <div className="flex flex-col items-center gap-1">
-          <Link href="/profile" title={user.name || user.email} data-testid="profile-link"
-                className="w-8 h-8 rounded bg-neutral-900 text-white flex items-center justify-center text-[11px] font-bold hover:opacity-80">
-            {initials}
+  const [menuOpenD, setMenuOpenD] = useState(false); // desktop header
+  const [menuOpenM, setMenuOpenM] = useState(false); // mobile top bar
+  const pageTitle =
+    [...items].filter((it) => isActive(it.to)).sort((x, y) => y.to.length - x.to.length)[0]?.label ??
+    (pathname.startsWith("/profile") ? "Profile" : "");
+
+  const renderUserMenu = (menuOpen: boolean, setMenuOpen: (v: boolean) => void) => (
+    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="flex items-center gap-2 pl-1.5 pr-2 py-1 rounded hover:bg-neutral-100 transition-colors"
+          data-testid="user-menu-btn" aria-label="Account menu"
+        >
+          <span className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center text-[11px] font-bold">{initials}</span>
+          <span className="hidden lg:block text-left leading-tight">
+            <span className="block text-[13px] font-semibold text-neutral-900 max-w-[140px] truncate">{user.name || user.email}</span>
+            <span className="block text-[10px] uppercase tracking-widest text-neutral-400">{user.role}</span>
+          </span>
+          <ChevronDown size={14} className="hidden lg:block text-neutral-400" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="w-64 p-0" data-testid="user-menu">
+        <div className="p-3 border-b border-border">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 shrink-0 rounded-full bg-neutral-900 text-white flex items-center justify-center text-sm font-bold">{initials}</span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold truncate">{user.name || user.email}</div>
+              <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+              <span className="inline-block mt-1 text-[10px] uppercase tracking-widest font-semibold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600">{user.role}</span>
+            </div>
+          </div>
+        </div>
+        <div className="p-1.5">
+          <Link href="/profile" onClick={() => setMenuOpen(false)} data-testid="profile-link"
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded text-[13px] font-medium text-neutral-700 hover:bg-neutral-100">
+            <UserIcon size={15} /> My profile
           </Link>
-          {bell}
-          <button onClick={doLogout} title="Logout" className="p-1.5 rounded text-neutral-500 hover:text-neutral-950 hover:bg-neutral-100" data-testid="logout-btn">
-            <LogOut size={16} />
+          <button onClick={doLogout} data-testid="logout-btn"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded text-[13px] font-medium text-neutral-700 hover:bg-neutral-100">
+            <LogOut size={15} /> Logout
           </button>
         </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-2.5 px-2 py-2">
-            <Link href="/profile" className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80" data-testid="profile-link">
-              <div className="w-8 h-8 shrink-0 rounded bg-neutral-900 text-white flex items-center justify-center text-[11px] font-bold">{initials}</div>
-              <div className="min-w-0">
-                <div className="text-[13px] font-semibold text-neutral-900 truncate leading-tight">{user.name || user.email}</div>
-                <div className="text-[10px] uppercase tracking-widest text-neutral-400 mt-0.5">{user.role}</div>
-              </div>
-            </Link>
-            {bell}
-          </div>
-          <button
-            onClick={doLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded text-[13px] font-medium text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100 transition-colors"
-            data-testid="logout-btn"
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
-        </>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 
   return (
@@ -263,7 +271,6 @@ export default function Layout({ children }: { children: ReactNode }) {
           </div>
         )}
         {renderNav(collapsed)}
-        {renderUser(collapsed)}
       </aside>
 
       {/* Mobile top bar */}
@@ -280,9 +287,8 @@ export default function Layout({ children }: { children: ReactNode }) {
             </span>
           )}
         </Link>
-        <button onClick={doLogout} className="p-1.5 -mr-1 rounded hover:bg-neutral-100" aria-label="Logout" data-testid="logout-btn-mobile">
-          <LogOut size={18} />
-        </button>
+        {bell}
+        {renderUserMenu(menuOpenM, setMenuOpenM)}
       </div>
 
       {/* Mobile drawer */}
@@ -297,14 +303,24 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
             </div>
             {renderNav(false)}
-            {renderUser(false)}
           </aside>
         </div>
       )}
 
-      <main className="flex-1 min-w-0 pt-12 md:pt-0">
-        <div className="p-3 sm:p-4 md:p-6 max-w-[1440px] mx-auto">{children}</div>
-      </main>
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Desktop header */}
+        <header className="hidden md:flex sticky top-0 z-30 h-14 items-center justify-between gap-4 px-6 bg-white border-b border-border" data-testid="app-header">
+          <h2 className="font-display text-[15px] tracking-tight text-neutral-900 truncate">{pageTitle}</h2>
+          <div className="flex items-center gap-1.5">
+            {bell}
+            <span className="w-px h-6 bg-border mx-1" />
+            {renderUserMenu(menuOpenD, setMenuOpenD)}
+          </div>
+        </header>
+        <main className="flex-1 min-w-0 pt-12 md:pt-0">
+          <div className="p-3 sm:p-4 md:p-6 max-w-[1440px] mx-auto">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
