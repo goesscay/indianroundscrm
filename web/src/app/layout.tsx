@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import ServiceWorkerRegister from "@/components/app/ServiceWorkerRegister";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Indian Rounds CRM",
@@ -17,7 +21,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${interTight.variable}`}>
       <body>
         <AuthProvider>
           {children}

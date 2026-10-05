@@ -35,7 +35,7 @@ function TableHead({ className, ...props }: React.ComponentPropsWithRef<"th">) {
   return (
     <th
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-9 px-2 text-left align-middle font-semibold text-muted-foreground bg-secondary/60 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       {...props}

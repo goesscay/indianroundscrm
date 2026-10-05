@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 type DivProps = React.ComponentPropsWithRef<"div">;
 
 function Card({ className, ...props }: DivProps) {
-  return <div className={cn("rounded-xl border bg-card text-card-foreground shadow", className)} {...props} />;
+  return <div className={cn("rounded-md border bg-card text-card-foreground", className)} {...props} />;
 }
 
 function CardHeader({ className, ...props }: DivProps) {

@@ -27,7 +27,7 @@ export default function StatusPill({ status, className }: { status?: string; cla
   const s = STATUS_STYLES[status ?? ""] || NEUTRAL;
   return (
     <span
-      className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border", className)}
+      className={cn("inline-flex items-center rounded px-2 py-0.5 text-[11px] font-semibold border", className)}
       style={{ background: s.bg, color: s.text, borderColor: s.border }}
       data-testid={`status-pill-${(status || "unknown").toLowerCase().replace(/\s+/g, "-")}`}
     >
