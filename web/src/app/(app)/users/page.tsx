@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { DestinationAllocation, MasterItem, RoleDef, User, UserCreate } from "@/types";
-import { Trash2, KeyRound, Unlock as UnlockIcon, Shield, LogOut } from "lucide-react";
+import { Trash2, KeyRound, Unlock as UnlockIcon, Shield, LogOut, UserPlus } from "lucide-react";
 
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-emerald-100 text-emerald-800",
@@ -28,7 +29,10 @@ export default function Users() {
   const [roles, setRoles] = useState<RoleDef[]>([]);
   const [roleFilter, setRoleFilter] = useState("all");
   const [users, setUsers] = useState<User[]>([]);
-  const [f, setF] = useState<UserCreate>({ email: "", password: "", name: "", role: "sales", staff_code: "", consultant_code: "" });
+  const EMPTY_USER: UserCreate = { email: "", password: "", name: "", role: "sales", staff_code: "", consultant_code: "" };
+  const [f, setF] = useState<UserCreate>(EMPTY_USER);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [allocations, setAllocations] = useState<DestinationAllocation[]>([]);
   const [allocForm, setAllocForm] = useState({ destination: "", consultant_id: "" });
   const [destinations, setDestinations] = useState<string[]>([]);
@@ -48,12 +52,15 @@ export default function Users() {
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
       await api.post("/users", f);
       toast.success("User created");
-      setF({ email: "", password: "", name: "", role: "sales", staff_code: "", consultant_code: "" });
+      setF(EMPTY_USER);
+      setCreateOpen(false);
       load();
     } catch (e) { toast.error(formatApiError(e)); }
+    finally { setSaving(false); }
   };
 
   const forceReset = async (u: User) => {
@@ -99,35 +106,69 @@ export default function Users() {
 
   return (
     <div className="space-y-6" data-testid="users-page">
-      <div>
-        <div className="label-caps">Team</div>
-        <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Users & Security</h1>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div className="label-caps">Team</div>
+          <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Users & Security</h1>
+        </div>
+        {canManage && (
+          <Button onClick={() => setCreateOpen(true)} data-testid="u-create-btn">
+            <UserPlus size={15} /> Create user
+          </Button>
+        )}
       </div>
 
-      {canManage && <Card className="p-6 rounded-lg">
-        <h3 className="font-display text-xl font-bold mb-4">Add new user</h3>
-        <form onSubmit={create} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
-          <div><Label className="label-caps">Name</Label><Input className="mt-1.5" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required data-testid="u-name" /></div>
-          <div><Label className="label-caps">Email</Label><Input type="email" className="mt-1.5" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required data-testid="u-email" /></div>
-          <div><Label className="label-caps">Password</Label><Input type="password" className="mt-1.5" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} required data-testid="u-password" placeholder="Min 8, Aa1@" /></div>
-          <div><Label className="label-caps">Role</Label>
-            <Select value={f.role} onValueChange={(v) => setF({ ...f, role: v })}>
-              <SelectTrigger className="mt-1.5" data-testid="u-role"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {roles.map(r => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div><Label className="label-caps">Staff Code</Label><Input className="mt-1.5" placeholder="SAL001" value={f.staff_code} onChange={e => setF({ ...f, staff_code: e.target.value })} data-testid="u-code" /></div>
-          <div><Label className="label-caps">Consultant Code</Label>
-            <div className="flex gap-2 mt-1.5">
-              <Input placeholder="KA" maxLength={2} value={f.consultant_code} onChange={e => setF({ ...f, consultant_code: e.target.value.toUpperCase() })} data-testid="u-consultant" />
-              <Button type="submit" style={{ background: "#0A0A0A" }} data-testid="u-add">Add</Button>
-            </div>
-            <div className="text-[10px] text-muted-foreground mt-1">Password must meet policy · Used in Lead ID</div>
-          </div>
-        </form>
-      </Card>}
+      {canManage && (
+        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) setF(EMPTY_USER); }}>
+          <DialogContent className="sm:max-w-lg" data-testid="create-user-dialog">
+            <DialogHeader>
+              <DialogTitle className="font-display">Create user</DialogTitle>
+              <DialogDescription>Add a team member and choose what they can access.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={create} className="space-y-4" data-testid="create-user-form">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="label-caps">Full name</Label>
+                  <Input className="mt-1.5" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required autoFocus data-testid="u-name" />
+                </div>
+                <div>
+                  <Label className="label-caps">Email</Label>
+                  <Input type="email" className="mt-1.5" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required data-testid="u-email" />
+                </div>
+                <div>
+                  <Label className="label-caps">Password</Label>
+                  <Input type="password" className="mt-1.5" autoComplete="new-password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} required data-testid="u-password" placeholder="Min 8, Aa1@" />
+                </div>
+                <div>
+                  <Label className="label-caps">Role</Label>
+                  <Select value={f.role} onValueChange={(v) => setF({ ...f, role: v })}>
+                    <SelectTrigger className="mt-1.5" data-testid="u-role"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {roles.map(r => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="label-caps">Staff code</Label>
+                  <Input className="mt-1.5" placeholder="SAL001" value={f.staff_code} onChange={e => setF({ ...f, staff_code: e.target.value })} data-testid="u-code" />
+                </div>
+                <div>
+                  <Label className="label-caps">Consultant code</Label>
+                  <Input className="mt-1.5" placeholder="KA" maxLength={2} value={f.consultant_code} onChange={e => setF({ ...f, consultant_code: e.target.value.toUpperCase() })} data-testid="u-consultant" />
+                  <div className="text-[10px] text-muted-foreground mt-1">2 letters · used in the Lead ID</div>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Password needs 8+ characters with an uppercase letter, a lowercase letter, a number and a special character.
+              </div>
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} data-testid="u-cancel">Cancel</Button>
+                <Button type="submit" disabled={saving} data-testid="u-add">{saving ? "Creating…" : "Create user"}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Card className="rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center gap-3 flex-wrap">
