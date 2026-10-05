@@ -124,7 +124,7 @@ function ChangePassword() {
                 </Button>
               )}
               <Button type="submit" disabled={busy || !allPass || !match}
-                      style={{ background: "#106EBE" }} data-testid="cp-submit">
+                      style={{ background: "#0A0A0A" }} data-testid="cp-submit">
                 {busy ? "Saving…" : "Change Password"}
               </Button>
             </div>

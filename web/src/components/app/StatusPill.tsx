@@ -2,26 +2,32 @@
 
 import { cn } from "@/lib/utils";
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  "New Lead":               { bg: "#DBEAFE", text: "#1E40AF", border: "#BFDBFE" },
-  "Supplier Mail Sent":     { bg: "#F3E8FF", text: "#6B21A8", border: "#E9D5FF" },
-  "Quotation Awaiting":     { bg: "#FEF3C7", text: "#92400E", border: "#FDE68A" },
-  "Quote Received":         { bg: "#CCFBF1", text: "#0F766E", border: "#99F6E4" },
-  "Quote Sent to Customer": { bg: "#E0E7FF", text: "#3730A3", border: "#C7D2FE" },
-  "Follow-up":              { bg: "#FFEDD5", text: "#C2410C", border: "#FED7AA" },
-  "Booked":                 { bg: "#0FFCBE", text: "#024a37", border: "#0AE0A8" },
-  "Payment Pending":        { bg: "#FEF08A", text: "#854D0E", border: "#FDE047" },
-  "Payment Received":       { bg: "#DCFCE7", text: "#166534", border: "#BBF7D0" },
-  "Travel Completed":       { bg: "#DCFCE7", text: "#166534", border: "#BBF7D0" },
-  "Closed":                 { bg: "#E5E7EB", text: "#374151", border: "#D1D5DB" },
-  "Cancelled":              { bg: "#FEE2E2", text: "#B91C1C", border: "#FECACA" },
+type PillStyle = { bg: string; text: string; border: string };
+const NEUTRAL: PillStyle = { bg: "#F1F1F1", text: "#262626", border: "#E2E2E2" };
+const DARK: PillStyle = { bg: "#0A0A0A", text: "#FFFFFF", border: "#0A0A0A" };
+const AMBER: PillStyle = { bg: "#FFF6DD", text: "#8A5A00", border: "#F3E2A9" };
+const RED: PillStyle = { bg: "#FFFFFF", text: "#B91C1C", border: "#F3B8B8" };
+
+const STATUS_STYLES: Record<string, PillStyle> = {
+  "New Lead":               { bg: "#FFFFFF", text: "#0A0A0A", border: "#0A0A0A" },
+  "Supplier Mail Sent":     NEUTRAL,
+  "Quotation Awaiting":     AMBER,
+  "Quote Received":         NEUTRAL,
+  "Quote Sent to Customer": { bg: "#E4E4E4", text: "#0A0A0A", border: "#D0D0D0" },
+  "Follow-up":              AMBER,
+  "Booked":                 DARK,
+  "Payment Pending":        AMBER,
+  "Payment Received":       DARK,
+  "Travel Completed":       { bg: "#2B2B2B", text: "#FFFFFF", border: "#2B2B2B" },
+  "Closed":                 { bg: "#E9E9E9", text: "#525252", border: "#DADADA" },
+  "Cancelled":              RED,
 };
 
 export default function StatusPill({ status, className }: { status?: string; className?: string }) {
-  const s = STATUS_STYLES[status ?? ""] || { bg: "#E5E7EB", text: "#374151", border: "#D1D5DB" };
+  const s = STATUS_STYLES[status ?? ""] || NEUTRAL;
   return (
     <span
-      className={cn("inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border", className)}
+      className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border", className)}
       style={{ background: s.bg, color: s.text, borderColor: s.border }}
       data-testid={`status-pill-${(status || "unknown").toLowerCase().replace(/\s+/g, "-")}`}
     >

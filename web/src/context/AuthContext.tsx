@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 onClick={stayLoggedIn}
                 data-testid="idle-stay"
                 className="h-10 px-5 rounded-md text-white font-semibold text-sm"
-                style={{ background: "#106EBE" }}
+                style={{ background: "#0A0A0A" }}
               >
                 Stay Logged In
               </button>

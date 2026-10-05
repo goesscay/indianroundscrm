@@ -54,7 +54,7 @@ function LaneCard({ lane, items }: { lane: Lane; items: RsqRequest[] }) {
         )}
         {items.map((r) => (
           <Link key={r.id || r.lead_id} href={`/leads/${r.lead_id}`} className="block" data-testid={`rsq-card-${r.lead_id}`}>
-            <div className="p-3 bg-white rounded-md border border-border hover:border-[#106EBE] hover:shadow-sm transition-all">
+            <div className="p-3 bg-white rounded-md border border-border hover:border-[#0A0A0A] hover:shadow-sm transition-all">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">

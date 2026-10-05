@@ -20,15 +20,15 @@ const INR = (n: number | string | null | undefined) => "₹" + (Number(n) || 0).
 
 function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "primary" | "accent" | "amber" | "red" | "orange" }) {
   const tones: Record<string, string> = {
-    primary: "bg-[#106EBE] text-white",
-    accent: "bg-[#0FFCBE] text-[#024a37]",
+    primary: "bg-[#0A0A0A] text-white",
+    accent: "bg-[#E5E5E5] text-[#0A0A0A]",
     amber: "bg-amber-100 text-amber-900",
     red: "bg-red-100 text-red-900",
     orange: "bg-orange-100 text-orange-900",
   };
   return (
     <div className={`p-3 rounded-md ${(tone && tones[tone]) || "bg-secondary"}`}>
-      <div className="label-caps opacity-80">{label}</div>
+      <div className={`label-caps ${tone === "primary" ? "text-white/70!" : "opacity-80"}`}>{label}</div>
       <div className="font-display font-black text-2xl tracking-tight mt-1">{value}</div>
     </div>
   );
@@ -46,13 +46,13 @@ interface KpiProps {
 function Kpi({ label, value, icon: Icon, tone = "default", testId, dragHandlers }: KpiProps) {
   const tones: Record<string, string> = {
     default: "bg-card",
-    primary: "bg-[#106EBE] text-white",
-    accent: "bg-[#0FFCBE] text-[#024a37]",
+    primary: "bg-[#0A0A0A] text-white",
+    accent: "bg-[#E5E5E5] text-[#0A0A0A]",
   };
-  const isDark = tone !== "default";
+  const isDark = tone === "primary";
   return (
     <Card
-      className={`p-6 rounded-lg border border-border ${tones[tone]} transition-all hover:-translate-y-0.5 hover:shadow-sm relative group cursor-move`}
+      className={`p-4 rounded-lg border border-border ${tones[tone]} transition-all hover:-translate-y-0.5 hover:shadow-sm relative group cursor-move`}
       data-testid={testId}
       draggable
       {...dragHandlers}
@@ -133,7 +133,7 @@ export default function Dashboard() {
   const onDragEnd = () => { dragIdx.current = null; };
 
   const statusChart = Object.entries(stats.status_counts || {}).map(([k, v]) => ({ name: k, value: v }));
-  const COLORS = ["#106EBE", "#0FFCBE", "#8B5CF6", "#F59E0B", "#EC4899", "#10B981", "#EF4444", "#3B82F6"];
+  const COLORS = ["#0A0A0A", "#525252", "#8A8A8A", "#BDBDBD", "#2E2E2E", "#6B6B6B", "#A3A3A3", "#D4D4D4"];
   const title = user.role === "sales" ? "My Dashboard" : user.role === "operations" ? "Operations Dashboard" : "Master Dashboard";
 
   return (
@@ -149,7 +149,7 @@ export default function Dashboard() {
             <RotateCcw size={14} /> Reset layout
           </Button>
           {user.role !== "operations" && (
-            <Button onClick={() => router.push("/leads/new")} className="h-10 px-5" style={{ background: "#106EBE" }} data-testid="dashboard-new-lead">+ New Lead</Button>
+            <Button onClick={() => router.push("/leads/new")} className="h-10 px-5" style={{ background: "#0A0A0A" }} data-testid="dashboard-new-lead">+ New Lead</Button>
           )}
         </div>
       </div>
@@ -218,7 +218,7 @@ export default function Dashboard() {
                   <div className="text-xs text-muted-foreground truncate">{f.destination} · {f.lead_status}</div>
                   {ten.length === 10 && (
                     <div className="flex gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
-                      <a href={`tel:+91${ten}`} className="text-[#106EBE] p-1 hover:bg-[#106EBE]/10 rounded"><Phone size={13} /></a>
+                      <a href={`tel:+91${ten}`} className="text-[#0A0A0A] p-1 hover:bg-[#0A0A0A]/10 rounded"><Phone size={13} /></a>
                       <a href={`https://wa.me/91${ten}`} target="_blank" rel="noreferrer" className="text-emerald-600 p-1 hover:bg-emerald-100 rounded"><MessageCircle size={13} /></a>
                     </div>
                   )}
@@ -241,8 +241,8 @@ export default function Dashboard() {
                 <YAxis fontSize={12} />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="leads" stroke="#106EBE" strokeWidth={2} />
-                <Line type="monotone" dataKey="revenue" stroke="#0FFCBE" strokeWidth={2} />
+                <Line type="monotone" dataKey="leads" stroke="#0A0A0A" strokeWidth={2} />
+                <Line type="monotone" dataKey="revenue" stroke="#8A8A8A" strokeWidth={2} />
                 <Line type="monotone" dataKey="profit" stroke="#8B5CF6" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -287,7 +287,7 @@ export default function Dashboard() {
                 <XAxis dataKey="destination" fontSize={11} />
                 <YAxis fontSize={11} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#106EBE" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="count" fill="#0A0A0A" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -302,7 +302,7 @@ export default function Dashboard() {
               {leaderboard.map((r, i) => (
                 <div key={r.staff_id} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-md flex items-center justify-center font-black text-sm ${i === 0 ? "bg-[#0FFCBE] text-[#024a37]" : "bg-secondary"}`}>
+                    <div className={`w-8 h-8 rounded-md flex items-center justify-center font-black text-sm ${i === 0 ? "bg-[#E5E5E5] text-[#0A0A0A]" : "bg-secondary"}`}>
                       {i + 1}
                     </div>
                     <div>
@@ -328,7 +328,7 @@ export default function Dashboard() {
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
               {user.role !== "operations" && (
-                <Link href="/leads/new"><Button className="h-11" style={{ background: "#106EBE" }} data-testid="quick-new-lead">+ Create Lead</Button></Link>
+                <Link href="/leads/new"><Button className="h-11" style={{ background: "#0A0A0A" }} data-testid="quick-new-lead">+ Create Lead</Button></Link>
               )}
               <Link href="/leads"><Button variant="outline" className="h-11" data-testid="quick-view-leads">View Leads</Button></Link>
               <Link href="/calendar"><Button variant="outline" className="h-11">Calendar</Button></Link>

@@ -77,7 +77,7 @@ export default function ResetPassword() {
               </div>
               <h2 className="font-display text-2xl font-black mt-4">Link not valid</h2>
               <p className="text-sm text-muted-foreground mt-2">{errMsg || "This reset link is invalid, used, or expired."}</p>
-              <Button asChild className="mt-6 w-full" style={{ background: "#106EBE" }}>
+              <Button asChild className="mt-6 w-full" style={{ background: "#0A0A0A" }}>
                 <Link href="/forgot-password">Request a new link</Link>
               </Button>
             </div>
@@ -125,7 +125,7 @@ export default function ResetPassword() {
                 </div>
               </div>
               <Button type="submit" disabled={busy || !allPass || !match}
-                      style={{ background: "#106EBE" }} className="w-full h-11 text-base font-semibold"
+                      style={{ background: "#0A0A0A" }} className="w-full h-11 text-base font-semibold"
                       data-testid="rp-submit">
                 {busy ? "Saving…" : "Set new password →"}
               </Button>

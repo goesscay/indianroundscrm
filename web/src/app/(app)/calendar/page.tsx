@@ -89,15 +89,15 @@ export default function CalendarView() {
                   key={i}
                   onClick={() => setSelected(date)}
                   className={`min-h-[80px] p-2 rounded-md border text-left transition-all ${
-                    isSelected ? "border-[#106EBE] ring-2 ring-[#106EBE]/30" :
-                    isToday ? "border-[#0FFCBE] bg-[#0FFCBE]/10" : "border-border hover:bg-secondary/60"
+                    isSelected ? "border-[#0A0A0A] ring-2 ring-[#0A0A0A]/30" :
+                    isToday ? "border-[#E5E5E5] bg-[#E5E5E5]/10" : "border-border hover:bg-secondary/60"
                   }`}
                   data-testid={`cal-day-${d}`}
                 >
-                  <div className={`font-display font-bold text-sm ${isToday ? "text-[#024a37]" : ""}`}>{d}</div>
+                  <div className={`font-display font-bold text-sm ${isToday ? "text-[#0A0A0A]" : ""}`}>{d}</div>
                   <div className="mt-1 space-y-0.5">
                     {travel > 0 && (
-                      <div className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#106EBE] text-white inline-flex items-center gap-1">
+                      <div className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#0A0A0A] text-white inline-flex items-center gap-1">
                         <Plane size={9} /> {travel}
                       </div>
                     )}
@@ -124,7 +124,7 @@ export default function CalendarView() {
               <Link key={i} href={`/leads/${ev.lead_id}`} className="block border border-border rounded-md p-3 hover:bg-secondary/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="font-mono font-semibold text-sm">{ev.lead_id}</div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${ev.kind === "travel" ? "bg-[#106EBE] text-white" : "bg-amber-500 text-white"}`}>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${ev.kind === "travel" ? "bg-[#0A0A0A] text-white" : "bg-amber-500 text-white"}`}>
                     {ev.kind === "travel" ? "TRAVEL" : "FOLLOW-UP"}
                   </span>
                 </div>

@@ -62,7 +62,7 @@ export default function LeadList() {
             <Download size={16} /> Export CSV
           </Button>
           {user.role !== "operations" && (
-            <Button onClick={() => router.push("/leads/new")} style={{ background: "#106EBE" }} data-testid="new-lead-btn">+ New Lead</Button>
+            <Button onClick={() => router.push("/leads/new")} style={{ background: "#0A0A0A" }} data-testid="new-lead-btn">+ New Lead</Button>
           )}
         </div>
       </div>
@@ -131,7 +131,7 @@ export default function LeadList() {
                         <>
                           <a href={`tel:+91${tenDigit}`} title="Call"
                              onClick={(e) => { e.stopPropagation(); logContact(l.lead_id, "call", l.phone); }}
-                             className="p-1 rounded hover:bg-[#106EBE]/10 text-[#106EBE]"
+                             className="p-1 rounded hover:bg-[#0A0A0A]/10 text-[#0A0A0A]"
                              data-testid={`row-call-${l.lead_id}`}>
                             <Phone size={13} />
                           </a>

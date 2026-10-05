@@ -54,7 +54,7 @@ export default function Suppliers() {
             <div><Label className="label-caps">Destination</Label><Input className="mt-1.5" value={f.destination} onChange={e => setF({ ...f, destination: e.target.value })} data-testid="s-destination" /></div>
             <div><Label className="label-caps">Country</Label><Input className="mt-1.5" value={f.country} onChange={e => setF({ ...f, country: e.target.value })} data-testid="s-country" /></div>
             <div className="md:col-span-6 flex justify-end">
-              <Button type="submit" style={{ background: "#106EBE" }} data-testid="s-add">Add supplier</Button>
+              <Button type="submit" style={{ background: "#0A0A0A" }} data-testid="s-add">Add supplier</Button>
             </div>
           </form>
         </Card>

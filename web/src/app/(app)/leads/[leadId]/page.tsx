@@ -223,10 +223,10 @@ export default function LeadDetail() {
           <div className="flex gap-2 flex-wrap">
             {canQuote && !lead.quote_type && (
               <>
-                <Button onClick={() => setNrsqOpen(true)} className="h-11" style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
+                <Button onClick={() => setNrsqOpen(true)} className="h-11" style={{ background: "#E5E5E5", color: "#0A0A0A" }} data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
                   ⚡ NRSQ
                 </Button>
-                <Button onClick={canOps ? openMail : createRsqRequest} className="h-11" style={{ background: "#106EBE" }} data-testid="rsq-btn" title={canOps ? "Compose supplier email now" : "Request Ops team to fetch supplier quotes"}>
+                <Button onClick={canOps ? openMail : createRsqRequest} className="h-11" style={{ background: "#0A0A0A" }} data-testid="rsq-btn" title={canOps ? "Compose supplier email now" : "Request Ops team to fetch supplier quotes"}>
                   <Mail size={16} /> RSQ
                 </Button>
               </>
@@ -237,7 +237,7 @@ export default function LeadDetail() {
               </Button>
             )}
             {canOps && lead.quote_type === "rsq" && (
-              <Button onClick={openMail} className="h-11" style={{ background: "#106EBE" }} data-testid="send-mail-btn">
+              <Button onClick={openMail} className="h-11" style={{ background: "#0A0A0A" }} data-testid="send-mail-btn">
                 <Mail size={16} /> Supplier Mail
               </Button>
             )}
@@ -265,7 +265,7 @@ export default function LeadDetail() {
           </div>
       </div>
 
-      <Card className="p-4 rounded-lg border-l-4 border-l-[#106EBE]" data-testid="contact-panel">
+      <Card className="p-4 rounded-lg border-l-4 border-l-[#0A0A0A]" data-testid="contact-panel">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -409,7 +409,7 @@ export default function LeadDetail() {
           <h3 className="font-display text-xl font-bold mb-4">Supplier mail history</h3>          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}
           <div className="space-y-3">
             {history.map((h) => (
-              <div key={h.id} className="border-l-2 border-[#106EBE] pl-3 py-1">
+              <div key={h.id} className="border-l-2 border-[#0A0A0A] pl-3 py-1">
                 <div className="text-sm font-semibold">{h.subject}</div>
                 <div className="label-caps mt-0.5">{(h.sent_at || "").slice(0, 16).replace("T", " ")}</div>
                 <div className="text-xs text-muted-foreground mt-1">
@@ -443,10 +443,10 @@ export default function LeadDetail() {
               For pre-packaged trips with fixed pricing, use <b>NRSQ</b>. For customized itineraries or live supplier pricing, use <b>RSQ</b>.
             </p>
             <div className="flex justify-center gap-3 mt-4 flex-wrap">
-              <Button onClick={() => setNrsqOpen(true)} className="h-11 px-6" style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-cta">
+              <Button onClick={() => setNrsqOpen(true)} className="h-11 px-6" style={{ background: "#E5E5E5", color: "#0A0A0A" }} data-testid="nrsq-cta">
                 ⚡ NRSQ — Instant Quote
               </Button>
-              <Button onClick={canOps ? openMail : createRsqRequest} className="h-11 px-6" style={{ background: "#106EBE" }} data-testid="rsq-cta">
+              <Button onClick={canOps ? openMail : createRsqRequest} className="h-11 px-6" style={{ background: "#0A0A0A" }} data-testid="rsq-cta">
                 <Mail size={16} /> {canOps ? "RSQ — Compose Supplier Mail" : "RSQ — Request Ops Team"}
               </Button>
             </div>
@@ -459,7 +459,7 @@ export default function LeadDetail() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <div className="label-caps flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-[#0FFCBE] text-[#024a37] rounded font-bold">NRSQ</span>
+                <span className="px-2 py-0.5 bg-[#E5E5E5] text-[#0A0A0A] rounded font-bold">NRSQ</span>
                 No Requirement Supplier Quotation
               </div>
               <h3 className="font-display text-xl font-bold mt-1">
@@ -486,7 +486,7 @@ export default function LeadDetail() {
         <DialogContent data-testid="nrsq-dialog">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <span className="px-2 py-0.5 bg-[#0FFCBE] text-[#024a37] rounded text-xs font-bold">NRSQ</span>
+              <span className="px-2 py-0.5 bg-[#E5E5E5] text-[#0A0A0A] rounded text-xs font-bold">NRSQ</span>
               Generate Instant Quote
             </DialogTitle>
           </DialogHeader>
@@ -512,7 +512,7 @@ export default function LeadDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNrsqOpen(false)}>Cancel</Button>
-            <Button onClick={saveNrsq} style={{ background: "#0FFCBE", color: "#024a37" }} data-testid="nrsq-save">
+            <Button onClick={saveNrsq} style={{ background: "#E5E5E5", color: "#0A0A0A" }} data-testid="nrsq-save">
               Generate Quote & Send
             </Button>
           </DialogFooter>
@@ -546,7 +546,7 @@ export default function LeadDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReassignOpen(false)}>Cancel</Button>
-            <Button onClick={doReassign} style={{ background: "#106EBE" }} data-testid="reassign-save">Reassign</Button>
+            <Button onClick={doReassign} style={{ background: "#0A0A0A" }} data-testid="reassign-save">Reassign</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -604,7 +604,7 @@ export default function LeadDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMailOpen(false)}>Cancel</Button>
-            <Button onClick={send} style={{ background: "#106EBE" }} data-testid="mail-send">Send Enquiry</Button>
+            <Button onClick={send} style={{ background: "#0A0A0A" }} data-testid="mail-send">Send Enquiry</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -12,7 +12,7 @@ const ICONS: Record<string, ComponentType<{ size?: number }>> = {
   itinerary_shared: FileText, payment_link_sent: IndianRupee, location: MapPin,
 };
 const COLORS: Record<string, string> = {
-  call: "#106EBE", whatsapp: "#25D366", sms: "#8B5CF6", email: "#F59E0B",
+  call: "#0A0A0A", whatsapp: "#25D366", sms: "#8B5CF6", email: "#F59E0B",
   itinerary_shared: "#3B82F6", payment_link_sent: "#10B981", location: "#EF4444",
 };
 const LABELS: Record<string, string> = {
@@ -32,7 +32,7 @@ export default function ContactTimeline({ leadId, refreshKey }: { leadId: string
   return (
     <Card className="p-6 rounded-lg lg:col-span-3" data-testid="contact-timeline">
       <div className="flex items-center gap-2 mb-4">
-        <Activity size={18} className="text-[#106EBE]" />
+        <Activity size={18} className="text-[#0A0A0A]" />
         <h3 className="font-display text-xl font-bold">Contact History</h3>
         <span className="label-caps ml-auto">{events.length} interaction{events.length !== 1 ? "s" : ""}</span>
       </div>

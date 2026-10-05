@@ -24,10 +24,10 @@ const STATUS_COLOR: Record<string, string> = {
   "Follow-up Required": "bg-orange-100 text-orange-800",
   "Quote Received":     "bg-emerald-100 text-emerald-800",
   "Quote Rejected":     "bg-red-100 text-red-800",
-  "Quote Accepted":     "bg-[#0FFCBE] text-[#024a37]",
+  "Quote Accepted":     "bg-[#E5E5E5] text-[#0A0A0A]",
   "Supplier Declined":  "bg-rose-100 text-rose-800",
   "No Response":        "bg-slate-300 text-slate-800",
-  "Booking Confirmed":  "bg-[#106EBE] text-white",
+  "Booking Confirmed":  "bg-[#0A0A0A] text-white",
 };
 
 interface TrackerForm {
@@ -141,7 +141,7 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
                     <a href={`mailto:${r.supplier_email}`}><Button size="sm" variant="outline" title="Email"><Mail size={12} /></Button></a>
                     <a href={`tel:${r.supplier_email}`}><Button size="sm" variant="outline" title="Call"><Phone size={12} /></Button></a>
                     {waPhone && <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer"><Button size="sm" variant="outline" title="WhatsApp customer"><MessageCircle size={12} /></Button></a>}
-                    <Button size="sm" onClick={() => openEdit(r)} style={{ background: "#106EBE" }} data-testid={`edit-${r.sequence}`}>
+                    <Button size="sm" onClick={() => openEdit(r)} style={{ background: "#0A0A0A" }} data-testid={`edit-${r.sequence}`}>
                       <FileText size={12} /> Update
                     </Button>
                   </td>
@@ -191,7 +191,7 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={save} style={{ background: "#106EBE" }} data-testid="upd-save">Save Response</Button>
+            <Button onClick={save} style={{ background: "#0A0A0A" }} data-testid="upd-save">Save Response</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

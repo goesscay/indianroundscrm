@@ -402,7 +402,7 @@ export default function LeadForm() {
                   const sel = f.stay_cities.find(sc => sc.city === city);
                   return (
                     <label key={city}
-                           className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${sel ? "border-[#106EBE] bg-[#106EBE]/5" : "border-border hover:bg-secondary/40"}`}
+                           className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${sel ? "border-[#0A0A0A] bg-[#0A0A0A]/5" : "border-border hover:bg-secondary/40"}`}
                            data-testid={`f-city-${city}`}>
                       <Checkbox checked={!!sel} onCheckedChange={(v) => toggleCity(city, !!v)} />
                       <span className="flex-1 text-sm font-medium">{city}</span>
@@ -440,7 +440,7 @@ export default function LeadForm() {
             {f.stay_cities.filter(sc => !availableCities.includes(sc.city)).length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3" data-testid="f-custom-city-chips">
                 {f.stay_cities.filter(sc => !availableCities.includes(sc.city)).map(sc => (
-                  <span key={sc.city} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#106EBE]/10 text-sm border border-[#106EBE]/30">
+                  <span key={sc.city} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#0A0A0A]/10 text-sm border border-[#0A0A0A]/30">
                     <span className="font-medium">{sc.city}</span>
                     <Input type="number" min="1" max="30" value={sc.nights || ""}
                            onChange={(e) => setCityNights(sc.city, e.target.value)}
@@ -554,7 +554,7 @@ export default function LeadForm() {
 
         <div className="flex justify-end gap-3 pb-24">
           <Button type="button" variant="outline" onClick={() => { setF(EMPTY); setAgeErrors({}); }} data-testid="reset-btn">Reset</Button>
-          <Button type="submit" disabled={busy || !!validPhone(f.phone)} className="px-8" style={{ background: "#106EBE" }} data-testid="submit-lead">
+          <Button type="submit" disabled={busy || !!validPhone(f.phone)} className="px-8" style={{ background: "#0A0A0A" }} data-testid="submit-lead">
             {busy ? "Saving…" : "Create Lead →"}
           </Button>
         </div>
@@ -581,7 +581,7 @@ export default function LeadForm() {
             <Button variant="outline" onClick={() => setBlockDialog(null)}>Cancel</Button>
             <Button onClick={() => { const lid = blockDialog?.existing?.lead_id; setBlockDialog(null); if (lid) router.push(`/leads/${lid}`); }} data-testid="open-existing-lead">Open Existing</Button>
             {user.role === "admin" && (
-              <Button style={{ background: "#106EBE" }} onClick={() => { setBlockDialog(null); submit(null, true); }} data-testid="force-create-lead">
+              <Button style={{ background: "#0A0A0A" }} onClick={() => { setBlockDialog(null); submit(null, true); }} data-testid="force-create-lead">
                 Create anyway (Admin)
               </Button>
             )}

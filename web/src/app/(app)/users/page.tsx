@@ -115,7 +115,7 @@ export default function Users() {
           <div><Label className="label-caps">Consultant Code</Label>
             <div className="flex gap-2 mt-1.5">
               <Input placeholder="KA" maxLength={2} value={f.consultant_code} onChange={e => setF({ ...f, consultant_code: e.target.value.toUpperCase() })} data-testid="u-consultant" />
-              <Button type="submit" style={{ background: "#106EBE" }} data-testid="u-add">Add</Button>
+              <Button type="submit" style={{ background: "#0A0A0A" }} data-testid="u-add">Add</Button>
             </div>
             <div className="text-[10px] text-muted-foreground mt-1">Password must meet policy · Used in Lead ID</div>
           </div>
@@ -215,7 +215,7 @@ export default function Users() {
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" style={{ background: "#106EBE" }} data-testid="a-save">Set allocation</Button>
+          <Button type="submit" style={{ background: "#0A0A0A" }} data-testid="a-save">Set allocation</Button>
         </form>
         <div className="flex flex-wrap gap-2">
           {allocations.length === 0 && <div className="text-sm text-muted-foreground">No allocations yet.</div>}
@@ -224,7 +224,7 @@ export default function Users() {
               <span className="font-semibold text-sm">{a.destination}</span>
               <span className="text-muted-foreground">→</span>
               <span className="font-medium text-sm">{a.consultant_name}</span>
-              <span className="font-mono font-bold text-[#106EBE] text-xs">{a.consultant_code}</span>
+              <span className="font-mono font-bold text-[#0A0A0A] text-xs">{a.consultant_code}</span>
               <button onClick={() => removeAllocation(a.id)} className="text-muted-foreground hover:text-destructive ml-1"><Trash2 size={12} /></button>
             </span>
           ))}

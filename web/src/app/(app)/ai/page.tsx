@@ -61,7 +61,7 @@ export default function AIAssistant() {
             <div><Label className="label-caps">Hotel Category</Label><Input className="mt-1.5" value={f.hotel_category} onChange={set("hotel_category")} data-testid="ai-hotel" /></div>
           </div>
           <div className="flex gap-2 pt-2">
-            <Button onClick={() => run("itinerary")} disabled={busy} className="flex-1" style={{ background: "#106EBE" }} data-testid="ai-run-itinerary">
+            <Button onClick={() => run("itinerary")} disabled={busy} className="flex-1" style={{ background: "#0A0A0A" }} data-testid="ai-run-itinerary">
               <Sparkles size={16} /> Generate Itinerary
             </Button>
             <Button onClick={() => run("quote")} disabled={busy} variant="outline" className="flex-1" data-testid="ai-run-quote">

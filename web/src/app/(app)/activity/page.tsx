@@ -146,7 +146,7 @@ export default function ActivityLog() {
             <div className="flex gap-1 mt-1.5">
               <Input placeholder="lead ID / user name" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })}
                 onKeyDown={(e) => e.key === "Enter" && load()} className="h-9" data-testid="fil-q" />
-              <Button onClick={load} size="sm" className="h-9" style={{ background: "#106EBE" }} data-testid="fil-search">Go</Button>
+              <Button onClick={load} size="sm" className="h-9" style={{ background: "#0A0A0A" }} data-testid="fil-search">Go</Button>
             </div>
           </div>
         </div>

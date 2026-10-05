@@ -47,7 +47,7 @@ export default function ForgotPassword() {
                          placeholder="you@indianrounds.com" className="mt-1.5 h-11" data-testid="fp-email" autoFocus />
                 </div>
                 <Button type="submit" disabled={busy} className="w-full h-11 text-base font-semibold"
-                        style={{ background: "#106EBE" }} data-testid="fp-submit">
+                        style={{ background: "#0A0A0A" }} data-testid="fp-submit">
                   {busy ? "Sending…" : "Send reset link →"}
                 </Button>
               </form>

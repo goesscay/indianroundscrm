@@ -107,7 +107,7 @@ export default function SecurityLog() {
                    placeholder="sales@indianrounds.com" data-testid="sl-user" />
           </div>
           <div className="flex items-end">
-            <Button onClick={load} disabled={busy} className="w-full h-10" style={{ background: "#106EBE" }} data-testid="sl-filter">
+            <Button onClick={load} disabled={busy} className="w-full h-10" style={{ background: "#0A0A0A" }} data-testid="sl-filter">
               <Search size={14} /> Filter
             </Button>
           </div>

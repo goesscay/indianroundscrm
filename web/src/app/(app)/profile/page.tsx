@@ -85,7 +85,7 @@ export default function Profile() {
 
       <Card className="p-6 rounded-lg">
         <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-display font-black text-2xl" style={{ background: "#106EBE" }}>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-display font-black text-2xl" style={{ background: "#0A0A0A" }}>
             {(data.name || data.email || "?").charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -126,7 +126,7 @@ export default function Profile() {
         </div>
         <div className="space-y-2">
           <Link href="/change-password" className="block">
-            <div className="flex items-center justify-between p-4 rounded-md border border-border hover:border-[#106EBE] hover:bg-secondary/40 transition-colors" data-testid="profile-change-password">
+            <div className="flex items-center justify-between p-4 rounded-md border border-border hover:border-[#0A0A0A] hover:bg-secondary/40 transition-colors" data-testid="profile-change-password">
               <div>
                 <div className="font-semibold text-sm">Change Password</div>
                 <div className="text-xs text-muted-foreground">Update your password. Requires current password.</div>
@@ -157,7 +157,7 @@ export default function Profile() {
         <div className="space-y-2">
           {sessions.map(s => (
             <div key={s.jti}
-                 className={`flex items-center justify-between p-3 rounded-md border ${s.is_current ? "border-[#106EBE] bg-[#106EBE]/5" : "border-border"}`}
+                 className={`flex items-center justify-between p-3 rounded-md border ${s.is_current ? "border-[#0A0A0A] bg-[#0A0A0A]/5" : "border-border"}`}
                  data-testid={`session-${s.jti}`}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">

@@ -42,14 +42,14 @@ export default function LeadNotes({ leadId }: { leadId: string }) {
   return (
     <Card className="p-6 rounded-lg lg:col-span-3" data-testid="lead-notes">
       <div className="flex items-center gap-2 mb-4">
-        <StickyNote size={18} className="text-[#106EBE]" />
+        <StickyNote size={18} className="text-[#0A0A0A]" />
         <h3 className="font-display text-xl font-bold">Notes</h3>
         <span className="label-caps ml-auto">{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
       </div>
       <div className="flex gap-2 mb-4">
         <Textarea rows={2} value={txt} onChange={(e) => setTxt(e.target.value)}
           placeholder="Add a quick note — customer said..." data-testid="note-input" />
-        <Button onClick={add} disabled={busy || !txt.trim()} style={{ background: "#106EBE" }} data-testid="note-add">Add</Button>
+        <Button onClick={add} disabled={busy || !txt.trim()} style={{ background: "#0A0A0A" }} data-testid="note-add">Add</Button>
       </div>
       <div className="space-y-2 max-h-80 overflow-y-auto">
         {notes.length === 0 && <div className="text-sm text-muted-foreground">No notes yet. Add one above.</div>}
