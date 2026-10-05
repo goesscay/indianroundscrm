@@ -61,7 +61,7 @@ function ChangePassword() {
       <div className={isForced ? "w-full max-w-md" : "max-w-2xl mx-auto space-y-6"}>
         {isForced && (
           <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-amber-100 text-amber-800 text-xs font-semibold">
               <Shield size={14} /> Password Reset Required
             </div>
             <p className="text-sm text-muted-foreground mt-3">
@@ -73,7 +73,7 @@ function ChangePassword() {
         {!isForced && (
           <div>
             <div className="label-caps">Security</div>
-            <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Change Password</h1>
+            <h1 className="font-display text-3xl sm:text-4xl tracking-tight mt-1">Change Password</h1>
           </div>
         )}
 
@@ -101,7 +101,7 @@ function ChangePassword() {
               )}
             </div>
 
-            <div className="rounded-md border border-border bg-secondary/40 p-3">
+            <div className="rounded border border-border bg-secondary/40 p-3">
               <div className="label-caps mb-2">Password requirements</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
                 {rules.map(r => {

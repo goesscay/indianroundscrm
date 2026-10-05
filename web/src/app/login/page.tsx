@@ -40,80 +40,85 @@ export default function Login() {
       {/* Left brand panel */}
       <div className="relative hidden lg:flex flex-col justify-between p-12 overflow-hidden bg-black"
            data-testid="login-brand-panel">
+        <img
+          src="/login-bg.jpg" alt=""
+          className="absolute inset-0 w-full h-full object-cover grayscale opacity-60"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/35 to-black/90" />
+
         <div className="relative z-10">
-          <img src="/logo-dark.png" alt="Indian Rounds" className="w-56 h-auto" />
+          <img src="/logo-word.png" alt="Indian Rounds" className="h-9 w-auto" />
         </div>
+
         <div className="relative z-10 text-white">
-          <h1 className="font-display text-4xl xl:text-5xl font-black tracking-tight leading-[1.05]">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-white/50 mb-5">Indian Rounds · Travel CRM</div>
+          <h1 className="font-display text-5xl xl:text-6xl tracking-tight leading-[1.05]">
             Every enquiry.<br />Every itinerary.<br />
-            <span className="text-white/45">One CRM.</span>
+            <span className="font-serif italic font-normal text-white/80">One CRM.</span>
           </h1>
-          <p className="mt-6 max-w-md text-white/60 text-sm leading-relaxed">
+          <p className="mt-6 max-w-md text-white/60 text-[15px] leading-relaxed">
             Capture leads, dispatch supplier RFQs in one click, and track bookings from first
             enquiry to travel-completed, with role-based control for Sales, Ops &amp; Admin.
           </p>
         </div>
+
         <div className="relative z-10 text-[10px] uppercase tracking-[0.3em] text-white/35">Travel beyond borders</div>
-        <div className="absolute -right-32 -bottom-32 w-[28rem] h-[28rem] rounded-full border border-white/10" />
-        <div className="absolute -right-12 -bottom-12 w-[20rem] h-[20rem] rounded-full border border-white/10" />
       </div>
 
       {/* Right form */}
-      <div className="flex items-center justify-center p-6 md:p-12">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="rounded-md bg-black px-3 py-2">
-              <img src="/logo-dark.png" alt="Indian Rounds" className="h-8 w-auto" />
-            </div>
+      <div className="flex items-center justify-center px-6 py-10 sm:px-10">
+        <div className="w-full max-w-[22rem]">
+          <div className="lg:hidden mb-8 inline-block rounded bg-black px-3 py-2">
+            <img src="/logo-word.png" alt="Indian Rounds" className="h-6 w-auto" />
           </div>
-          <div className="label-caps">Sign in</div>
-          <h2 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-2">Welcome back.</h2>
-          <p className="text-muted-foreground text-sm mt-2">Use your Indian Rounds credentials to continue.</p>
+
+          <h2 className="font-display text-[28px] tracking-tight">Sign in</h2>
+          <p className="text-muted-foreground text-sm mt-1.5">Welcome back. Sign in to your Indian Rounds workspace.</p>
 
           <form onSubmit={submit} className="mt-8 space-y-4" data-testid="login-form">
             <div>
-              <Label htmlFor="email" className="label-caps">Email</Label>
+              <Label htmlFor="email" className="text-[13px] font-medium">Email</Label>
               <Input
-                id="email" type="email" required
+                id="email" type="email" required autoComplete="username"
                 value={email} onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@indianrounds.com"
-                className="mt-1.5 h-11"
+                className="mt-1.5 h-10"
                 data-testid="login-email"
               />
             </div>
             <div>
-              <Label htmlFor="password" className="label-caps">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-[13px] font-medium">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground hover:underline" data-testid="login-forgot">
+                  Forgot password?
+                </Link>
+              </div>
               <Input
-                id="password" type="password" required
+                id="password" type="password" required autoComplete="current-password"
                 value={password} onChange={(e) => setPassword(e.target.value)}
-                className="mt-1.5 h-11"
+                className="mt-1.5 h-10"
                 data-testid="login-password"
               />
             </div>
             {err && <div className="text-sm text-destructive font-medium" data-testid="login-error">{err}</div>}
             <Button
               type="submit" disabled={loading}
-              className="w-full h-11 text-base font-semibold"
-              style={{ background: "#0A0A0A" }}
+              className="w-full h-10 text-sm font-semibold"
               data-testid="login-submit"
             >
-              {loading ? "Signing in…" : "Sign in →"}
+              {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
 
-          <div className="mt-3 text-right">
-            <Link href="/forgot-password" className="text-xs font-semibold text-[#0A0A0A] hover:underline" data-testid="login-forgot">
-              Forgot password?
-            </Link>
+          <div className="mt-8 flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            Demo accounts
+            <span className="h-px flex-1 bg-border" />
           </div>
-
-          <div className="mt-8 p-4 rounded-md border border-border bg-secondary/40">
-            <div className="label-caps mb-2">Demo Accounts</div>
-            <div className="text-xs text-muted-foreground space-y-1 font-mono">
-              <div>admin@indianrounds.com / admin123</div>
-              <div>sales@indianrounds.com / Ir@2026Safe</div>
-              <div>ops@indianrounds.com / ops123</div>
-            </div>
+          <div className="mt-3 text-xs text-muted-foreground space-y-1 font-mono">
+            <div>admin@indianrounds.com / admin123</div>
+            <div>sales@indianrounds.com / Ir@2026Safe</div>
+            <div>ops@indianrounds.com / ops123</div>
           </div>
         </div>
       </div>

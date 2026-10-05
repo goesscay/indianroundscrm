@@ -72,10 +72,10 @@ export default function ResetPassword() {
           )}
           {status === "invalid" && (
             <div className="text-center py-4" data-testid="rp-invalid">
-              <div className="w-14 h-14 rounded-full bg-red-100 mx-auto flex items-center justify-center">
+              <div className="w-12 h-12 rounded bg-red-100 mx-auto flex items-center justify-center">
                 <ShieldAlert className="text-red-600" size={28} />
               </div>
-              <h2 className="font-display text-2xl font-black mt-4">Link not valid</h2>
+              <h2 className="font-display text-2xl mt-4">Link not valid</h2>
               <p className="text-sm text-muted-foreground mt-2">{errMsg || "This reset link is invalid, used, or expired."}</p>
               <Button asChild className="mt-6 w-full" style={{ background: "#0A0A0A" }}>
                 <Link href="/forgot-password">Request a new link</Link>
@@ -84,10 +84,10 @@ export default function ResetPassword() {
           )}
           {status === "success" && (
             <div className="text-center py-4" data-testid="rp-success">
-              <div className="w-14 h-14 rounded-full bg-emerald-100 mx-auto flex items-center justify-center">
+              <div className="w-12 h-12 rounded bg-emerald-100 mx-auto flex items-center justify-center">
                 <ShieldCheck className="text-emerald-600" size={28} />
               </div>
-              <h2 className="font-display text-2xl font-black mt-4">Password reset</h2>
+              <h2 className="font-display text-2xl mt-4">Password reset</h2>
               <p className="text-sm text-muted-foreground mt-2">Redirecting to sign in…</p>
             </div>
           )}
@@ -95,7 +95,7 @@ export default function ResetPassword() {
             <form onSubmit={submit} className="space-y-4" data-testid="rp-form">
               <div>
                 <div className="label-caps">Reset password</div>
-                <h1 className="font-display text-3xl font-black tracking-tight mt-1">Choose a new password</h1>
+                <h1 className="font-display text-3xl tracking-tight mt-1">Choose a new password</h1>
                 {emailForToken && <p className="text-sm text-muted-foreground mt-1">for <b>{emailForToken}</b></p>}
               </div>
               <div>
@@ -109,7 +109,7 @@ export default function ResetPassword() {
                        className="mt-1.5" data-testid="rp-confirm" autoComplete="new-password" />
                 {cf && !match && <div className="text-xs text-destructive mt-1">Passwords do not match</div>}
               </div>
-              <div className="rounded-md border border-border bg-secondary/40 p-3">
+              <div className="rounded border border-border bg-secondary/40 p-3">
                 <div className="label-caps mb-2">Password requirements</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
                   {rules.map(r => {
@@ -125,7 +125,7 @@ export default function ResetPassword() {
                 </div>
               </div>
               <Button type="submit" disabled={busy || !allPass || !match}
-                      style={{ background: "#0A0A0A" }} className="w-full h-11 text-base font-semibold"
+                      style={{ background: "#0A0A0A" }} className="w-full h-10 text-sm font-semibold"
                       data-testid="rp-submit">
                 {busy ? "Saving…" : "Set new password →"}
               </Button>

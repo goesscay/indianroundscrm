@@ -178,3 +178,5 @@ body {
 /* Square-cut, flat surfaces */
 .rounded-full.pill-square { border-radius: 3px; }
 table thead th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.font-serif { font-family: var(--font-serif-italic), Georgia, serif; }
