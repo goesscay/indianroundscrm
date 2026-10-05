@@ -6,7 +6,9 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useChatRealtime } from "@/context/ChatRealtimeContext";
 import type { ChatMessage, ChatMessagesResponse, Conversation } from "@/types";
+import LiveDot from "./LiveDot";
 import RichText from "./RichText";
 import { dayKey, dayLabel, idGreater, initials, timeLabel } from "./util";
 
@@ -23,6 +25,7 @@ interface Props {
 }
 
 const POLL_MS = 3000;
+const POLL_CONNECTED_MS = 30000;
 const NEAR_PX = 120;
 let tmpCounter = 0;
 
@@ -52,10 +55,17 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
   const lastMarked = useRef<string>("");
   const messagesRef = useRef<ChatMessage[]>([]);
   const polling = useRef(false);
+  const { connected, onMessage, onDeleted, onReconnect, emitMessage, emitDeleted, registerViewing } = useChatRealtime();
 
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
+  /** Update messages state and the synchronous ref together (events can arrive faster than renders). */
+  const update = useCallback((fn: (cur: ChatMessage[]) => ChatMessage[]) => {
+    const next = fn(messagesRef.current);
+    messagesRef.current = next;
+    setMessages(next);
+  }, []);
+
+  // While mounted, this thread counts as "being viewed" (unread badge won't bump for it).
+  useEffect(() => registerViewing(convId), [registerViewing, convId]);
 
   const lastServerId = useCallback((): string | null => {
     const list = messagesRef.current;
@@ -64,13 +74,13 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
   }, []);
 
   const markRead = useCallback(
-    async (messageId?: string | null) => {
+    async (messageId?: string | null, silent = false) => {
       const id = messageId ?? lastServerId();
       if (!id || lastMarked.current === id) return;
       lastMarked.current = id;
       try {
         await api.post(`/chat/conversations/${convId}/read`, { message_id: id });
-        onActivity();
+        if (!silent) onActivity();
       } catch {
         lastMarked.current = "";
       }
@@ -95,7 +105,7 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
   // Initial load.
   useEffect(() => {
     let alive = true;
-    setMessages([]);
+    update(() => []);
     setLoading(true);
     setShowJump(false);
     nearBottom.current = true;
@@ -105,7 +115,7 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
         const { data } = await api.get<ChatMessagesResponse>(`/chat/conversations/${convId}/messages`, { params: { limit: 50 } });
         if (!alive) return;
         wantScroll.current = true;
-        setMessages(mergeMessages([], data.messages));
+        update(() => mergeMessages([], data.messages));
         setHasMore(data.has_more);
         const last = data.messages[data.messages.length - 1];
         if (last) {
@@ -134,15 +144,11 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
     try {
       const { data } = await api.get<ChatMessagesResponse>(`/chat/conversations/${convId}/messages`, { params: { after_id: after, limit: 50 } });
       if (data.messages.length === 0) return;
-      const fresh = data.messages.filter((m) => !messagesRef.current.some((x) => x.id === m.id));
+      const fresh = data.messages.filter((m) => !messagesRef.current.some((x) => x.id === m.id && !x.pending));
       if (fresh.length === 0) return;
       if (nearBottom.current) wantScroll.current = true;
       else if (fresh.some((m) => m.sender_id !== meId)) setShowJump(true);
-      setMessages((cur) => {
-        // Drop optimistic duplicates of our own just-confirmed messages.
-        const next = mergeMessages(cur, fresh);
-        return next;
-      });
+      update((cur) => mergeMessages(cur, fresh));
       if (fresh.some((m) => m.sender_id !== meId) && nearBottom.current) void markRead(fresh[fresh.length - 1].id);
       else if (nearBottom.current) lastMarked.current = fresh[fresh.length - 1].id;
     } catch {
@@ -150,12 +156,16 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
     } finally {
       polling.current = false;
     }
-  }, [convId, lastServerId, markRead, meId]);
+  }, [convId, lastServerId, markRead, meId, update]);
 
   useEffect(() => {
-    const t = setInterval(() => void poll(), POLL_MS);
+    // Safety-net rate while the websocket is live; normal polling otherwise.
+    const t = setInterval(() => void poll(), connected ? POLL_CONNECTED_MS : POLL_MS);
     const onVis = () => {
-      if (document.visibilityState === "visible") void poll();
+      if (document.visibilityState !== "visible") return;
+      void poll();
+      // Messages that arrived while the tab was hidden were not marked read yet.
+      if (nearBottom.current) void markRead();
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", onVis);
@@ -164,7 +174,46 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
     };
-  }, [poll]);
+  }, [poll, connected, markRead]);
+
+  // Realtime: append instantly, reconcile with optimistic sends, handle deletions, catch up on (re)connect.
+  useEffect(
+    () =>
+      onMessage(({ conversation_id, message: m }) => {
+        if (conversation_id !== convId) return;
+        if (messagesRef.current.some((x) => x.id === m.id)) return; // already have it (POST response / poll)
+        const fromOther = m.sender_id !== meId;
+        const stick = nearBottom.current;
+        update((cur) => {
+          let base = cur;
+          if (!fromOther) {
+            // Our own message echoed back: replace the oldest matching optimistic bubble.
+            const i = cur.findIndex((x) => x.id.startsWith("tmp-") && x.pending && x.body === m.body);
+            if (i >= 0) base = cur.filter((_, k) => k !== i);
+          }
+          return mergeMessages(base, [m]);
+        });
+        if (stick) wantScroll.current = true;
+        else if (fromOther) setShowJump(true);
+        if (!fromOther) {
+          lastMarked.current = m.id;
+        } else if (stick && document.visibilityState === "visible") {
+          void markRead(m.id, true);
+        } else if (!stick) {
+          onActivity(); // unread on the server but not marked: reconcile list + badge
+        }
+      }),
+    [onMessage, convId, meId, update, markRead, onActivity]
+  );
+  useEffect(
+    () =>
+      onDeleted(({ conversation_id, message_id }) => {
+        if (conversation_id !== convId) return;
+        update((cur) => (cur.some((x) => x.id === message_id && !x.deleted) ? cur.map((x) => (x.id === message_id ? { ...x, deleted: true } : x)) : cur));
+      }),
+    [onDeleted, convId, update]
+  );
+  useEffect(() => onReconnect(() => void poll()), [onReconnect, poll]);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -185,7 +234,7 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
     const prevHeight = el?.scrollHeight ?? 0;
     try {
       const { data } = await api.get<ChatMessagesResponse>(`/chat/conversations/${convId}/messages`, { params: { before_id: first.id, limit: 50 } });
-      setMessages((cur) => mergeMessages(cur, data.messages));
+      update((cur) => mergeMessages(cur, data.messages));
       setHasMore(data.has_more);
       requestAnimationFrame(() => {
         if (el) el.scrollTop = el.scrollHeight - prevHeight;
@@ -200,14 +249,12 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
   const sendBody = async (body: string, tmpId: string) => {
     try {
       const { data } = await api.post<ChatMessage>(`/chat/conversations/${convId}/messages`, { body });
-      setMessages((cur) => {
-        const withoutTmp = cur.filter((m) => m.id !== tmpId);
-        return mergeMessages(withoutTmp, [data]);
-      });
+      update((cur) => mergeMessages(cur.filter((m) => m.id !== tmpId), [data]));
       lastMarked.current = data.id;
-      onActivity();
+      // Update lists/badge locally (no refetch); the websocket echo is deduped by id.
+      emitMessage({ conversation_id: convId, message: data });
     } catch (e) {
-      setMessages((cur) => cur.map((m) => (m.id === tmpId ? { ...m, pending: false, failed: true } : m)));
+      update((cur) => cur.map((m) => (m.id === tmpId ? { ...m, pending: false, failed: true } : m)));
       toast.error(formatApiError(e));
     }
   };
@@ -229,24 +276,24 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
     wantScroll.current = true;
     nearBottom.current = true;
     setShowJump(false);
-    setMessages((cur) => [...cur, optimistic]);
+    update((cur) => [...cur, optimistic]);
     setText("");
     void sendBody(body, tmpId);
   };
 
   const retry = (m: ChatMessage) => {
-    setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, pending: true, failed: false } : x)));
+    update((cur) => cur.map((x) => (x.id === m.id ? { ...x, pending: true, failed: false } : x)));
     void sendBody(m.body, m.id);
   };
 
-  const discard = (m: ChatMessage) => setMessages((cur) => cur.filter((x) => x.id !== m.id));
+  const discard = (m: ChatMessage) => update((cur) => cur.filter((x) => x.id !== m.id));
 
   const remove = async (m: ChatMessage) => {
     if (!window.confirm("Delete this message?")) return;
     try {
       await api.delete(`/chat/messages/${m.id}`);
-      setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, deleted: true } : x)));
-      onActivity();
+      update((cur) => cur.map((x) => (x.id === m.id ? { ...x, deleted: true } : x)));
+      emitDeleted({ conversation_id: convId, message_id: m.id });
     } catch (e) {
       toast.error(formatApiError(e));
     }
@@ -277,6 +324,7 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
           <div className="text-sm font-semibold text-neutral-900 truncate" data-testid="chat-thread-name">{conversation.name}</div>
           {isGroup && <div className="text-[11px] text-neutral-500">{conversation.members.length} members</div>}
         </div>
+        <LiveDot />
         {isGroup && isAdmin && (
           <Button variant="outline" size="sm" onClick={onManage} data-testid="manage-group-btn" aria-label="Manage group">
             <Settings2 /> <span className="hidden sm:inline">Manage</span>

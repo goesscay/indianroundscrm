@@ -427,3 +427,16 @@ export interface RoleUser {
   email: string;
   active?: boolean;
 }
+
+// ---- Chat realtime (Laravel Reverb) payloads ----
+export interface ChatMessageSentEvent {
+  conversation_id: string;
+  message: ChatMessage;
+}
+export interface ChatMessageDeletedEvent {
+  conversation_id: string;
+  message_id: string;
+}
+export interface ChatConversationUpdatedEvent {
+  conversation_id: string;
+}

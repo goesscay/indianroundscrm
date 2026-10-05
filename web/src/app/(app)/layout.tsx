@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import ProtectedRoute from "@/components/app/ProtectedRoute";
+import { ChatRealtimeProvider } from "@/context/ChatRealtimeContext";
 import { ChatUnreadProvider } from "@/context/ChatUnreadContext";
 import { ChatDockProvider } from "@/context/ChatDockContext";
 import ChatDock from "@/components/chat/ChatDock";
@@ -10,12 +11,14 @@ import Layout from "@/components/app/Layout";
 export default function AppShellLayout({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute>
-      <ChatUnreadProvider>
-        <ChatDockProvider>
-          <Layout>{children}</Layout>
-          <ChatDock />
-        </ChatDockProvider>
-      </ChatUnreadProvider>
+      <ChatRealtimeProvider>
+        <ChatUnreadProvider>
+          <ChatDockProvider>
+            <Layout>{children}</Layout>
+            <ChatDock />
+          </ChatDockProvider>
+        </ChatUnreadProvider>
+      </ChatRealtimeProvider>
     </ProtectedRoute>
   );
 }

@@ -1,8 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
+import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/context/AuthContext";
+import { useChatRealtime } from "@/context/ChatRealtimeContext";
+import { applyDeletedMessage, applyIncomingMessage } from "@/components/chat/util";
 import type { Conversation } from "@/types";
 
 export interface DockWindow {
@@ -52,6 +55,17 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
   const [windows, setWindows] = useState<DockWindow[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const { onMessage, onDeleted, onConversationUpdated, onReconnect, isViewing } = useChatRealtime();
+  const pathname = usePathname();
+  const onChatPage = pathname === "/chat" || pathname.startsWith("/chat/");
+  const convsRef = useRef<Conversation[]>([]);
+  useEffect(() => {
+    convsRef.current = convs;
+  }, [convs]);
+  const onChatPageRef = useRef(onChatPage);
+  useEffect(() => {
+    onChatPageRef.current = onChatPage;
+  }, [onChatPage]);
 
   // Restore persisted state (after mount, so SSR markup matches).
   useEffect(() => {
@@ -94,6 +108,47 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
       setLoaded(true);
     }
   }, []);
+
+  // Coalesced list refetch (the /chat page owns its own list and refetches itself).
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const scheduleRefetch = useCallback(() => {
+    if (onChatPageRef.current) return;
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => void loadConvs(), 250);
+  }, [loadConvs]);
+  useEffect(() => () => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+  }, []);
+
+  // Realtime: update the list locally; refetch only for unknown conversations / conversation.updated / reconnect.
+  useEffect(
+    () =>
+      onMessage(({ conversation_id, message }) => {
+        const r = applyIncomingMessage(convsRef.current, conversation_id, message, userId, isViewing(conversation_id));
+        if (!r.known) {
+          scheduleRefetch();
+          return;
+        }
+        if (r.list !== convsRef.current) {
+          convsRef.current = r.list;
+          setConvs(r.list);
+        }
+      }),
+    [onMessage, isViewing, userId, scheduleRefetch]
+  );
+  useEffect(
+    () =>
+      onDeleted(({ conversation_id, message_id }) => {
+        const next = applyDeletedMessage(convsRef.current, conversation_id, message_id);
+        if (next !== convsRef.current) {
+          convsRef.current = next;
+          setConvs(next);
+        }
+      }),
+    [onDeleted]
+  );
+  useEffect(() => onConversationUpdated(() => scheduleRefetch()), [onConversationUpdated, scheduleRefetch]);
+  useEffect(() => onReconnect(() => scheduleRefetch()), [onReconnect, scheduleRefetch]);
 
   const upsertConv = useCallback((c: Conversation) => {
     setConvs((cur) => sortConvs([c, ...cur.filter((x) => x.id !== c.id)]));

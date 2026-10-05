@@ -1,6 +1,6 @@
 # Internal team chat
 
-Direct messages (any two active users) + admin-created groups. Polling based (no websockets).
+Direct messages (any two active users) + admin-created groups. Polling fallback plus real-time push via Laravel Reverb (see docs/REALTIME.md).
 Routes: `routes/api_chat.php` -> `App\Http\Controllers\Chat\ChatController`. All under `/api/chat`, `auth:sanctum`, errors `{"detail": "..."}`, ids are strings.
 
 ## Tables (migration 2026_10_05_200000)

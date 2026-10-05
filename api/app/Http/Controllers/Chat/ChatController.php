@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Chat;
 
 use App\Http\Controllers\Controller;
+use App\Events\Chat\ConversationUpdated;
+use App\Events\Chat\MessageDeleted;
+use App\Events\Chat\MessageSent;
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\ChatParticipant;
@@ -13,6 +16,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
@@ -21,6 +25,22 @@ class ChatController extends Controller
     private function me(Request $r): User
     {
         return $r->user();
+    }
+
+    /** Participant user ids of a conversation. */
+    private function participantIds(int $conversationId): array
+    {
+        return ChatParticipant::where('conversation_id', $conversationId)->pluck('user_id')->map(fn ($i) => (int) $i)->all();
+    }
+
+    /** Real-time push; must never fail or noticeably slow the HTTP request. */
+    private function broadcastSafely(callable $dispatch): void
+    {
+        try {
+            $dispatch();
+        } catch (\Throwable $e) {
+            Log::warning('Chat broadcast failed: '.$e->getMessage());
+        }
     }
 
     private function userRow(User $u): array
@@ -195,6 +215,7 @@ class ChatController extends Controller
 
         $key = min($me->id, $otherId).':'.max($me->id, $otherId);
         $conv = ChatConversation::where('direct_key', $key)->first();
+        $created = false;
         if (! $conv) {
             try {
                 $conv = DB::transaction(function () use ($key, $me, $otherId) {
@@ -206,9 +227,14 @@ class ChatController extends Controller
 
                     return $conv;
                 });
+                $created = true;
             } catch (UniqueConstraintViolationException) {
                 $conv = ChatConversation::where('direct_key', $key)->firstOrFail(); // lost a creation race
             }
+        }
+
+        if ($created) {
+            $this->broadcastSafely(fn () => ConversationUpdated::dispatch([(int) $me->id, $otherId], (string) $conv->id));
         }
 
         return response()->json($this->presentOne($conv, $me));
@@ -241,6 +267,7 @@ class ChatController extends Controller
             return $conv;
         });
         ActivityLogger::log($me, 'create', 'chat_group', $conv->id, null, ['name' => $name, 'member_ids' => array_map('strval', $all)]);
+        $this->broadcastSafely(fn () => ConversationUpdated::dispatch($all, (string) $conv->id));
 
         return response()->json($this->presentOne($conv, $me));
     }
@@ -292,6 +319,12 @@ class ChatController extends Controller
             ]);
         }
 
+        if ($toAdd || $toRemove || ($newName !== null && $newName !== $oldName)) {
+            // current members + removed ones (so their clients drop the group)
+            $this->broadcastSafely(fn () => ConversationUpdated::dispatch(
+                array_merge($this->participantIds($conv->id), $toRemove), (string) $conv->id));
+        }
+
         return response()->json($this->presentOne($conv->fresh(), $me));
     }
 
@@ -299,8 +332,10 @@ class ChatController extends Controller
     {
         $conv = $this->groupOrFail($id);
         $name = $conv->name;
+        $memberIds = $this->participantIds($conv->id);
         $conv->delete(); // participants + messages cascade
         ActivityLogger::log($this->me($r), 'delete', 'chat_group', $conv->id, ['name' => $name], null);
+        $this->broadcastSafely(fn () => ConversationUpdated::dispatch($memberIds, (string) $conv->id));
 
         return response()->json(['ok' => true]);
     }
@@ -356,7 +391,10 @@ class ChatController extends Controller
             return $msg;
         });
 
-        return response()->json($this->messageRow($msg, $me->name));
+        $row = $this->messageRow($msg, $me->name);
+        $this->broadcastSafely(fn () => MessageSent::dispatch($this->participantIds($conv->id), (string) $conv->id, $row));
+
+        return response()->json($row);
     }
 
     public function deleteMessage(Request $r, string $id): JsonResponse
@@ -370,6 +408,7 @@ class ChatController extends Controller
 
         if ($msg->deleted_at === null) {
             $msg->update(['deleted_at' => now()]);
+            $this->broadcastSafely(fn () => MessageDeleted::dispatch($this->participantIds($conv->id), (string) $conv->id, (string) $msg->id));
         }
 
         return response()->json(['ok' => true]);

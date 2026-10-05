@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronUp, ExternalLink, MessageSquare, MessageSquarePlus, Search, Users, X } from "lucide-react";
@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { useAuth, useCurrentUser } from "@/context/AuthContext";
 import { useChatUnread } from "@/context/ChatUnreadContext";
 import { useChatDock } from "@/context/ChatDockContext";
+import { useChatRealtime } from "@/context/ChatRealtimeContext";
+import LiveDot from "./LiveDot";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types";
 import ChatThread from "./ChatThread";
@@ -17,6 +19,7 @@ import NewChatDialog from "./NewChatDialog";
 import { initials, relativeTime } from "./util";
 
 const LIST_POLL_MS = 8000;
+const LIST_POLL_CONNECTED_MS = 45000;
 const MIN_QUERY = "(min-width: 768px)";
 
 /** Desktop-only flag; server snapshot is false so there is no hydration mismatch. */
@@ -40,6 +43,41 @@ function Avatar({ conv }: { conv: Conversation }) {
   );
 }
 
+const DockConvRow = memo(function DockConvRow({ c, meId, open, onOpen }: { c: Conversation; meId: string; open: boolean; onOpen: (c: Conversation) => void }) {
+  const lm = c.last_message;
+  const preview = lm
+    ? lm.deleted
+      ? "Message deleted"
+      : `${c.type === "group" || lm.sender_id === meId ? (lm.sender_id === meId ? "You" : lm.sender_name) + ": " : ""}${lm.body}`
+    : "No messages yet";
+  const unread = c.unread_count > 0 && !open;
+  return (
+    <button
+      role="listitem"
+      type="button"
+      onClick={() => onOpen(c)}
+      data-testid={`chat-dock-conv-${c.id}`}
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-neutral-50"
+    >
+      <Avatar conv={c} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className={cn("text-sm truncate", unread ? "font-bold text-neutral-950" : "font-semibold text-neutral-900")}>{c.name}</span>
+          <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(lm?.created_at ?? c.updated_at)}</span>
+        </span>
+        <span className="flex items-center justify-between gap-2 mt-0.5">
+          <span className={cn("text-xs truncate", unread ? "text-neutral-800" : "text-neutral-500")}>{preview}</span>
+          {unread && (
+            <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-sm bg-neutral-900 text-white text-[10px] font-bold flex items-center justify-center">
+              {c.unread_count > 99 ? "99+" : c.unread_count}
+            </span>
+          )}
+        </span>
+      </span>
+    </button>
+  );
+});
+
 export default function ChatDock() {
   const pathname = usePathname();
   const isDesktop = useIsDesktop();
@@ -52,6 +90,7 @@ function DockInner() {
   const { user, can } = useCurrentUser();
   const isAdmin = can("chat.create_groups");
   const { total, refresh: refreshUnread } = useChatUnread();
+  const { connected } = useChatRealtime();
   const { convs, loaded, windows, panelOpen, loadConvs, upsertConv, setPanelOpen, openWindow, toggleMinimize, closeWindow } = useChatDock();
   const [search, setSearch] = useState("");
   const [newChatOpen, setNewChatOpen] = useState(false);
@@ -71,13 +110,13 @@ function DockInner() {
     const tick = () => {
       if (document.visibilityState === "visible") void loadConvs();
     };
-    const t = setInterval(tick, LIST_POLL_MS);
+    const t = setInterval(tick, connected ? LIST_POLL_CONNECTED_MS : LIST_POLL_MS);
     document.addEventListener("visibilitychange", tick);
     return () => {
       clearInterval(t);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [needList, loadConvs]);
+  }, [needList, loadConvs, connected]);
 
   // Brief pulse when the unread total grows.
   useEffect(() => {
@@ -105,10 +144,10 @@ function DockInner() {
     return s ? convs.filter((c) => c.name.toLowerCase().includes(s)) : convs;
   }, [convs, search]);
 
-  const onActivity = () => {
+  const onActivity = useCallback(() => {
     void loadConvs();
     void refreshUnread();
-  };
+  }, [loadConvs, refreshUnread]);
 
   const onPanelKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
@@ -190,7 +229,7 @@ function DockInner() {
         >
           <header className="flex items-center gap-1.5 px-3 h-10 shrink-0 bg-neutral-900 text-white">
             <MessageSquare size={14} />
-            <span className="text-sm font-semibold flex-1">Chat</span>
+            <span className="text-sm font-semibold flex-1 flex items-center gap-1.5">Chat <LiveDot /></span>
             <Link href="/chat" aria-label="Open full view" title="Open full view" data-testid="chat-dock-full" className="p-1 rounded-sm hover:bg-white/15">
               <ExternalLink size={14} />
             </Link>
@@ -219,41 +258,9 @@ function DockInner() {
             {loaded && filtered.length === 0 && (
               <div className="p-6 text-center text-sm text-neutral-400">{convs.length === 0 ? "No conversations yet." : "No matches"}</div>
             )}
-            {filtered.map((c) => {
-              const lm = c.last_message;
-              const preview = lm
-                ? lm.deleted
-                  ? "Message deleted"
-                  : `${c.type === "group" || lm.sender_id === user.id ? (lm.sender_id === user.id ? "You" : lm.sender_name) + ": " : ""}${lm.body}`
-                : "No messages yet";
-              const unread = c.unread_count > 0 && !openIds.has(c.id);
-              return (
-                <button
-                  key={c.id}
-                  role="listitem"
-                  type="button"
-                  onClick={() => openWindow(c)}
-                  data-testid={`chat-dock-conv-${c.id}`}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-neutral-50"
-                >
-                  <Avatar conv={c} />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline justify-between gap-2">
-                      <span className={cn("text-sm truncate", unread ? "font-bold text-neutral-950" : "font-semibold text-neutral-900")}>{c.name}</span>
-                      <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(lm?.created_at ?? c.updated_at)}</span>
-                    </span>
-                    <span className="flex items-center justify-between gap-2 mt-0.5">
-                      <span className={cn("text-xs truncate", unread ? "text-neutral-800" : "text-neutral-500")}>{preview}</span>
-                      {unread && (
-                        <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-sm bg-neutral-900 text-white text-[10px] font-bold flex items-center justify-center">
-                          {c.unread_count > 99 ? "99+" : c.unread_count}
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+            {filtered.map((c) => (
+              <DockConvRow key={c.id} c={c} meId={user.id} open={openIds.has(c.id)} onOpen={openWindow} />
+            ))}
           </div>
         </div>
       ) : (

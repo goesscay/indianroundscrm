@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageSquarePlus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
@@ -8,23 +8,59 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCurrentUser } from "@/context/AuthContext";
 import { useChatUnread } from "@/context/ChatUnreadContext";
+import { useChatRealtime } from "@/context/ChatRealtimeContext";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types";
 import ChatThread from "@/components/chat/ChatThread";
 import GroupDialog from "@/components/chat/GroupDialog";
 import NewChatDialog from "@/components/chat/NewChatDialog";
-import { initials, relativeTime } from "@/components/chat/util";
+import LiveDot from "@/components/chat/LiveDot";
+import { applyDeletedMessage, applyIncomingMessage, initials, relativeTime } from "@/components/chat/util";
 
 const LIST_POLL_MS = 8000;
+const LIST_POLL_CONNECTED_MS = 45000;
 
 function sortConvs(list: Conversation[]): Conversation[] {
   return [...list].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
 }
 
+const ConvRow = memo(function ConvRow({ c, meId, active, onSelect }: { c: Conversation; meId: string; active: boolean; onSelect: (id: string) => void }) {
+  const lm = c.last_message;
+  const preview = lm ? (lm.deleted ? "Message deleted" : `${c.type === "group" || lm.sender_id === meId ? (lm.sender_id === meId ? "You" : lm.sender_name) + ": " : ""}${lm.body}`) : "No messages yet";
+  const unread = c.unread_count > 0 && !active;
+  return (
+    <button
+      role="listitem"
+      onClick={() => onSelect(c.id)}
+      data-testid={`chat-conv-${c.id}`}
+      className={cn("w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-neutral-50", active && "bg-neutral-100")}
+    >
+      <span className="w-10 h-10 shrink-0 rounded bg-neutral-900 text-white text-xs font-bold flex items-center justify-center">
+        {c.type === "group" ? <Users size={16} /> : initials(c.name)}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className={cn("text-sm truncate", unread ? "font-bold text-neutral-950" : "font-semibold text-neutral-900")}>{c.name}</span>
+          <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(lm?.created_at ?? c.updated_at)}</span>
+        </span>
+        <span className="flex items-center justify-between gap-2 mt-0.5">
+          <span className={cn("text-xs truncate", unread ? "text-neutral-800" : "text-neutral-500")}>{preview}</span>
+          {unread && (
+            <span data-testid="chat-unread" className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-sm bg-neutral-900 text-white text-[10px] font-bold flex items-center justify-center">
+              {c.unread_count > 99 ? "99+" : c.unread_count}
+            </span>
+          )}
+        </span>
+      </span>
+    </button>
+  );
+});
+
 export default function ChatPage() {
   const { user, can } = useCurrentUser();
   const isAdmin = can("chat.create_groups");
   const { refresh: refreshUnread } = useChatUnread();
+  const { connected, onMessage, onDeleted, onConversationUpdated, onReconnect, isViewing } = useChatRealtime();
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -33,6 +69,10 @@ export default function ChatPage() {
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const activeRef = useRef<string | null>(null);
+  const convsRef = useRef<Conversation[]>([]);
+  useEffect(() => {
+    convsRef.current = convs;
+  }, [convs]);
   useEffect(() => {
     activeRef.current = activeId;
   }, [activeId]);
@@ -55,7 +95,7 @@ export default function ChatPage() {
     const tick = () => {
       if (document.visibilityState === "visible") void loadConvs();
     };
-    const t = setInterval(tick, LIST_POLL_MS);
+    const t = setInterval(tick, connected ? LIST_POLL_CONNECTED_MS : LIST_POLL_MS);
     document.addEventListener("visibilitychange", tick);
     window.addEventListener("focus", tick);
     return () => {
@@ -63,7 +103,45 @@ export default function ChatPage() {
       document.removeEventListener("visibilitychange", tick);
       window.removeEventListener("focus", tick);
     };
+  }, [loadConvs, connected]);
+
+  // Realtime: update the list locally; refetch only for unknown conversations, conversation.updated and reconnects.
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const scheduleRefetch = useCallback(() => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => void loadConvs(), 250);
   }, [loadConvs]);
+  useEffect(() => () => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+  }, []);
+  useEffect(
+    () =>
+      onMessage(({ conversation_id, message }) => {
+        const r = applyIncomingMessage(convsRef.current, conversation_id, message, user.id, isViewing(conversation_id));
+        if (!r.known) {
+          scheduleRefetch();
+          return;
+        }
+        if (r.list !== convsRef.current) {
+          convsRef.current = r.list;
+          setConvs(r.list);
+        }
+      }),
+    [onMessage, isViewing, user.id, scheduleRefetch]
+  );
+  useEffect(
+    () =>
+      onDeleted(({ conversation_id, message_id }) => {
+        const next = applyDeletedMessage(convsRef.current, conversation_id, message_id);
+        if (next !== convsRef.current) {
+          convsRef.current = next;
+          setConvs(next);
+        }
+      }),
+    [onDeleted]
+  );
+  useEffect(() => onConversationUpdated(scheduleRefetch), [onConversationUpdated, scheduleRefetch]);
+  useEffect(() => onReconnect(scheduleRefetch), [onReconnect, scheduleRefetch]);
 
   const onActivity = useCallback(() => {
     void loadConvs();
@@ -112,7 +190,7 @@ export default function ChatPage() {
       >
         <div className="p-3 border-b border-border space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <h1 className="font-display text-lg font-bold text-neutral-900">Chat</h1>
+            <h1 className="font-display text-lg font-bold text-neutral-900 flex items-center gap-2">Chat <LiveDot /></h1>
             <div className="flex gap-1.5">
               {isAdmin && (
                 <Button variant="outline" size="sm" onClick={() => setNewGroupOpen(true)} data-testid="new-group-btn">
@@ -136,38 +214,9 @@ export default function ChatPage() {
               {convs.length === 0 ? "No conversations yet. Start a new chat." : "No matches"}
             </div>
           )}
-          {filtered.map((c) => {
-            const lm = c.last_message;
-            const preview = lm ? (lm.deleted ? "Message deleted" : `${c.type === "group" || lm.sender_id === user.id ? (lm.sender_id === user.id ? "You" : lm.sender_name) + ": " : ""}${lm.body}`) : "No messages yet";
-            const unread = c.unread_count > 0 && c.id !== activeId;
-            return (
-              <button
-                key={c.id}
-                role="listitem"
-                onClick={() => setActiveId(c.id)}
-                data-testid={`chat-conv-${c.id}`}
-                className={cn("w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-neutral-50", c.id === activeId && "bg-neutral-100")}
-              >
-                <span className="w-10 h-10 shrink-0 rounded bg-neutral-900 text-white text-xs font-bold flex items-center justify-center">
-                  {c.type === "group" ? <Users size={16} /> : initials(c.name)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className={cn("text-sm truncate", unread ? "font-bold text-neutral-950" : "font-semibold text-neutral-900")}>{c.name}</span>
-                    <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(lm?.created_at ?? c.updated_at)}</span>
-                  </span>
-                  <span className="flex items-center justify-between gap-2 mt-0.5">
-                    <span className={cn("text-xs truncate", unread ? "text-neutral-800" : "text-neutral-500")}>{preview}</span>
-                    {unread && (
-                      <span data-testid="chat-unread" className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-sm bg-neutral-900 text-white text-[10px] font-bold flex items-center justify-center">
-                        {c.unread_count > 99 ? "99+" : c.unread_count}
-                      </span>
-                    )}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
+          {filtered.map((c) => (
+            <ConvRow key={c.id} c={c} meId={user.id} active={c.id === activeId} onSelect={setActiveId} />
+          ))}
         </div>
       </aside>
 
