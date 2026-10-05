@@ -247,6 +247,9 @@ export interface Notification {
   title: string;
   detail?: string;
   lead_id?: string;
+  /** 'supplier_reply' | 'supplier_bounce' | other server-defined kinds. */
+  kind?: string;
+  reply_id?: string;
   [extra: string]: unknown;
 }
 
@@ -483,4 +486,87 @@ export interface ActivityInput {
   assigned_to?: string | null;
   lead_id?: string | null;
   done?: boolean;
+}
+
+
+// ---- Supplier reply tracking ----
+export type SupplierReplyStatus = "matched" | "unmatched" | "auto_reply" | "bounce" | "ignored";
+export type SupplierReplyMatchedBy = "thread" | "reference" | "subject" | "sender" | "manual";
+
+export interface SupplierReplyAttachment {
+  id: string;
+  filename: string;
+  content_type?: string | null;
+  size?: number | null;
+  skipped?: boolean;
+  skip_reason?: string | null;
+}
+
+export interface SupplierReply {
+  id: string;
+  lead_id: string | null;
+  customer_name: string | null;
+  supplier: { id: string; name: string; email?: string | null } | null;
+  from_email: string;
+  from_name?: string | null;
+  subject: string;
+  body_text: string;
+  preview?: string;
+  received_at: string;
+  status: SupplierReplyStatus;
+  matched_by: SupplierReplyMatchedBy | null;
+  read: boolean;
+  attachments: SupplierReplyAttachment[];
+}
+
+export interface SupplierReplyCounts {
+  all: number;
+  matched: number;
+  unmatched: number;
+  bounce: number;
+  auto_reply: number;
+  ignored: number;
+  unread: number;
+}
+
+export interface SupplierReplyPage {
+  items: SupplierReply[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+  counts?: SupplierReplyCounts;
+}
+
+export interface MailStatus {
+  transport: "graph" | "log";
+  configured: boolean;
+  mailbox?: string | null;
+  last_poll_at?: string | null;
+  last_success_at?: string | null;
+  last_error?: string | null;
+  unprocessed_count?: number;
+  replies_total?: number;
+  unmatched_count?: number;
+}
+
+export interface MailPollResult {
+  fetched: number;
+  new: number;
+  matched: number;
+  unmatched: number;
+  errors: number;
+}
+
+/** Realtime payload on `notifications.user.{id}` event `.supplier.reply`. */
+export interface SupplierReplyEvent {
+  reply: {
+    id: string;
+    lead_id: string | null;
+    customer_name?: string | null;
+    supplier_name?: string | null;
+    subject?: string;
+    preview?: string;
+    received_at?: string;
+  };
 }

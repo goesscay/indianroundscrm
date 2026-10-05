@@ -202,13 +202,16 @@ class AuthController extends Controller
         ]);
 
         $link = rtrim(config('app.frontend_url'), '/').'/reset-password/'.$token;
-        try {
-            Mail::raw($this->resetEmailText($user->name, $link), function ($m) use ($email) {
-                $m->to($email)->subject('Password Reset — Indian Rounds CRM');
-            });
-            SecurityLogger::log($user, 'password_reset_requested', $request, ['status' => 'sent']);
-        } catch (\Throwable $e) {
-            SecurityLogger::log($user, 'password_reset_email_failed', $request, ['error' => $e->getMessage()]);
+        // Same Microsoft 365 transport as supplier mail (never throws; failures come back as status 'failed').
+        $result = \App\Crm\MailSender::send(
+            [$email],
+            'Password Reset — Indian Rounds CRM',
+            $this->resetEmailText($user->name, $link)
+        );
+        if (($result['status'] ?? '') === 'failed') {
+            SecurityLogger::log($user, 'password_reset_email_failed', $request, ['error' => $result['error'] ?? 'unknown']);
+        } else {
+            SecurityLogger::log($user, 'password_reset_requested', $request, ['status' => $result['status'] ?? 'sent']);
         }
 
         return $generic;

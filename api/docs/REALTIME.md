@@ -47,3 +47,7 @@ Set the `REVERB_*` values in `.env` (see `.env.example`), keep `SANCTUM_STATEFUL
 
 ## Tests
 `tests/Feature/ChatBroadcastTest.php` (event dispatch/payloads/channels, channel auth, `/api/broadcasting/auth` over the SPA session, broadcaster failure tolerance).
+
+## Supplier reply notifications
+
+`App\Events\SupplierReplyReceived` (`ShouldBroadcastNow`, event name `supplier.reply`) goes to the private channel `notifications.user.{userId}` of the lead owner and every active `rsq.manage` holder when a supplier reply (or bounce) is ingested. Payload `{reply:{id, lead_id, customer_name, supplier_name, subject, preview, received_at, kind}}`; `kind` is `supplier_reply` or `supplier_bounce`. The channel authorises the user's own id only (`routes/channels.php`). Broadcast failures are logged, never raised. See `docs/MAIL_INTEGRATION.md`.

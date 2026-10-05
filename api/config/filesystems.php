@@ -30,6 +30,15 @@ return [
 
     'disks' => [
 
+        // Supplier reply attachments (never public): storage/app/supplier-replies/{yyyy}/{mm}/{random}
+        'supplier_replies' => [
+            'driver' => 'local',
+            'root' => storage_path('app/supplier-replies'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

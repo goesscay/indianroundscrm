@@ -18,8 +18,22 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
-    'resend' => [
-        'key' => env('RESEND_API_KEY'),
+    // Microsoft 365 / Graph mail (supplier enquiry sending + reply tracking). See docs/MAIL_INTEGRATION.md
+    'microsoft' => [
+        'transport' => env('MAIL_TRANSPORT'), // graph | log ; empty = graph when MS_* are set, else log
+        'tenant_id' => env('MS_TENANT_ID'),
+        'client_id' => env('MS_CLIENT_ID'),
+        'client_secret' => env('MS_CLIENT_SECRET'),
+        'mailbox' => env('MS_MAILBOX', 'enquiry@indianrounds.in'),
+        'inbox_folder' => env('MS_INBOX_FOLDER', 'Inbox'),
+        'processed_category' => env('MS_MAIL_CATEGORY_PROCESSED', 'ERP-Processed'),
+        'graph_base' => env('MS_GRAPH_BASE', 'https://graph.microsoft.com/v1.0'),
+        'login_base' => env('MS_LOGIN_BASE', 'https://login.microsoftonline.com'),
+        'timeout' => (int) env('MS_HTTP_TIMEOUT', 25),
+        'max_retries' => (int) env('MS_HTTP_RETRIES', 3),
+        'retry_max_wait' => (int) env('MS_HTTP_RETRY_MAX_WAIT', 30), // seconds, cap for Retry-After / backoff
+        'poll_overlap_minutes' => (int) env('MS_POLL_OVERLAP_MINUTES', 10),
+        'poll_lookback_hours' => (int) env('MS_POLL_LOOKBACK_HOURS', 48), // first poll only
     ],
 
     'ses' => [

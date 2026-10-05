@@ -6,3 +6,8 @@ use Illuminate\Support\Facades\Broadcast;
 Broadcast::channel('chat.user.{userId}', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });
+
+// Private per-user notification channel (supplier replies etc.): own id only.
+Broadcast::channel('notifications.user.{userId}', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});

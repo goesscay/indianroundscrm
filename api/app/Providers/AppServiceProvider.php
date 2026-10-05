@@ -14,7 +14,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // MAIL_TRANSPORT=graph|log (log when Microsoft 365 is not configured: never touches the network)
+        $this->app->bind(\App\Services\Mail\MailTransport::class, fn () => \App\Services\Mail\MailTransportResolver::make());
     }
 
     /**

@@ -8,10 +8,11 @@ import type { LucideIcon } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { useChatUnread } from "@/context/ChatUnreadContext";
+import { useSupplierReplies } from "@/context/SupplierRepliesContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  Calendar, ListChecks, Bell, Inbox, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
+  Calendar, ListChecks, Bell, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAiPanel } from "@/components/ai/AiPanelContext";
@@ -36,6 +37,7 @@ const NAV: NavItem[] = [
   { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar", group: "Sales", perms: ["calendar.view"] },
   { to: "/chat", label: "Chat", icon: MessageSquare, testId: "nav-chat", group: "Team", perms: ["chat.use"] },
   { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard", group: "Operations", perms: ["supplier_dashboard.view"] },
+  { to: "/supplier-inbox", label: "Supplier Inbox", icon: MailOpen, testId: "nav-supplier-inbox", group: "Operations", perms: ["rsq.manage"] },
   { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers", group: "Operations", perms: ["suppliers.view"] },
   { to: "/users", label: "Users", icon: Users, testId: "nav-users", group: "Administration", perms: ["users.view"] },
   { to: "/roles", label: "Roles & Permissions", icon: ShieldCheck, testId: "nav-roles", group: "Administration", perms: ["roles.manage"] },
@@ -52,6 +54,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const items = NAV.filter((it) => can(...it.perms));
   const { total: chatUnread } = useChatUnread();
+  const { counts: replyCounts, version: repliesVersion } = useSupplierReplies();
+  const inboxUnread = replyCounts?.unread ?? 0;
+  const inboxUnmatched = replyCounts?.unmatched ?? 0;
   const [alerts, setAlerts] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false); // mobile drawer
   const [collapsed, setCollapsed] = useState(false); // desktop rail
@@ -97,7 +102,15 @@ export default function Layout({ children }: { children: ReactNode }) {
       mounted = false;
       clearInterval(t);
     };
-  }, []);
+    // repliesVersion: refetch immediately on realtime supplier replies / after replies are read.
+  }, [repliesVersion]);
+
+  const alertHref = (a: Notification): string | null => {
+    const isReply = a.kind === "supplier_reply" || a.kind === "supplier_bounce";
+    if (a.lead_id) return isReply ? `/leads/${a.lead_id}#supplier-replies` : `/leads/${a.lead_id}`;
+    if (isReply && can("rsq.manage")) return "/supplier-inbox";
+    return null;
+  };
 
   const doLogout = async () => {
     await logout();
@@ -148,6 +161,21 @@ export default function Layout({ children }: { children: ReactNode }) {
                       {chatUnread > 99 ? "99+" : chatUnread}
                     </span>
                   ))}
+                {it.testId === "nav-supplier-inbox" && (inboxUnread > 0 || inboxUnmatched > 0) &&
+                  (rail ? (
+                    <span data-testid="inbox-nav-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-sidebar">
+                      {(inboxUnread || inboxUnmatched) > 9 ? "9+" : inboxUnread || inboxUnmatched}
+                    </span>
+                  ) : (
+                    <span
+                      data-testid="inbox-nav-badge"
+                      title={inboxUnread > 0 ? `${inboxUnread} unread` : `${inboxUnmatched} unmatched`}
+                      className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center",
+                        inboxUnread > 0 ? (active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground") : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300")}
+                    >
+                      {(inboxUnread || inboxUnmatched) > 99 ? "99+" : inboxUnread || inboxUnmatched}
+                    </span>
+                  ))}
               </Link>
             </div>
           );
@@ -171,19 +199,28 @@ export default function Layout({ children }: { children: ReactNode }) {
       <PopoverContent className="w-80 max-h-96 overflow-y-auto p-0" side="bottom" align="end" sideOffset={8} data-testid="bell-popover">
         <div className="p-3 border-b border-border">
           <div className="font-display font-bold">Notifications</div>
-          <div className="text-xs text-muted-foreground">Auto-refreshes every 30s</div>
+          <div className="text-xs text-muted-foreground">Updates live; refreshes every 30s</div>
         </div>
         {alerts.length === 0 && <div className="p-4 text-sm text-muted-foreground text-center">All caught up!</div>}
         <div className="divide-y divide-border">
           {alerts.map((a, i) => (
             <button
               key={i}
-              onClick={() => a.lead_id && router.push(`/leads/${a.lead_id}`)}
+              onClick={() => { const h = alertHref(a); if (h) router.push(h); }}
               className="w-full text-left p-3 hover:bg-secondary/60 transition-colors"
               data-testid={`alert-${i}`}
             >
               <div className="flex items-start gap-2">
-                <span className="text-lg">{a.icon}</span>
+                {a.kind === "supplier_reply" || a.kind === "supplier_bounce" ? (
+                  <span
+                    className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full", a.kind === "supplier_bounce" ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300" : "bg-secondary text-foreground")}
+                    data-testid={`alert-icon-${a.kind}`}
+                  >
+                    {a.kind === "supplier_bounce" ? <MailWarning size={14} aria-hidden /> : <MailOpen size={14} aria-hidden />}
+                  </span>
+                ) : (
+                  <span className="text-lg">{a.icon}</span>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold truncate">{a.title}</div>
                   <div className="text-xs text-muted-foreground truncate">{a.detail}</div>

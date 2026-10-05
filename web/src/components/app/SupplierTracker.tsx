@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Mail, Phone, MessageCircle, FileText, Bell } from "lucide-react";
 import { toast } from "sonner";
-import type { LeadSupplier } from "@/types";
+import type { LeadSupplier, SupplierReply } from "@/types";
 
 const SUPPLIER_STATUSES = [
   "Email Not Sent","Email Sent","Awaiting Reply","Follow-up Required","Quote Received",
@@ -49,7 +49,7 @@ const EMPTY_FORM: TrackerForm = {
   flight_included: false, transfer_included: false, activities_included: "", valid_until: "", remarks: "",
 };
 
-export default function SupplierTracker({ leadId, leadPhone }: { leadId: string; leadPhone?: string }) {
+export default function SupplierTracker({ leadId, leadPhone, replies = [] }: { leadId: string; leadPhone?: string; replies?: SupplierReply[] }) {
   const [rows, setRows] = useState<LeadSupplier[]>([]);
   const lm = useLoadMore(rows, 10);
   const [editing, setEditing] = useState<LeadSupplier | null>(null);
@@ -94,6 +94,16 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
     catch (e) { toast.error(formatApiError(e)); }
   };
 
+  const replyState = (r: LeadSupplier): "bounce" | "replied" | null => {
+    const email = (r.supplier_email || "").toLowerCase();
+    const mine = replies.filter((x) =>
+      (r.supplier_id && x.supplier?.id === r.supplier_id) ||
+      (email && ((x.supplier?.email || "").toLowerCase() === email || (x.from_email || "").toLowerCase() === email)));
+    if (mine.some((x) => x.status === "bounce")) return "bounce";
+    if (mine.some((x) => x.status !== "ignored" && x.status !== "auto_reply")) return "replied";
+    return null;
+  };
+
   if (rows.length === 0) return null;
   const waPhone = (leadPhone || "").replace(/\D/g, "");
 
@@ -122,6 +132,20 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
                   <td className="py-3 px-2">
                     <div className="font-semibold">{r.supplier_name}</div>
                     <div className="text-xs text-muted-foreground">{r.supplier_email}</div>
+                    {(() => {
+                      const st = replyState(r);
+                      if (!st) return null;
+                      return (
+                        <a
+                          href="#supplier-replies"
+                          onClick={(e) => { e.preventDefault(); document.getElementById("supplier-replies")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                          className={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide hover:underline ${st === "bounce" ? "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"}`}
+                          title="Jump to this supplier's replies" data-testid={`tracker-reply-${r.sequence}`}
+                        >
+                          <Mail size={10} aria-hidden /> {st === "bounce" ? "Bounced" : "Replied"}
+                        </a>
+                      );
+                    })()}
                   </td>
                   <td className="py-3 px-2">
                     <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUS_COLOR[r.status] || "bg-slate-100 dark:bg-neutral-800"}`}>

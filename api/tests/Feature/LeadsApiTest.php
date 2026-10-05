@@ -205,9 +205,6 @@ class LeadsApiTest extends TestCase
         $this->patchJson("/api/leads/{$id}", ['lead_status' => 'Quote Sent to Customer'])->assertOk();
         $this->getJson("/api/leads/{$id}")->assertJsonPath('rsq_status', 'completed');
         $this->assertCount(1, $this->getJson('/api/rsq-requests')->json('completed'));
-
-        // inbound webhook (unauthenticated) flips trackers
-        $this->postJson('/api/webhooks/resend', ['type' => 'email.delivered', 'data' => ['email_id' => 'none']])->assertOk()->assertJson(['ok' => true]);
     }
 
     public function test_dashboard_stats_leaderboard_activity_and_ai(): void

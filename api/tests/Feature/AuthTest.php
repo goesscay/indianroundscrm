@@ -185,6 +185,8 @@ class AuthTest extends TestCase
 
     public function test_forgot_and_reset_password_flow(): void
     {
+        $fake = new \Tests\Support\FakeMailTransport;
+        $this->app->instance(\App\Services\Mail\MailTransport::class, $fake);
         $u = User::factory()->create();
         $this->loginAs($u, 'old');
 
@@ -193,9 +195,11 @@ class AuthTest extends TestCase
         $this->api('POST', '/api/auth/forgot-password', ['email' => strtoupper($u->email)])->assertOk();
         $this->assertDatabaseCount('password_reset_tokens', 1);
 
-        $msg = app('mailer')->getSymfonyTransport()->messages()->last();
-        $body = quoted_printable_decode($msg->getOriginalMessage()->getBody()->bodyToString());
-        $this->assertSame('Password Reset — Indian Rounds CRM', $msg->getOriginalMessage()->getSubject());
+        $this->assertCount(1, $fake->sent);
+        $msg = $fake->sent[0];
+        $body = $msg->body;
+        $this->assertSame([$u->email], $msg->to);
+        $this->assertSame('Password Reset — Indian Rounds CRM', $msg->subject);
         $this->assertMatchesRegularExpression('#http://localhost:3000/reset-password/([A-Za-z0-9]+)#', $body);
         preg_match('#/reset-password/([A-Za-z0-9]+)#', $body, $m);
         $token = $m[1];
@@ -218,9 +222,11 @@ class AuthTest extends TestCase
 
     public function test_expired_reset_token_is_rejected_and_unlocks_account(): void
     {
+        $fake = new \Tests\Support\FakeMailTransport;
+        $this->app->instance(\App\Services\Mail\MailTransport::class, $fake);
         $u = User::factory()->create(['account_status' => 'locked', 'locked_until' => now()->addMinutes(10)]);
         $this->api('POST', '/api/auth/forgot-password', ['email' => $u->email])->assertOk();
-        $body = quoted_printable_decode(app('mailer')->getSymfonyTransport()->messages()->last()->getOriginalMessage()->getBody()->bodyToString());
+        $body = $fake->sent[0]->body;
         preg_match('#/reset-password/([A-Za-z0-9]+)#', $body, $m);
 
         \App\Models\PasswordResetToken::query()->update(['expires_at' => now()->subMinute()]);

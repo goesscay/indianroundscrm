@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\Lead;
 use App\Models\LeadSupplier;
 use App\Models\RsqRequest;
+use App\Models\SupplierReply;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -151,6 +152,27 @@ class DashboardController extends Controller
                 'title' => "Follow-up today: {$l->customer_name}",
                 'detail' => "Lead {$l->lead_id} · {$l->destination}",
                 'lead_id' => $l->lead_id, 'timestamp' => $l->follow_up_date,
+            ];
+        }
+
+        // unread supplier replies / bounces (only rows persisted for this user: lead owner + rsq.manage holders)
+        $unread = SupplierReply::query()
+            ->join('supplier_reply_reads as rd', 'rd.reply_id', '=', 'supplier_replies.id')
+            ->where('rd.user_id', $user->id)->whereNull('rd.read_at')
+            ->whereIn('supplier_replies.status', ['matched', 'bounce'])
+            ->with(['lead', 'leadSupplier'])
+            ->select('supplier_replies.*')
+            ->orderByDesc('supplier_replies.received_at')->limit(20)->get();
+        foreach ($unread as $r) {
+            $bounce = $r->status === 'bounce';
+            $who = $r->leadSupplier?->supplier_name ?: ($r->from_name ?: $r->from_email);
+            $alerts[] = [
+                'kind' => $bounce ? 'supplier_bounce' : 'supplier_reply',
+                'icon' => $bounce ? "\u{26A0}\u{FE0F}" : "\u{1F4E9}",
+                'title' => ($bounce ? 'Delivery failed: ' : 'Reply from ').$who,
+                'detail' => $r->lead_id.' · '.($r->lead?->customer_name ?? ''),
+                'lead_id' => $r->lead_id, 'timestamp' => $iso($r->received_at),
+                'reply_id' => (string) $r->id,
             ];
         }
 

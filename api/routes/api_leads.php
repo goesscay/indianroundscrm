@@ -4,11 +4,10 @@ use App\Http\Controllers\Crm\ActivityController;
 use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\LeadController;
 use App\Http\Controllers\Crm\RsqController;
+use App\Http\Controllers\Crm\MailAdminController;
 use App\Http\Controllers\Crm\SupplierMailController;
+use App\Http\Controllers\Crm\SupplierReplyController;
 use Illuminate\Support\Facades\Route;
-
-// Public: Resend event webhook (no session)
-Route::post('/webhooks/resend', [SupplierMailController::class, 'resendWebhook']);
 
 Route::middleware('auth:sanctum')->group(function () {
     // ---- Leads (static paths first so they win over /leads/{lead_id})
@@ -44,6 +43,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('perm:supplier_mail.send')->post('/supplier-mail/send', [SupplierMailController::class, 'send']);
     Route::middleware('perm:supplier_mail.send')->get('/supplier-mail/preview/{lead_id}', [SupplierMailController::class, 'preview']);
     Route::get('/supplier-mail/{lead_id}', [SupplierMailController::class, 'history'])->middleware('perm:suppliers.view,supplier_mail.send');
+
+    // ---- Supplier replies (Microsoft 365 mailbox). Static paths before {id}.
+    Route::get('/leads/{lead_id}/supplier-replies', [SupplierReplyController::class, 'forLead'])->middleware('perm:rsq.request,rsq.manage');
+    Route::middleware('perm:rsq.manage')->get('/supplier-replies', [SupplierReplyController::class, 'index']);
+    Route::post('/supplier-replies/read-all', [SupplierReplyController::class, 'markAllRead']);
+    Route::get('/supplier-replies/attachments/{id}/download', [SupplierReplyController::class, 'download'])->middleware('perm:rsq.request,rsq.manage');
+    Route::post('/supplier-replies/{id}/read', [SupplierReplyController::class, 'markRead'])->middleware('perm:rsq.request,rsq.manage');
+    Route::middleware('perm:rsq.manage')->post('/supplier-replies/{id}/link', [SupplierReplyController::class, 'link']);
+    Route::middleware('perm:rsq.manage')->post('/supplier-replies/{id}/ignore', [SupplierReplyController::class, 'ignore']);
+    Route::middleware('perm:mail.manage')->get('/mail/status', [MailAdminController::class, 'status']);
+    Route::middleware('perm:mail.manage')->post('/mail/poll', [MailAdminController::class, 'poll']);
 
     // ---- Dashboard & reporting
     Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->middleware('perm:dashboard.view');

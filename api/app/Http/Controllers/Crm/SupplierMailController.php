@@ -48,18 +48,26 @@ class SupplierMailController extends Controller
             Fail::bad('No valid suppliers selected');
         }
 
+        $subject = $b['subject'];
+        if (stripos($subject, $leadId) === false) {
+            $subject = rtrim($subject).' - '.$leadId; // replies are matched by the lead id in the subject
+        }
         $mailBody = trim((string) ($b['body'] ?? '')) !== '' ? $b['body'] : Rfq::render($lead);
         $cc = $b['cc'] ?? [];
         $bcc = $b['bcc'] ?? [];
-        $result = MailSender::send(array_column($suppliers, 'email'), $b['subject'], $mailBody, $cc, $bcc);
+        $result = MailSender::send(array_column($suppliers, 'email'), $subject, $mailBody, $cc, $bcc);
 
-        $mail = DB::transaction(function () use ($user, $leadId, $b, $mailBody, $result, $suppliers, $cc, $bcc, $lead) {
+        $mail = DB::transaction(function () use ($user, $leadId, $subject, $mailBody, $result, $suppliers, $cc, $bcc, $lead) {
             $mail = MailHistory::create([
-                'lead_id' => $leadId, 'subject' => $b['subject'], 'body' => $mailBody,
+                'lead_id' => $leadId, 'subject' => $subject, 'body' => $mailBody,
                 'sent_by' => $user->email, 'sent_at' => now(),
                 'status' => $result['status'] ?? 'unknown', 'provider' => $result['provider'] ?? null,
                 'message_id' => $result['message_id'] ?? null, 'error' => $result['error'] ?? null,
+                'graph_message_id' => $result['graph_message_id'] ?? null,
+                'internet_message_id' => $result['internet_message_id'] ?? null,
+                'conversation_id' => $result['conversation_id'] ?? null,
             ]);
+            $conversationId = $result['conversation_id'] ?? null;
             foreach ($suppliers as $s) {
                 MailRecipient::create(['mail_history_id' => $mail->id, 'type' => 'to',
                     'supplier_id' => $s['id'], 'name' => $s['name'], 'email' => $s['email']]);
@@ -77,7 +85,8 @@ class SupplierMailController extends Controller
                 $row = LeadSupplier::where('lead_id', $leadId)->where('supplier_id', $s['id'])->first();
                 if ($row) {
                     $row->fill(['status' => 'Email Sent', 'last_email_at' => now(), 'last_update' => now(),
-                        'emails_sent' => $row->emails_sent + 1])->save();
+                        'emails_sent' => $row->emails_sent + 1]
+                        + ($conversationId ? ['conversation_id' => $conversationId] : []))->save();
                 } else {
                     $count++;
                     LeadSupplier::create([
@@ -85,7 +94,7 @@ class SupplierMailController extends Controller
                         'supplier_email' => $s['email'], 'sequence' => $count, 'status' => 'Email Sent',
                         'emails_sent' => 1, 'first_email_at' => now(), 'last_email_at' => now(),
                         'reply_received' => false, 'quote_received' => false, 'followups' => 0,
-                        'last_update' => now(), 'created_at' => now(),
+                        'last_update' => now(), 'created_at' => now(), 'conversation_id' => $conversationId,
                     ]);
                 }
             }
@@ -124,48 +133,5 @@ class SupplierMailController extends Controller
         return MailHistory::where('lead_id', $leadId)->with('recipients')
             ->orderByDesc('sent_at')->orderByDesc('id')->limit(200)->get()
             ->map(fn ($m) => $m->toApi())->values();
-    }
-
-    /** Resend event webhook (POST /api/webhooks/resend), unauthenticated. */
-    public function resendWebhook(Request $request)
-    {
-        $payload = Fail::body($request);
-        $event = (string) ($payload['type'] ?? $payload['event'] ?? '');
-        $data = (array) ($payload['data'] ?? []);
-        $msgId = (string) ($data['email_id'] ?? $data['id'] ?? '');
-
-        if ($msgId !== '') {
-            $mh = MailHistory::where('message_id', $msgId)->first();
-            if ($mh) {
-                $upd = ['webhook_last_event' => $event, 'webhook_last_at' => now()];
-                if (str_ends_with($event, '.delivered')) {
-                    $upd['delivery_status'] = 'delivered';
-                } elseif (str_ends_with($event, '.bounced')) {
-                    $upd['delivery_status'] = 'bounced';
-                } elseif (str_ends_with($event, '.opened')) {
-                    $upd['opened_at'] = now();
-                }
-                $mh->fill($upd)->save();
-            }
-        }
-
-        // inbound reply -> flip supplier tracker to Awaiting Quote
-        if (in_array($event, ['email.received', 'inbound.received'], true)) {
-            $from = mb_strtolower((string) ($data['from'] ?? ''));
-            if ($from !== '') {
-                $supp = Supplier::whereRaw('LOWER(email) = ?', [$from])->first();
-                if ($supp) {
-                    $affected = LeadSupplier::where('supplier_id', $supp->id)->where('reply_received', false)->get();
-                    LeadSupplier::where('supplier_id', $supp->id)->where('reply_received', false)->update([
-                        'reply_received' => true, 'reply_date' => now(), 'status' => 'Awaiting Quote',
-                        'last_update' => now(), 'inbound_snippet' => mb_substr((string) ($data['text'] ?? ''), 0, 500),
-                    ]);
-                    foreach ($affected as $row) {
-                        RsqController::markResponseReceived($row->lead_id);
-                    }
-                }
-            }
-        }
-        return ['ok' => true];
     }
 }

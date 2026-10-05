@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import ProtectedRoute from "@/components/app/ProtectedRoute";
 import { ChatRealtimeProvider } from "@/context/ChatRealtimeContext";
+import { SupplierRepliesProvider } from "@/context/SupplierRepliesContext";
 import { ChatUnreadProvider } from "@/context/ChatUnreadContext";
 import { ChatDockProvider } from "@/context/ChatDockContext";
 import ChatDock from "@/components/chat/ChatDock";
@@ -13,6 +14,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute>
       <ChatRealtimeProvider>
+        <SupplierRepliesProvider>
         <ChatUnreadProvider>
           <ChatDockProvider>
             <AiPanelProvider>
@@ -21,6 +23,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
             <ChatDock />
           </ChatDockProvider>
         </ChatUnreadProvider>
+        </SupplierRepliesProvider>
       </ChatRealtimeProvider>
     </ProtectedRoute>
   );

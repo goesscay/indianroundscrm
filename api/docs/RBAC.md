@@ -52,6 +52,12 @@ Roles and permissions are admin-managed and data-driven.
 | GET /dashboard/leaderboard | dashboard.leaderboard |
 | GET /activity, /activity/facets | activity.view |
 | RSQ/supplier alerts in /notifications | rsq.manage |
+| supplier_reply / supplier_bounce alerts in /notifications | only the caller's own unread rows (lead owner + rsq.manage holders) |
+| GET /leads/{id}/supplier-replies | rsq.request or rsq.manage, AND the lead visible to the caller (scopeForUser) |
+| GET /supplier-replies (Supplier Inbox), POST /supplier-replies/{id}/link, /ignore | rsq.manage |
+| POST /supplier-replies/{id}/read, GET /supplier-replies/attachments/{id}/download | rsq.manage, or rsq.request with the reply's lead visible (unmatched replies: rsq.manage only) |
+| POST /supplier-replies/read-all | any user (only touches the caller's own unread rows) |
+| GET /mail/status, POST /mail/poll | mail.manage |
 | (none yet) | ai.use is reserved for the upcoming AI assistant panel; no route requires it currently |
 | GET /activities, /activities/calendar, /activities/{id}, /leads/{id}/activities | activities.view (rows scoped: without activities.view_all only assigned-to-me / created-by-me / on my leads) |
 | GET /activities/options | activities.view, create or manage |
@@ -87,6 +93,7 @@ X = granted. Admin has every permission implicitly.
 | rsq.request | X | X | X |
 | rsq.manage | X | | X |
 | supplier_mail.send | X | | X |
+| mail.manage | X | | |
 | suppliers.view | X | X | X |
 | suppliers.manage | X | | X |
 | supplier_dashboard.view | X | | X |

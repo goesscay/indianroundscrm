@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
 import SupplierTracker from "@/components/app/SupplierTracker";
+import SupplierReplies, { useLeadReplies } from "@/components/app/SupplierReplies";
 import LeadNotes from "@/components/app/LeadNotes";
 import FollowupCountdown from "@/components/app/FollowupCountdown";
 import LeadActivities from "@/components/activities/LeadActivities";
@@ -30,6 +31,7 @@ export default function LeadDetail() {
   const router = useRouter();
   const { can } = useCurrentUser();
   const [lead, setLead] = useState<Lead | null>(null);
+  const supplierReplies = useLeadReplies(leadId);
   const [history, setHistory] = useState<SupplierMailHistory[]>([]);
   const historyLm = useLoadMore(history, 10);
   const [mailOpen, setMailOpen] = useState(false);
@@ -145,9 +147,9 @@ export default function LeadDetail() {
         subject, body,
       });
       const r = data.send_result || {};
-      if (r.status === "sent") toast.success(`Email sent via Resend (${(r.message_id || "").slice(0, 8)}…)`);
-      else if (r.status === "failed") toast.error(`Resend failed: ${r.error || "unknown"}`);
-      else toast.info("Email simulated — configure RESEND_API_KEY in backend .env to send for real.");
+      if (r.status === "sent") toast.success("Email sent. Replies will show up on this lead.");
+      else if (r.status === "failed") toast.error(`Email failed: ${r.error || "unknown error"}`);
+      else toast.info("Email simulated — the Microsoft 365 mailbox isn't connected yet, so nothing was sent.");
       setMailOpen(false);
       load();
     } catch (e) { toast.error(formatApiError(e)); }
@@ -397,7 +399,7 @@ export default function LeadDetail() {
                     h.status === "failed" ? "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300" :
                     "bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300"
                   }`}>
-                    {h.status === "sent" ? `SENT via ${h.provider || "resend"}` :
+                    {h.status === "sent" ? "SENT" :
                      h.status === "failed" ? "FAILED" : "SIMULATED"}
                   </span>
                   {h.message_id && <span className="ml-2 text-muted-foreground font-mono">{h.message_id.slice(0, 12)}…</span>}
@@ -409,7 +411,16 @@ export default function LeadDetail() {
         </Card>
       </div>
 
-      {lead.quote_type === "rsq" && <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} />}
+      {lead.quote_type === "rsq" && <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} replies={supplierReplies.replies} />}
+
+      <SupplierReplies
+        leadId={lead.lead_id}
+        replies={supplierReplies.replies}
+        patchLocal={supplierReplies.patchLocal}
+        bump={supplierReplies.bump}
+        reload={supplierReplies.reload}
+        show={supplierReplies.replies.length > 0 || can("rsq.request", "rsq.manage")}
+      />
 
       {!lead.quote_type && (
         <Card className="p-6 rounded-lg lg:col-span-3 border-2 border-dashed" data-testid="quote-choice-card">

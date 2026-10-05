@@ -49,7 +49,7 @@ class Permissions
             ]),
             $g('rsq', 'RSQ requests', [
                 'request' => ['Raise RSQ requests', 'Request supplier quotes for a visible lead.'],
-                'manage' => ['Manage RSQ queue', 'See all RSQ requests and RSQ/reply notifications.'],
+                'manage' => ['Manage RSQ queue', 'See all RSQ requests, RSQ/reply notifications and the Supplier Inbox (all supplier replies; link or ignore unmatched ones).'],
             ]),
             $g('supplier_mail', 'Supplier mail', [
                 'send' => ['Send supplier mail', 'Preview and send quote-request emails to suppliers.'],
@@ -86,6 +86,9 @@ class Permissions
                 'view_all' => ['View all activities', 'See every activity, whoever it is assigned to.'],
                 'create' => ['Create activities', 'Create tasks, calls, meetings, emails and follow-ups; edit, complete and delete the ones they created or that are assigned to them.'],
                 'manage' => ['Manage activities', 'Edit, complete and delete activities of anyone and assign them to other users.'],
+            ]),
+            $g('mail', 'Mail integration', [
+                'manage' => ['Manage mail integration', 'See the Microsoft 365 mail status (last poll, errors) and trigger a manual reply poll. Admin-only by default.'],
             ]),
             $g('ai', 'AI assistant', [
                 'use' => ['Use AI assistant', 'Open and use the AI assistant panel.'],
