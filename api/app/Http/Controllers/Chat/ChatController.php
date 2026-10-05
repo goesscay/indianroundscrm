@@ -366,7 +366,7 @@ class ChatController extends Controller
         abort_if(! $msg, 404, 'Not found');
         $conv = $this->memberConversation($r, (string) $msg->conversation_id); // 404 for non-members
         $own = $msg->sender_id !== null && (int) $msg->sender_id === (int) $me->id;
-        abort_if(! $own && ! ($me->isAdmin() && $conv->type === 'group'), 403, 'Forbidden');
+        abort_if(! $own && ! ($me->hasPermission('chat.create_groups') && $conv->type === 'group'), 403, 'Forbidden');
 
         if ($msg->deleted_at === null) {
             $msg->update(['deleted_at' => now()]);

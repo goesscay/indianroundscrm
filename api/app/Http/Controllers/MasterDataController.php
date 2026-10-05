@@ -92,7 +92,7 @@ class MasterDataController extends Controller
         if (! $consultant) {
             abort(404, 'Consultant not found');
         }
-        if (! in_array($consultant->role, ['sales', 'admin'], true)) {
+        if (! $consultant->hasPermission('leads.assignable')) {
             abort(400, 'Assigned user must be a sales consultant or admin');
         }
         Allocation::updateOrCreate(['destination' => $data['destination']], ['consultant_id' => $consultant->id]);

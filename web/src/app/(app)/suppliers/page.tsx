@@ -13,8 +13,8 @@ import { useCurrentUser } from "@/context/AuthContext";
 import type { Supplier, SupplierCreate } from "@/types";
 
 export default function Suppliers() {
-  const { user } = useCurrentUser();
-  const canEdit = user.role === "admin" || user.role === "operations";
+  const { can } = useCurrentUser();
+  const canEdit = can("suppliers.manage");
   const [rows, setRows] = useState<Supplier[]>([]);
   const [f, setF] = useState<SupplierCreate>({ name: "", email: "", phone: "", destination: "", country: "" });
 

@@ -3,21 +3,20 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import type { Role } from "@/types";
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  /** When set, only these roles may view the route; others are sent to the dashboard. */
-  roles?: Role[];
+  /** When set, the user needs ANY of these permission keys; others are sent to the dashboard. */
+  permissions?: string[];
   /** Render the loading state inline (inside an existing shell) instead of full-screen. */
   inline?: boolean;
 }
 
-export default function ProtectedRoute({ children, roles, inline = false }: ProtectedRouteProps) {
-  const { user, ready } = useAuth();
+export default function ProtectedRoute({ children, permissions, inline = false }: ProtectedRouteProps) {
+  const { user, ready, can } = useAuth();
   const router = useRouter();
 
-  const denied = ready && !!user && !!roles && !roles.includes(user.role);
+  const denied = ready && !!user && !!permissions && !can(...permissions);
 
   useEffect(() => {
     if (!ready) return;

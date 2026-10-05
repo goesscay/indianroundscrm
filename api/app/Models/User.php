@@ -6,6 +6,7 @@ use App\Models\Concerns\StringId;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use App\Support\Permissions;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -13,7 +14,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, StringId;
 
-    public const ROLES = ['admin', 'sales', 'operations'];
+    public const ROLES = ['admin', 'sales', 'operations']; // system role slugs; custom roles live in the `roles` table
     public const STATUSES = ['active', 'inactive', 'suspended', 'locked', 'password_reset_required'];
 
     protected $fillable = [
@@ -23,6 +24,13 @@ class User extends Authenticatable
     ];
 
     protected $hidden = ['password', 'remember_token', 'token_version'];
+
+    protected $appends = ['role_name'];
+
+    public function getRoleNameAttribute(): string
+    {
+        return Permissions::roleName($this->role);
+    }
 
     protected function casts(): array
     {
@@ -48,6 +56,46 @@ class User extends Authenticatable
         $roles = array_map(fn ($r) => $r === 'ops' ? 'operations' : $r, $roles);
 
         return in_array($this->role, $roles, true);
+    }
+
+    /** Admin bypasses every check; other roles are resolved from role_permissions. Unknown keys are denied. */
+    public function hasPermission(string $key): bool
+    {
+        if (! Permissions::isValid($key)) {
+            return false;
+        }
+        if ($this->role === 'admin') {
+            return true;
+        }
+        // full edit implies limited edit
+        if ($key === 'leads.edit_limited' && in_array('leads.edit', Permissions::forRole($this->role), true)) {
+            return true;
+        }
+
+        return in_array($key, Permissions::forRole($this->role), true);
+    }
+
+    /** ANY-of. */
+    public function hasAnyPermission(string ...$keys): bool
+    {
+        foreach ($keys as $k) {
+            if ($this->hasPermission($k)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<string> */
+    public function permissionKeys(): array
+    {
+        $keys = Permissions::forRole($this->role);
+        if (in_array('leads.edit', $keys, true) && ! in_array('leads.edit_limited', $keys, true)) {
+            $keys[] = 'leads.edit_limited';
+        }
+
+        return array_values(array_intersect(Permissions::keys(), $keys));
     }
 
     public function userSessions()

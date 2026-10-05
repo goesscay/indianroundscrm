@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { X, Plus } from "lucide-react";
+import { useCan } from "@/context/AuthContext";
 import type { DestinationCities, MasterItem } from "@/types";
 
 const CATEGORIES = [
@@ -22,6 +23,7 @@ const CATEGORIES = [
 ];
 
 function DestinationCitiesEditor() {
+  const canManage = useCan()("master.manage");
   const [dcMap, setDcMap] = useState<DestinationCities>({});
   const [destinations, setDestinations] = useState<string[]>([]);
   const [selDest, setSelDest] = useState("");
@@ -88,21 +90,21 @@ function DestinationCitiesEditor() {
 
       {selDest ? (
         <>
-          <div className="flex gap-2 mb-3">
+          {canManage && <div className="flex gap-2 mb-3">
             <Input value={newCity} onChange={e => setNewCity(e.target.value)}
                    onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addCity())}
                    placeholder={`Add a city to ${selDest}…`} data-testid="dc-new-city" />
             <Button onClick={addCity} style={{ background: "#0A0A0A" }} data-testid="dc-add"><Plus size={14} /> Add</Button>
-          </div>
+          </div>}
           <div className="space-y-1.5">
             {cities.length === 0 && <div className="text-xs text-muted-foreground py-4 text-center border border-dashed rounded-md">No cities yet — add above</div>}
             {cities.map((c, i) => (
               <div key={c} className="flex items-center gap-2 px-3 py-2 rounded-md bg-secondary/40 border border-border" data-testid={`dc-row-${c}`}>
                 <span className="text-xs text-muted-foreground font-mono w-6">{i + 1}.</span>
                 <span className="flex-1 text-sm font-medium">{c}</span>
-                <button onClick={() => move(i, -1)} disabled={i === 0} className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30" title="Move up">▲</button>
+                {canManage && <><button onClick={() => move(i, -1)} disabled={i === 0} className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30" title="Move up">▲</button>
                 <button onClick={() => move(i, 1)} disabled={i === cities.length - 1} className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30" title="Move down">▼</button>
-                <button onClick={() => removeCity(c)} className="text-muted-foreground hover:text-destructive" title="Remove"><X size={14} /></button>
+                <button onClick={() => removeCity(c)} className="text-muted-foreground hover:text-destructive" title="Remove"><X size={14} /></button></>}
               </div>
             ))}
           </div>
@@ -115,6 +117,7 @@ function DestinationCitiesEditor() {
 }
 
 export default function MasterData() {
+  const canManage = useCan()("master.manage");
   const [items, setItems] = useState<MasterItem[]>([]);
   const [category, setCategory] = useState("destination");
   const [value, setValue] = useState("");
@@ -145,7 +148,7 @@ export default function MasterData() {
       </div>
 
       <Card className="p-6 rounded-lg">
-        <form onSubmit={add} className="flex flex-wrap gap-3 items-end">
+        {canManage && <form onSubmit={add} className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[200px]">
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="h-10" data-testid="m-category"><SelectValue /></SelectTrigger>
@@ -158,7 +161,7 @@ export default function MasterData() {
             <Input value={value} onChange={e => setValue(e.target.value)} placeholder="Add new value…" data-testid="m-value" />
           </div>
           <Button type="submit" style={{ background: "#0A0A0A" }} data-testid="m-add">Add</Button>
-        </form>
+        </form>}
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -172,7 +175,7 @@ export default function MasterData() {
                 {rows.map(r => (
                   <span key={r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary text-sm">
                     {r.value}
-                    <button onClick={() => remove(r.id)} className="text-muted-foreground hover:text-destructive"><X size={12} /></button>
+                    {canManage && <button onClick={() => remove(r.id)} className="text-muted-foreground hover:text-destructive"><X size={12} /></button>}
                   </span>
                 ))}
               </div>

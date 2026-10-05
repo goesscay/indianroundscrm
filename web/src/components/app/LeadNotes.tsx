@@ -11,7 +11,7 @@ import { useCurrentUser } from "@/context/AuthContext";
 import type { LeadNote } from "@/types";
 
 export default function LeadNotes({ leadId }: { leadId: string }) {
-  const { user } = useCurrentUser();
+  const { user, can } = useCurrentUser();
   const [notes, setNotes] = useState<LeadNote[]>([]);
   const [txt, setTxt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -57,7 +57,7 @@ export default function LeadNotes({ leadId }: { leadId: string }) {
           <div key={n.id} className="p-3 rounded-md border border-border bg-secondary/30 group" data-testid={`note-${n.id}`}>
             <div className="flex justify-between items-start gap-2">
               <div className="text-sm whitespace-pre-wrap flex-1">{n.note}</div>
-              {(user.role === "admin" || n.created_by_id === user.id) && (
+              {(can("leads.delete") || n.created_by_id === user.id) && (
                 <button onClick={() => remove(n.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
                   <Trash2 size={13} />
                 </button>

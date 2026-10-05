@@ -3,7 +3,7 @@
 use App\Http\Controllers\Chat\ChatController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth:sanctum')->prefix('chat')->group(function () {
+Route::middleware(['auth:sanctum', 'perm:chat.use'])->prefix('chat')->group(function () {
     Route::get('/users', [ChatController::class, 'users']);
     Route::get('/unread-count', [ChatController::class, 'unreadCount']);
     Route::get('/conversations', [ChatController::class, 'conversations']);
@@ -13,7 +13,7 @@ Route::middleware('auth:sanctum')->prefix('chat')->group(function () {
     Route::post('/conversations/{id}/read', [ChatController::class, 'markRead']);
     Route::delete('/messages/{id}', [ChatController::class, 'deleteMessage']);
 
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware('perm:chat.create_groups')->group(function () {
         Route::post('/groups', [ChatController::class, 'createGroup']);
         Route::patch('/groups/{id}', [ChatController::class, 'updateGroup']);
         Route::delete('/groups/{id}', [ChatController::class, 'deleteGroup']);

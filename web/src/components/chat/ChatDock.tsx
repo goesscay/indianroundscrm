@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronUp, ExternalLink, MessageSquare, MessageSquarePlus, Search, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCurrentUser } from "@/context/AuthContext";
+import { useAuth, useCurrentUser } from "@/context/AuthContext";
 import { useChatUnread } from "@/context/ChatUnreadContext";
 import { useChatDock } from "@/context/ChatDockContext";
 import { cn } from "@/lib/utils";
@@ -43,13 +43,14 @@ function Avatar({ conv }: { conv: Conversation }) {
 export default function ChatDock() {
   const pathname = usePathname();
   const isDesktop = useIsDesktop();
-  if (!isDesktop || pathname === "/chat" || pathname.startsWith("/chat/")) return null;
+  const { can } = useAuth();
+  if (!can("chat.use") || !isDesktop || pathname === "/chat" || pathname.startsWith("/chat/")) return null;
   return <DockInner />;
 }
 
 function DockInner() {
-  const { user } = useCurrentUser();
-  const isAdmin = user.role === "admin";
+  const { user, can } = useCurrentUser();
+  const isAdmin = can("chat.create_groups");
   const { total, refresh: refreshUnread } = useChatUnread();
   const { convs, loaded, windows, panelOpen, loadConvs, upsertConv, setPanelOpen, openWindow, toggleMinimize, closeWindow } = useChatDock();
   const [search, setSearch] = useState("");

@@ -19,6 +19,7 @@ class EnforceSession
 {
     public function handle(Request $request, Closure $next)
     {
+        \App\Support\Permissions::flush(); // role permissions are memoised per request only
         if (! $request->hasSession()) {
             return $next($request);
         }

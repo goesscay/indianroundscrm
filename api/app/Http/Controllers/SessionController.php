@@ -45,7 +45,7 @@ class SessionController extends Controller
             abort(404, 'Session not found');
         }
         $own = (int) $sess->user_id === (int) $user->id;
-        if (! $own && $user->role !== 'admin') {
+        if (! $own && ! $user->hasPermission('users.manage')) {
             abort(403, 'Not your session');
         }
         $sess->revoke($own ? 'user_revoke' : 'admin_revoke');

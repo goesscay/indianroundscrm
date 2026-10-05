@@ -78,7 +78,7 @@ const addDaysISO = (isoDate: string, days: string | number) => {
 
 export default function LeadForm() {
   const router = useRouter();
-  const { user } = useCurrentUser();
+  const { user, can } = useCurrentUser();
   const [master, setMaster] = useState<Record<string, string[]>>({});
   const [destCities, setDestCities] = useState<DestinationCities>({});
   const [f, setF] = useState<LeadFormState>(EMPTY);
@@ -253,7 +253,7 @@ export default function LeadForm() {
       const url = force ? "/leads?force=true" : "/leads";
       const { data } = await api.post<Lead>(url, payload);
       // If the destination was auto-allocated to a different sales consultant, sales won't see the lead in their list
-      if (user.role === "sales" && data.staff_id && data.staff_id !== user.id) {
+      if (!can("leads.view_all") && data.staff_id && data.staff_id !== user.id) {
         toast.success(`Lead ${data.lead_id} created — assigned to ${data.staff_name || "another consultant"}`);
         router.push("/leads");
       } else {
@@ -580,7 +580,7 @@ export default function LeadForm() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setBlockDialog(null)}>Cancel</Button>
             <Button onClick={() => { const lid = blockDialog?.existing?.lead_id; setBlockDialog(null); if (lid) router.push(`/leads/${lid}`); }} data-testid="open-existing-lead">Open Existing</Button>
-            {user.role === "admin" && (
+            {can("users.manage") && (
               <Button style={{ background: "#0A0A0A" }} onClick={() => { setBlockDialog(null); submit(null, true); }} data-testid="force-create-lead">
                 Create anyway (Admin)
               </Button>

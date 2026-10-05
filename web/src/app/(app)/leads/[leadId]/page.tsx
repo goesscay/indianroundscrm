@@ -26,7 +26,7 @@ const INR = (n: number | string | null | undefined) => "₹" + (Number(n) || 0).
 export default function LeadDetail() {
   const { leadId } = useParams<{ leadId: string }>();
   const router = useRouter();
-  const { user } = useCurrentUser();
+  const { can } = useCurrentUser();
   const [lead, setLead] = useState<Lead | null>(null);
   const [history, setHistory] = useState<SupplierMailHistory[]>([]);
   const [mailOpen, setMailOpen] = useState(false);
@@ -61,8 +61,8 @@ export default function LeadDetail() {
 
   if (!lead) return <div className="text-muted-foreground">Loading…</div>;
 
-  const canOps = user.role === "operations" || user.role === "admin";
-  const canQuote = user.role === "sales" || user.role === "operations" || user.role === "admin";
+  const canOps = can("rsq.manage");
+  const canQuote = can("rsq.request", "rsq.manage");
 
   const update = async (patch: LeadUpdate) => {
     try {
@@ -170,12 +170,12 @@ export default function LeadDetail() {
     finally { setAiBusy(false); }
   };
 
-  const canReassign = user.role === "admin" || user.role === "operations";
+  const canReassign = can("leads.reassign");
 
   const openReassign = async () => {
     try {
       const { data } = await api.get<User[]>("/users");
-      setConsultants(data.filter(u => u.role === "sales" || u.role === "admin"));
+      setConsultants(data.filter(u => u.active !== false && (!!u.consultant_code || u.role === "sales" || u.role === "admin")));
     } catch { /* ignore */ }
     setAssignTo(""); setReassignReason("");
     setReassignOpen(true);

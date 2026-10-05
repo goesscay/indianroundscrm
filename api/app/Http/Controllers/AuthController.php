@@ -98,6 +98,8 @@ class AuthController extends Controller
             'email' => $user->email,
             'name' => $user->name,
             'role' => $user->role,
+            'role_name' => $user->role_name,
+            'permissions' => $user->permissionKeys(),
             'staff_code' => $user->staff_code ?? '',
             'account_status' => $user->account_status,
             'password_reset_required' => $user->account_status === 'password_reset_required',
@@ -129,6 +131,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
         $out = $user->toArray();
+        $out['permissions'] = $user->permissionKeys();
         $out['account_status'] = $user->account_status;
         $out['password_reset_required'] = $user->account_status === 'password_reset_required';
         $out['last_login_at'] = $user->last_login_at;

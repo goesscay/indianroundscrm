@@ -1,6 +1,7 @@
 // TypeScript models mirroring the Pydantic models / JSON shapes of the CRM API contract (backend/server.py).
 
-export type Role = "admin" | "sales" | "operations";
+/** Role slug. The three built-in roles are "admin" | "sales" | "operations"; admins can create more. */
+export type Role = string;
 
 export type AccountStatus = "active" | "inactive" | "locked" | "suspended" | "password_reset_required";
 
@@ -9,6 +10,9 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  role_name?: string;
+  /** Permission keys granted to the user's role (admin receives every key). */
+  permissions?: string[];
   staff_code?: string;
   consultant_code?: string;
   mobile?: string;
@@ -385,4 +389,41 @@ export interface ChatMessage {
 export interface ChatMessagesResponse {
   messages: ChatMessage[];
   has_more: boolean;
+}
+
+// ---- Roles & permissions ----
+export interface PermissionItem {
+  key: string;
+  label: string;
+  description?: string;
+}
+
+export interface PermissionGroup {
+  key: string;
+  label: string;
+  items: PermissionItem[];
+}
+
+export interface RoleDef {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  is_system: boolean;
+  user_count: number;
+  permissions: string[];
+  all_permissions: boolean;
+}
+
+export interface RoleInput {
+  name?: string;
+  description?: string;
+  permissions?: string[];
+}
+
+export interface RoleUser {
+  id: string;
+  name: string;
+  email: string;
+  active?: boolean;
 }

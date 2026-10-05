@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnforceSession;
+use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', EnforceSession::class);
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'perm' => PermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

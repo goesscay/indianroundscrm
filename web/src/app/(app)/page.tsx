@@ -72,7 +72,7 @@ function Kpi({ label, value, icon: Icon, tone = "default", testId, dragHandlers 
 const DEFAULT_ORDER = ["total_leads", "today_leads", "booked", "quote_pending", "revenue", "profit", "followups", "cancelled"];
 
 export default function Dashboard() {
-  const { user } = useCurrentUser();
+  const { user, can } = useCurrentUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [supSummary, setSupSummary] = useState<SupplierSummary | null>(null);
@@ -88,23 +88,34 @@ export default function Dashboard() {
 
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(order)); }, [order, storageKey]);
 
+  const canView = can("dashboard.view");
   useEffect(() => {
+    if (!canView) return;
     (async () => {
       try {
         const { data } = await api.get<DashboardStats>("/dashboard/stats");
         setStats(data);
-        if (user.role === "admin") {
+        if (can("users.view")) {
           const lb = await api.get<LeaderboardRow[]>("/dashboard/leaderboard");
           setLeaderboard(lb.data);
         }
-        if (user.role === "admin" || user.role === "operations") {
+        if (can("supplier_dashboard.view")) {
           try { const sup = await api.get<SupplierSummary>("/lead-suppliers/dashboard/summary"); setSupSummary(sup.data); } catch { /* ignore */ }
         }
         try { const fu = await api.get<UpcomingFollowup[]>("/followups/upcoming?hours=72"); setFollowups(fu.data); } catch { /* ignore */ }
       } catch (e) { setErr(formatApiError(e)); }
     })();
-  }, [user.role]);
+  }, [can, canView]);
 
+  if (!canView) {
+    return (
+      <div className="space-y-2" data-testid="dashboard-page">
+        <div className="label-caps">Overview</div>
+        <h1 className="font-display text-3xl font-black tracking-tight">Welcome back, {user.name}</h1>
+        <p className="text-sm text-muted-foreground">Use the menu to open the areas available to your role.</p>
+      </div>
+    );
+  }
   if (!stats) return <div className="text-muted-foreground text-sm">Loading dashboard…{err && ` · ${err}`}</div>;
 
   const kpiMap: Record<string, Omit<KpiProps, "dragHandlers">> = {
@@ -134,7 +145,7 @@ export default function Dashboard() {
 
   const statusChart = Object.entries(stats.status_counts || {}).map(([k, v]) => ({ name: k, value: v }));
   const COLORS = ["#0A0A0A", "#525252", "#8A8A8A", "#BDBDBD", "#2E2E2E", "#6B6B6B", "#A3A3A3", "#D4D4D4"];
-  const title = user.role === "sales" ? "My Dashboard" : user.role === "operations" ? "Operations Dashboard" : "Master Dashboard";
+  const title = can("users.view") ? "Master Dashboard" : can("supplier_dashboard.view") ? "Operations Dashboard" : "My Dashboard";
 
   return (
     <div className="space-y-6" data-testid="dashboard-page">
@@ -148,7 +159,7 @@ export default function Dashboard() {
           <Button variant="outline" size="sm" onClick={() => setOrder(DEFAULT_ORDER)} data-testid="reset-kpi-order">
             <RotateCcw size={14} /> Reset layout
           </Button>
-          {user.role !== "operations" && (
+          {can("leads.create") && (
             <Button onClick={() => router.push("/leads/new")} className="h-10 px-5" style={{ background: "#0A0A0A" }} data-testid="dashboard-new-lead">+ New Lead</Button>
           )}
         </div>
@@ -164,7 +175,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {supSummary && (user.role === "admin" || user.role === "operations") && (
+      {supSummary && can("supplier_dashboard.view") && (
         <Card className="p-6 rounded-lg" data-testid="supplier-summary">
           <div className="label-caps">Supplier operations</div>
           <h3 className="font-display text-xl font-bold mt-1 mb-4">Response tracker · live</h3>
@@ -302,7 +313,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {user.role === "admin" && (
+        {can("users.view") && (
           <Card className="p-6 rounded-lg lg:col-span-2" data-testid="leaderboard">
             <div className="label-caps">Team</div>
             <h3 className="font-display text-xl font-bold mt-1">Sales leaderboard</h3>
@@ -329,14 +340,14 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {user.role !== "admin" && (
+        {!can("users.view") && (
           <Card className="p-6 rounded-lg lg:col-span-2 flex flex-col justify-between" data-testid="quick-actions">
             <div>
               <div className="label-caps">Quick actions</div>
               <h3 className="font-display text-xl font-bold mt-1">What next?</h3>
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
-              {user.role !== "operations" && (
+              {can("leads.create") && (
                 <Link href="/leads/new"><Button className="h-11" style={{ background: "#0A0A0A" }} data-testid="quick-new-lead">+ Create Lead</Button></Link>
               )}
               <Link href="/leads"><Button variant="outline" className="h-11" data-testid="quick-view-leads">View Leads</Button></Link>

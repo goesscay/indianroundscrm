@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\ActivityLogger;
 use App\Support\Ids;
 use App\Support\PasswordPolicy;
+use App\Support\Permissions;
 use App\Support\SecurityLogger;
 use Illuminate\Http\Request;
 
@@ -14,7 +15,9 @@ class UserController extends Controller
 {
     public function index()
     {
-        return User::orderBy('id')->get();
+        return User::orderBy('id')->get()->each(
+            fn (User $u) => $u->setAttribute('assignable', $u->hasPermission('leads.assignable'))
+        );
     }
 
     public function store(Request $request)
@@ -31,7 +34,7 @@ class UserController extends Controller
         if (User::where('email', $email)->exists()) {
             abort(400, 'Email already exists');
         }
-        if (! in_array($data['role'], User::ROLES, true)) {
+        if (! Permissions::roleExists($data['role'])) {
             abort(400, 'Invalid role');
         }
         PasswordPolicy::validate($data['password']);
@@ -66,7 +69,7 @@ class UserController extends Controller
             $request->only(['name', 'role', 'staff_code', 'consultant_code', 'active', 'password']),
             fn ($v) => $v !== null
         );
-        if (isset($updates['role']) && ! in_array($updates['role'], User::ROLES, true)) {
+        if (isset($updates['role']) && ! Permissions::roleExists($updates['role'])) {
             abort(400, 'Invalid role');
         }
         if (isset($updates['consultant_code'])) {
@@ -80,6 +83,20 @@ class UserController extends Controller
             abort(404, 'User not found');
         }
 
+        $oldRole = $user->role;
+        $roleChanged = isset($updates['role']) && $updates['role'] !== $oldRole;
+        if ($roleChanged) {
+            if ((int) $user->id === (int) $request->user()->id) {
+                abort(403, 'You cannot change your own role');
+            }
+            if ($oldRole === 'admin') {
+                $this->assertNotLastAdmin($user, 'demote');
+            }
+        }
+        if (array_key_exists('active', $updates) && ! $updates['active']) {
+            $this->assertNotLastAdmin($user, 'disable');
+        }
+
         $logged = $updates;
         if (isset($updates['password'])) {
             PasswordPolicy::validate($updates['password']);
@@ -90,6 +107,9 @@ class UserController extends Controller
         }
         $user->fill($updates)->save();
         ActivityLogger::log($request->user(), 'update_user', 'user', $user->id, null, $logged);
+        if ($roleChanged) {
+            ActivityLogger::log($request->user(), 'change_user_role', 'user', $user->id, ['role' => $oldRole], ['role' => $user->role]);
+        }
 
         return $user->fresh();
     }
@@ -104,6 +124,7 @@ class UserController extends Controller
         if (! $user) {
             abort(404, 'User not found');
         }
+        $this->assertNotLastAdmin($user, 'delete');
         $user->delete();
         ActivityLogger::log($request->user(), 'delete_user', 'user', $id);
 
@@ -150,6 +171,9 @@ class UserController extends Controller
         if ((int) $user->id === (int) $request->user()->id && $data['account_status'] !== 'active') {
             abort(400, 'You cannot deactivate/suspend yourself.');
         }
+        if (! in_array($data['account_status'], ['active', 'password_reset_required'], true)) {
+            $this->assertNotLastAdmin($user, 'disable');
+        }
         $user->account_status = $data['account_status'];
         if (in_array($data['account_status'], ['inactive', 'suspended'], true)) {
             $user->invalidateSessions('admin_status_change');
@@ -189,6 +213,19 @@ class UserController extends Controller
         }
 
         return $q->orderByDesc('timestamp')->orderByDesc('id')->limit($limit)->get();
+    }
+
+    /** Refuse to remove (delete/demote/disable) the only remaining active admin. */
+    private function assertNotLastAdmin(User $user, string $what): void
+    {
+        if ($user->role !== 'admin') {
+            return;
+        }
+        $others = User::where('role', 'admin')->where('id', '!=', $user->id)
+            ->where('active', true)->whereIn('account_status', ['active', 'password_reset_required'])->count();
+        if ($others === 0) {
+            abort(409, "Cannot {$what} the last active admin");
+        }
     }
 
     private function target(string $uid): User

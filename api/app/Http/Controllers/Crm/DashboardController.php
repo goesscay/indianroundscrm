@@ -102,7 +102,7 @@ class DashboardController extends Controller
         $iso = fn ($dt) => $dt ? Carbon::instance($dt)->utc()->toIso8601String() : null;
         $alerts = [];
 
-        if (in_array($user->role, ['admin', 'operations'], true)) {
+        if ($user->hasPermission('rsq.manage')) {
             $new = RsqRequest::where('status', 'new')->orderByDesc('requested_at')->limit(15)->get();
             $leadMap = Lead::whereIn('lead_id', $new->pluck('lead_id'))->get()->keyBy('lead_id');
             foreach ($new as $r) {

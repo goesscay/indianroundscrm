@@ -30,7 +30,7 @@ class RsqController extends Controller
         if (! $lead) {
             Fail::notFound('Lead not found');
         }
-        if ($user->role === 'sales' && (int) $lead->staff_id !== (int) $user->id) {
+        if (! $user->hasPermission('leads.view_all') && (int) $lead->staff_id !== (int) $user->id) {
             Fail::forbidden('Not your lead');
         }
 
@@ -71,7 +71,7 @@ class RsqController extends Controller
         if (! $row) {
             return response()->json(null);
         }
-        if ($user->role === 'sales') {
+        if (! $user->hasPermission('leads.view_all')) {
             $lead = Lead::where('lead_id', $leadId)->first();
             if (! $lead || (int) $lead->staff_id !== (int) $user->id) {
                 Fail::forbidden('Not your lead');

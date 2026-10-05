@@ -22,8 +22,8 @@ function sortConvs(list: Conversation[]): Conversation[] {
 }
 
 export default function ChatPage() {
-  const { user } = useCurrentUser();
-  const isAdmin = user.role === "admin";
+  const { user, can } = useCurrentUser();
+  const isAdmin = can("chat.create_groups");
   const { refresh: refreshUnread } = useChatUnread();
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [loaded, setLoaded] = useState(false);

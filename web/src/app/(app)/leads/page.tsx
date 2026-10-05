@@ -23,7 +23,7 @@ export default function LeadList() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { user } = useCurrentUser();
+  const { can } = useCurrentUser();
 
   const load = async () => {
     setLoading(true);
@@ -54,14 +54,16 @@ export default function LeadList() {
         <div>
           <div className="label-caps">Pipeline</div>
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">
-            {user.role === "sales" ? "My Leads" : "All Leads"}
+            {can("leads.view_all") ? "All Leads" : "My Leads"}
           </h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportCsv} data-testid="export-csv">
-            <Download size={16} /> Export CSV
-          </Button>
-          {user.role !== "operations" && (
+          {can("leads.export") && (
+            <Button variant="outline" onClick={exportCsv} data-testid="export-csv">
+              <Download size={16} /> Export CSV
+            </Button>
+          )}
+          {can("leads.create") && (
             <Button onClick={() => router.push("/leads/new")} style={{ background: "#0A0A0A" }} data-testid="new-lead-btn">+ New Lead</Button>
           )}
         </div>

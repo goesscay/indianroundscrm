@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import ProtectedRoute from "@/components/app/ProtectedRoute";
 
-export default function RoleLayout({ children }: { children: ReactNode }) {
+export default function PermissionLayout({ children }: { children: ReactNode }) {
   return (
-    <ProtectedRoute roles={["admin", "operations"]} inline>
+    <ProtectedRoute permissions={["supplier_dashboard.view"]} inline>
       {children}
     </ProtectedRoute>
   );

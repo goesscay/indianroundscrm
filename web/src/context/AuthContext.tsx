@@ -13,6 +13,8 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   setUser: (u: User | null) => void;
+  /** True when the signed-in user holds ANY of the given permission keys (no keys = always true). */
+  can: (...keys: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -105,6 +107,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user, warnOpen, armTimers, clearTimers]);
 
+  const can = useCallback(
+    (...keys: string[]) => {
+      if (keys.length === 0) return true;
+      const granted = user?.permissions ?? [];
+      return keys.some((k) => granted.includes(k));
+    },
+    [user]
+  );
+
   const login = async (email: string, password: string) => {
     // Sanctum SPA auth: obtain a fresh XSRF-TOKEN cookie before posting credentials.
     await ensureCsrfCookie(true);
@@ -115,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, ready, login, logout: doLogout, setUser }}>
+    <AuthContext.Provider value={{ user, ready, login, logout: doLogout, setUser, can }}>
       {children}
       {warnOpen && (
         <div
@@ -163,4 +174,9 @@ export function useCurrentUser(): Omit<AuthContextValue, "user"> & { user: User 
   const ctx = useAuth();
   if (!ctx.user) throw new Error("useCurrentUser must be used within a protected route");
   return { ...ctx, user: ctx.user };
+}
+
+/** Returns `can(...keys)`: true if the current user has any of the given permissions. */
+export function useCan(): (...keys: string[]) => boolean {
+  return useAuth().can;
 }

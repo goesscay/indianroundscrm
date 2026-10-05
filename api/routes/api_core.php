@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MasterDataController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -23,12 +24,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---- Sessions ----
     Route::get('/sessions/mine', [SessionController::class, 'mine']);
-    Route::get('/sessions', [SessionController::class, 'all'])->middleware('role:admin');
+    Route::get('/sessions', [SessionController::class, 'all'])->middleware('perm:security.view');
     Route::post('/sessions/{jti}/revoke', [SessionController::class, 'revoke']);
 
-    // ---- Users + security audit (admin) ----
-    Route::middleware('role:admin')->group(function () {
-        Route::get('/users', [UserController::class, 'index']);
+    // ---- Users + security audit ----
+    Route::get('/users', [UserController::class, 'index'])->middleware('perm:users.view,users.manage');
+    Route::middleware('perm:users.manage')->group(function () {
         Route::post('/users', [UserController::class, 'store']);
         Route::patch('/users/{uid}', [UserController::class, 'update']);
         Route::delete('/users/{uid}', [UserController::class, 'destroy']);
@@ -36,23 +37,33 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/users/{uid}/unlock', [UserController::class, 'unlock']);
         Route::post('/users/{uid}/status', [UserController::class, 'status']);
         Route::post('/users/{uid}/logout', [UserController::class, 'logoutUser']);
-        Route::get('/security-audit-log', [UserController::class, 'securityAuditLog']);
+    });
+    Route::get('/security-audit-log', [UserController::class, 'securityAuditLog'])->middleware('perm:security.view');
+
+    // ---- Roles & permissions ----
+    Route::get('/permissions', [RoleController::class, 'permissions'])->middleware('perm:roles.manage,users.manage');
+    Route::get('/roles', [RoleController::class, 'index'])->middleware('perm:roles.manage,users.manage');
+    Route::middleware('perm:roles.manage')->group(function () {
+        Route::post('/roles', [RoleController::class, 'store']);
+        Route::patch('/roles/{id}', [RoleController::class, 'update']);
+        Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
+        Route::get('/roles/{id}/users', [RoleController::class, 'users']);
     });
 
     // ---- Master data ----
-    Route::get('/master', [MasterDataController::class, 'masterIndex']);
-    Route::post('/master', [MasterDataController::class, 'masterStore'])->middleware('role:admin');
-    Route::delete('/master/{mid}', [MasterDataController::class, 'masterDestroy'])->middleware('role:admin');
+    Route::get('/master', [MasterDataController::class, 'masterIndex'])->middleware('perm:master.view,master.manage');
+    Route::post('/master', [MasterDataController::class, 'masterStore'])->middleware('perm:master.manage');
+    Route::delete('/master/{mid}', [MasterDataController::class, 'masterDestroy'])->middleware('perm:master.manage');
 
-    Route::get('/destination-cities', [MasterDataController::class, 'citiesIndex']);
-    Route::get('/destination-cities/{destination}', [MasterDataController::class, 'citiesShow']);
-    Route::put('/destination-cities/{destination}', [MasterDataController::class, 'citiesUpdate'])->middleware('role:admin');
+    Route::get('/destination-cities', [MasterDataController::class, 'citiesIndex'])->middleware('perm:master.view,master.manage');
+    Route::get('/destination-cities/{destination}', [MasterDataController::class, 'citiesShow'])->middleware('perm:master.view,master.manage');
+    Route::put('/destination-cities/{destination}', [MasterDataController::class, 'citiesUpdate'])->middleware('perm:master.manage');
 
-    Route::get('/allocations', [MasterDataController::class, 'allocationsIndex']);
-    Route::post('/allocations', [MasterDataController::class, 'allocationsStore'])->middleware('role:admin');
-    Route::delete('/allocations/{aid}', [MasterDataController::class, 'allocationsDestroy'])->middleware('role:admin');
+    Route::get('/allocations', [MasterDataController::class, 'allocationsIndex'])->middleware('perm:master.view,allocations.manage');
+    Route::post('/allocations', [MasterDataController::class, 'allocationsStore'])->middleware('perm:allocations.manage');
+    Route::delete('/allocations/{aid}', [MasterDataController::class, 'allocationsDestroy'])->middleware('perm:allocations.manage');
 
-    Route::get('/suppliers', [MasterDataController::class, 'suppliersIndex']);
-    Route::post('/suppliers', [MasterDataController::class, 'suppliersStore'])->middleware('role:admin,operations');
-    Route::delete('/suppliers/{sid}', [MasterDataController::class, 'suppliersDestroy'])->middleware('role:admin,operations');
+    Route::get('/suppliers', [MasterDataController::class, 'suppliersIndex'])->middleware('perm:suppliers.view,suppliers.manage');
+    Route::post('/suppliers', [MasterDataController::class, 'suppliersStore'])->middleware('perm:suppliers.manage');
+    Route::delete('/suppliers/{sid}', [MasterDataController::class, 'suppliersDestroy'])->middleware('perm:suppliers.manage');
 });

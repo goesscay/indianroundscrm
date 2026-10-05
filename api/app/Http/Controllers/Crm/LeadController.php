@@ -37,10 +37,10 @@ class LeadController extends Controller
 
     // ------------------------------------------------------------------ helpers
 
-    /** Scope for role-based visibility: sales only see leads they own. */
+    /** Scope for permission-based visibility: without leads.view_all a user only sees leads they own. */
     public static function scopeForUser($query, $user)
     {
-        if ($user->role === 'sales') {
+        if (! $user->hasPermission('leads.view_all')) {
             $query->where('staff_id', $user->id);
         }
         return $query;
@@ -57,7 +57,7 @@ class LeadController extends Controller
 
     private function assertCanSee(Lead $lead, $user): void
     {
-        if ($user->role === 'sales' && (int) $lead->staff_id !== (int) $user->id) {
+        if (! $user->hasPermission('leads.view_all') && (int) $lead->staff_id !== (int) $user->id) {
             Fail::forbidden('Forbidden');
         }
     }
@@ -153,7 +153,7 @@ class LeadController extends Controller
                 $w->orWhereRaw('LOWER(email) = ?', [mb_strtolower($email)]);
             }
         });
-        if ($user->role === 'sales') {
+        if (! $user->hasPermission('leads.view_all')) {
             $q->where('staff_id', $user->id);
         }
         $docs = $q->orderByDesc('created_at')->limit(10)->get();
@@ -195,7 +195,7 @@ class LeadController extends Controller
         $user = $request->user();
         $q = self::scopeForUser(Lead::query()->with('stayCities'), $user);
         $staffId = (string) $request->query('staff_id', '');
-        if ($staffId !== '' && in_array($user->role, ['admin', 'operations'], true)) {
+        if ($staffId !== '' && $user->hasPermission('leads.view_all')) {
             $q->where('staff_id', ctype_digit($staffId) ? (int) $staffId : -1);
         }
         if (($v = (string) $request->query('status', '')) !== '') {
@@ -296,7 +296,7 @@ class LeadController extends Controller
         // Duplicate block - only admin can override with ?force=true
         $force = filter_var($request->query('force', false), FILTER_VALIDATE_BOOLEAN);
         $existing = Lead::where('phone', $phone)->orderBy('id')->first();
-        if ($existing && ! ($force && $user->role === 'admin')) {
+        if ($existing && ! ($force && $user->hasPermission('leads.override_duplicate'))) {
             Fail::http(409, [
                 'message' => 'Lead already exists for this mobile number.',
                 'existing' => [
@@ -309,7 +309,7 @@ class LeadController extends Controller
                 ],
             ]);
         }
-        if ($existing && $force && $user->role === 'admin') {
+        if ($existing && $force && $user->hasPermission('leads.override_duplicate')) {
             DuplicateLog::create(['phone' => $phone, 'original_lead_id' => $existing->lead_id,
                 'created_by' => $user->email, 'timestamp' => now()]);
         }
@@ -409,7 +409,7 @@ class LeadController extends Controller
 
         // exclude_unset + drop None
         $updates = array_filter($d, fn ($v) => $v !== null);
-        if ($user->role === 'sales') {
+        if (! $user->hasPermission('leads.edit')) {
             $updates = array_intersect_key($updates, array_flip(self::SALES_ALLOWED));
         }
         if (array_key_exists('stay_cities', $updates)) {
@@ -480,7 +480,7 @@ class LeadController extends Controller
         if (! $consultant) {
             Fail::notFound('Consultant not found');
         }
-        if (! in_array($consultant->role, ['sales', 'admin'], true)) {
+        if (! $consultant->hasPermission('leads.assignable')) {
             Fail::bad('Assigned user must be a sales consultant or admin');
         }
         $prev = ['staff_id' => $lead->staff_id !== null ? (string) $lead->staff_id : null,
@@ -531,7 +531,7 @@ class LeadController extends Controller
         if (! $note) {
             Fail::notFound('Not found');
         }
-        if ($user->role !== 'admin' && (int) $note->created_by_id !== (int) $user->id) {
+        if (! $user->hasPermission('leads.notes_delete_any') && (int) $note->created_by_id !== (int) $user->id) {
             Fail::forbidden('Only the author or admin can delete');
         }
         $note->delete();
