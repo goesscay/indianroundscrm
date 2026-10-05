@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import { useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -50,6 +51,7 @@ const EMPTY_FORM: TrackerForm = {
 
 export default function SupplierTracker({ leadId, leadPhone }: { leadId: string; leadPhone?: string }) {
   const [rows, setRows] = useState<LeadSupplier[]>([]);
+  const lm = useLoadMore(rows, 10);
   const [editing, setEditing] = useState<LeadSupplier | null>(null);
   const [form, setForm] = useState<TrackerForm>(EMPTY_FORM);
 
@@ -112,7 +114,7 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {lm.visible.map((r) => {
               const overdue = (r.hours_since_email ?? 0) > 24 && !r.reply_received;
               return (
                 <tr key={r.id} className="border-b border-border/50" data-testid={`tracker-${r.sequence}`}>
@@ -151,6 +153,7 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
           </tbody>
         </table>
       </div>
+      <LoadMore lm={lm} className="mt-3" />
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="update-dialog">

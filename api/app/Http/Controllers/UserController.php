@@ -212,7 +212,12 @@ class UserController extends Controller
             $q->where('user_email', $ue);
         }
 
-        return $q->orderByDesc('timestamp')->orderByDesc('id')->limit($limit)->get();
+        $q->orderByDesc('timestamp')->orderByDesc('id');
+        if (\App\Support\Paging::requested($request)) {
+            return \App\Support\Paging::paginate($request, $q, fn ($m) => $m->toArray());
+        }
+
+        return $q->limit($limit)->get();
     }
 
     /** Refuse to remove (delete/demote/disable) the only remaining active admin. */

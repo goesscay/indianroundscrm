@@ -188,12 +188,17 @@ class DashboardController extends Controller
                 }
             });
         }
-        $limit = max(1, (int) $request->query('limit', 500));
-        return $q->orderByDesc('timestamp')->orderByDesc('id')->limit($limit)->get()->map(function ($d) {
+        $q->orderByDesc('timestamp')->orderByDesc('id');
+        $map = function ($d) {
             $a = $d->toArray();
             $a['timestamp'] = $d->timestamp ? Carbon::instance($d->timestamp)->utc()->toIso8601String() : null;
             return $a;
-        })->values();
+        };
+        if (\App\Support\Paging::requested($request)) {
+            return \App\Support\Paging::paginate($request, $q, $map);
+        }
+        $limit = max(1, (int) $request->query('limit', 500));
+        return $q->limit($limit)->get()->map($map)->values();
     }
 
     public function activityFacets()

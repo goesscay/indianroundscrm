@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -36,6 +37,7 @@ const fmtDate = (iso?: string | null) => {
 
 function LaneCard({ lane, items }: { lane: Lane; items: RsqRequest[] }) {
   const Icon = lane.icon;
+  const lm = useLoadMore(items, 10);
   return (
     <Card className={`p-4 rounded-lg border-l-4 ${lane.accent}`} data-testid={`lane-${lane.key}`}>
       <div className="flex items-center justify-between mb-3">
@@ -52,7 +54,7 @@ function LaneCard({ lane, items }: { lane: Lane; items: RsqRequest[] }) {
             Nothing here yet
           </div>
         )}
-        {items.map((r) => (
+        {lm.visible.map((r) => (
           <Link key={r.id || r.lead_id} href={`/leads/${r.lead_id}`} className="block" data-testid={`rsq-card-${r.lead_id}`}>
             <div className="p-3 bg-white rounded-md border border-border hover:border-[#0A0A0A] hover:shadow-sm transition-all">
               <div className="flex items-center justify-between gap-2">
@@ -78,6 +80,7 @@ function LaneCard({ lane, items }: { lane: Lane; items: RsqRequest[] }) {
             </div>
           </Link>
         ))}
+        <LoadMore lm={lm} />
       </div>
     </Card>
   );

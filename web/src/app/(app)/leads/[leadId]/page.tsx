@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
@@ -29,6 +30,7 @@ export default function LeadDetail() {
   const { can } = useCurrentUser();
   const [lead, setLead] = useState<Lead | null>(null);
   const [history, setHistory] = useState<SupplierMailHistory[]>([]);
+  const historyLm = useLoadMore(history, 10);
   const [mailOpen, setMailOpen] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -408,7 +410,7 @@ export default function LeadDetail() {
         <Card className="p-6 rounded-lg">
           <h3 className="font-display text-xl font-bold mb-4">Supplier mail history</h3>          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}
           <div className="space-y-3">
-            {history.map((h) => (
+            {historyLm.visible.map((h) => (
               <div key={h.id} className="border-l-2 border-[#0A0A0A] pl-3 py-1">
                 <div className="text-sm font-semibold">{h.subject}</div>
                 <div className="label-caps mt-0.5">{(h.sent_at || "").slice(0, 16).replace("T", " ")}</div>
@@ -429,6 +431,7 @@ export default function LeadDetail() {
               </div>
             ))}
           </div>
+          <LoadMore lm={historyLm} className="mt-3" />
         </Card>
       </div>
 

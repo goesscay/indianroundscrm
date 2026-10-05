@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import { useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import type { LeadNote } from "@/types";
 export default function LeadNotes({ leadId }: { leadId: string }) {
   const { user, can } = useCurrentUser();
   const [notes, setNotes] = useState<LeadNote[]>([]);
+  const lm = useLoadMore(notes, 10);
   const [txt, setTxt] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -53,7 +55,7 @@ export default function LeadNotes({ leadId }: { leadId: string }) {
       </div>
       <div className="space-y-2 max-h-80 overflow-y-auto">
         {notes.length === 0 && <div className="text-sm text-muted-foreground">No notes yet. Add one above.</div>}
-        {notes.map((n) => (
+        {lm.visible.map((n) => (
           <div key={n.id} className="p-3 rounded-md border border-border bg-secondary/30 group" data-testid={`note-${n.id}`}>
             <div className="flex justify-between items-start gap-2">
               <div className="text-sm whitespace-pre-wrap flex-1">{n.note}</div>
@@ -68,6 +70,7 @@ export default function LeadNotes({ leadId }: { leadId: string }) {
             </div>
           </div>
         ))}
+        <LoadMore lm={lm} />
       </div>
     </Card>
   );

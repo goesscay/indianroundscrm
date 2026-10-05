@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
@@ -49,6 +50,7 @@ export default function CalendarView() {
   };
 
   const selectedList = selected ? grouped[selected] || [] : [];
+  const selLm = useLoadMore(selectedList, 10, selected ?? "");
 
   return (
     <div className="space-y-6" data-testid="calendar-page">
@@ -120,7 +122,7 @@ export default function CalendarView() {
           </h3>
           <div className="mt-4 space-y-3">
             {selected && selectedList.length === 0 && <div className="text-sm text-muted-foreground">No events on this day.</div>}
-            {selectedList.map((ev, i) => (
+            {selLm.visible.map((ev, i) => (
               <Link key={i} href={`/leads/${ev.lead_id}`} className="block border border-border rounded-md p-3 hover:bg-secondary/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="font-mono font-semibold text-sm">{ev.lead_id}</div>
@@ -133,6 +135,7 @@ export default function CalendarView() {
                 <div className="mt-2"><StatusPill status={ev.lead_status} /></div>
               </Link>
             ))}
+            <LoadMore lm={selLm} />
           </div>
         </Card>
       </div>

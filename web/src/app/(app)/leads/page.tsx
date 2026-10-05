@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { Suspense, useMemo, useState } from "react";
+import { formatApiError } from "@/lib/api";
+import { fetchAll, usePagedList } from "@/lib/usePagedList";
+import { Pagination } from "@/components/ui/pagination";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,36 +18,38 @@ import type { Lead } from "@/types";
 
 const INR = (n: number | undefined | null) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
 
-export default function LeadList() {
-  const [leads, setLeads] = useState<Lead[]>([]);
+function LeadList() {
   const [q, setQ] = useState("");
+  const [applied, setApplied] = useState("");
   const [status, setStatus] = useState("all");
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState("");
   const router = useRouter();
   const { can } = useCurrentUser();
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, string> = { q };
-      if (status !== "all") params.status = status;
-      const { data } = await api.get<Lead[]>("/leads", { params });
-      setLeads(data);
-    } catch (e) { setErr(formatApiError(e)); }
-    finally { setLoading(false); }
-  };
+  const params = useMemo(() => {
+    const p: Record<string, string> = {};
+    if (applied.trim()) p.q = applied.trim();
+    if (status !== "all") p.status = status;
+    return p;
+  }, [applied, status]);
+  const { rows: leads, loading, loaded, error, paginationProps } = usePagedList<Lead>("/leads", params);
+  const err = error || exportErr;
+  const search = () => setApplied(q);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [status]);
-
-  const exportCsv = () => {
+  // Export ALL rows matching the current filters (legacy un-paged endpoint), not just this page.
+  const exportCsv = async () => {
+    setExporting(true); setExportErr("");
+    let all: Lead[] = [];
+    try { all = await fetchAll<Lead>("/leads", params); }
+    catch (e) { setExportErr(formatApiError(e)); setExporting(false); return; }
     const headers = ["Lead ID", "Customer", "Phone", "Destination", "Travel Date", "Status", "Booking", "Supplier ₹", "Selling ₹", "Profit"];
-    const rows = leads.map(l => [l.lead_id, l.customer_name, l.phone, l.destination, l.travel_date, l.lead_status, l.booking_status, l.supplier_quote_amount || 0, l.selling_amount || 0, l.profit || 0]);
+    const rows = all.map(l => [l.lead_id, l.customer_name, l.phone, l.destination, l.travel_date, l.lead_status, l.booking_status, l.supplier_quote_amount || 0, l.selling_amount || 0, l.profit || 0]);
     const csv = [headers, ...rows].map(r => r.map(v => `"${(v ?? "").toString().replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = `leads-${Date.now()}.csv`; a.click();
+    setExporting(false);
   };
 
   return (
@@ -59,7 +63,7 @@ export default function LeadList() {
         </div>
         <div className="flex gap-2">
           {can("leads.export") && (
-            <Button variant="outline" onClick={exportCsv} data-testid="export-csv">
+            <Button variant="outline" onClick={exportCsv} disabled={exporting} data-testid="export-csv">
               <Download size={16} /> Export CSV
             </Button>
           )}
@@ -76,7 +80,7 @@ export default function LeadList() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && load()}
+              onKeyDown={(e) => e.key === "Enter" && search()}
               placeholder="Search lead ID, customer, phone, destination…"
               className="pl-9 h-10"
               data-testid="search-input"
@@ -91,7 +95,7 @@ export default function LeadList() {
               {LEAD_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button onClick={load} variant="outline" data-testid="search-btn">Search</Button>
+          <Button onClick={search} variant="outline" data-testid="search-btn">Search</Button>
         </div>
       </Card>
 
@@ -111,9 +115,9 @@ export default function LeadList() {
                 <TableHead>Staff</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {loading && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
-              {!loading && leads.length === 0 && (
+            <TableBody className={loading && loaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
+              {loading && !loaded && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
+              {loaded && leads.length === 0 && (
                 <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-12">No leads yet. Create one to get started.</TableCell></TableRow>
               )}
               {leads.map((l) => {
@@ -161,8 +165,13 @@ export default function LeadList() {
             </TableBody>
           </Table>
         </div>
+        <Pagination {...paginationProps} />
       </Card>
       {err && <div className="text-sm text-destructive">{err}</div>}
     </div>
   );
+}
+
+export default function LeadsPage() {
+  return <Suspense fallback={null}><LeadList /></Suspense>;
 }

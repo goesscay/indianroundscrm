@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -42,6 +43,7 @@ export default function RolesPage() {
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [roleUsers, setRoleUsers] = useState<RoleUser[]>([]);
+  const roleUsersLm = useLoadMore(roleUsers, 15);
   const [mobileDetail, setMobileDetail] = useState(false);
 
   const [newOpen, setNewOpen] = useState(false);
@@ -424,7 +426,7 @@ export default function RolesPage() {
                   <div className="text-sm text-muted-foreground">No users are assigned to this role.</div>
                 ) : (
                   <ul className="divide-y divide-border">
-                    {roleUsers.map((u) => (
+                    {roleUsersLm.visible.map((u) => (
                       <li key={u.id} className="py-2 flex items-center justify-between gap-3 text-sm">
                         <span className="min-w-0">
                           <span className="font-medium">{u.name || u.email}</span>
@@ -435,6 +437,7 @@ export default function RolesPage() {
                     ))}
                   </ul>
                 )}
+                <LoadMore lm={roleUsersLm} className="mt-2" />
               </Card>
 
               {dirty && (

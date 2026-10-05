@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -22,6 +23,7 @@ const LABELS: Record<string, string> = {
 
 export default function ContactTimeline({ leadId, refreshKey }: { leadId: string; refreshKey?: number }) {
   const [events, setEvents] = useState<ContactEvent[]>([]);
+  const lm = useLoadMore(events, 10);
   useEffect(() => {
     (async () => {
       try { const { data } = await api.get<ContactEvent[]>(`/leads/${leadId}/contact-events`); setEvents(data); }
@@ -40,7 +42,7 @@ export default function ContactTimeline({ leadId, refreshKey }: { leadId: string
       <div className="relative">
         {events.length > 0 && <div className="absolute left-4 top-1 bottom-1 w-px bg-border" />}
         <div className="space-y-3">
-          {events.map((e) => {
+          {lm.visible.map((e) => {
             const Icon = ICONS[e.kind] || Activity;
             const color = COLORS[e.kind] || "#64748B";
             const label = LABELS[e.kind] || e.kind;
@@ -65,6 +67,7 @@ export default function ContactTimeline({ leadId, refreshKey }: { leadId: string
           })}
         </div>
       </div>
+      <LoadMore lm={lm} className="mt-3" />
     </Card>
   );
 }

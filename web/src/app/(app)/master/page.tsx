@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { X, Plus } from "lucide-react";
 import { useCan } from "@/context/AuthContext";
@@ -21,6 +22,25 @@ const CATEGORIES = [
   { key: "payment_mode", label: "Payment Modes" },
   { key: "lead_source", label: "Lead Sources" },
 ];
+
+function CategoryCard({ label, testId, rows, canManage, onRemove }: { label: string; testId: string; rows: MasterItem[]; canManage: boolean; onRemove: (id: string) => void }) {
+  const lm = useLoadMore(rows, 24);
+  return (
+    <Card className="p-5 rounded-lg" data-testid={testId}>
+      <div className="label-caps">{label} <span className="text-muted-foreground font-normal">({rows.length})</span></div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {rows.length === 0 && <div className="text-xs text-muted-foreground">No items</div>}
+        {lm.visible.map(r => (
+          <span key={r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary text-sm">
+            {r.value}
+            {canManage && <button onClick={() => onRemove(r.id)} className="text-muted-foreground hover:text-destructive"><X size={12} /></button>}
+          </span>
+        ))}
+      </div>
+      <LoadMore lm={lm} className="mt-3" />
+    </Card>
+  );
+}
 
 function DestinationCitiesEditor() {
   const canManage = useCan()("master.manage");
@@ -45,6 +65,7 @@ function DestinationCitiesEditor() {
   useEffect(() => { load(); }, []);
 
   const cities = dcMap[selDest] || [];
+  const cityLm = useLoadMore(cities, 20, selDest);
 
   const saveList = async (updated: string[]) => {
     try {
@@ -98,7 +119,7 @@ function DestinationCitiesEditor() {
           </div>}
           <div className="space-y-1.5">
             {cities.length === 0 && <div className="text-xs text-muted-foreground py-4 text-center border border-dashed rounded-md">No cities yet — add above</div>}
-            {cities.map((c, i) => (
+            {cityLm.visible.map((c, i) => (
               <div key={c} className="flex items-center gap-2 px-3 py-2 rounded-md bg-secondary/40 border border-border" data-testid={`dc-row-${c}`}>
                 <span className="text-xs text-muted-foreground font-mono w-6">{i + 1}.</span>
                 <span className="flex-1 text-sm font-medium">{c}</span>
@@ -108,6 +129,7 @@ function DestinationCitiesEditor() {
               </div>
             ))}
           </div>
+          <LoadMore lm={cityLm} className="mt-3" />
         </>
       ) : (
         <div className="text-sm text-muted-foreground">Select a destination to manage its cities.</div>
@@ -168,18 +190,7 @@ export default function MasterData() {
         {CATEGORIES.map(c => {
           const rows = items.filter(i => i.category === c.key);
           return (
-            <Card key={c.key} className="p-5 rounded-lg" data-testid={`m-cat-${c.key}`}>
-              <div className="label-caps">{c.label}</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {rows.length === 0 && <div className="text-xs text-muted-foreground">No items</div>}
-                {rows.map(r => (
-                  <span key={r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary text-sm">
-                    {r.value}
-                    {canManage && <button onClick={() => remove(r.id)} className="text-muted-foreground hover:text-destructive"><X size={12} /></button>}
-                  </span>
-                ))}
-              </div>
-            </Card>
+            <CategoryCard key={c.key} label={c.label} testId={`m-cat-${c.key}`} rows={rows} canManage={canManage} onRemove={remove} />
           );
         })}
       </div>

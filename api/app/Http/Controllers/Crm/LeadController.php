@@ -215,8 +215,12 @@ class LeadController extends Controller
                 }
             });
         }
+        $q->orderByDesc('created_at')->orderByDesc('id');
+        if (\App\Support\Paging::requested($request)) {
+            return \App\Support\Paging::paginate($request, $q, fn (Lead $l) => $l->toApi());
+        }
         $limit = max(1, (int) $request->query('limit', 500));
-        return $q->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get()
+        return $q->limit($limit)->get()
             ->map(fn (Lead $l) => $l->toApi())->values();
     }
 

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { Suspense, useMemo, useEffect, useState } from "react";
+import { formatApiError } from "@/lib/api";
+import { fetchAll, usePagedList } from "@/lib/usePagedList";
+import { Pagination } from "@/components/ui/pagination";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -41,30 +43,30 @@ const fmt = (iso?: string | null) => {
   catch { return iso.slice(0, 16); }
 };
 
-export default function SecurityLog() {
-  const [rows, setRows] = useState<SecurityLogEntry[]>([]);
+function SecurityLog() {
   const [event, setEvent] = useState("");
   const [userEmail, setUserEmail] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [applied, setApplied] = useState({ event: "", user_email: "" });
+  const [tick, setTick] = useState(0);
 
-  const load = async () => {
-    setBusy(true);
-    try {
-      const params: Record<string, string> = {};
-      if (event) params.event = event;
-      if (userEmail.trim()) params.user_email = userEmail.trim();
-      const { data } = await api.get<SecurityLogEntry[]>("/security-audit-log", { params });
-      setRows(data);
-    } catch (e) { toast.error(formatApiError(e)); }
-    finally { setBusy(false); }
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
+  const params = useMemo(() => {
+    const p: Record<string, string> = {};
+    if (applied.event) p.event = applied.event;
+    if (applied.user_email.trim()) p.user_email = applied.user_email.trim();
+    return p;
+  }, [applied]);
+  const { rows, loading, loaded, error, paginationProps } = usePagedList<SecurityLogEntry>("/security-audit-log", params, tick);
+  useEffect(() => { if (error) toast.error(error); }, [error]);
+  const busy = loading;
+  const load = () => { setApplied({ event, user_email: userEmail }); setTick((t) => t + 1); };
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
+    let all: SecurityLogEntry[] = [];
+    try { all = await fetchAll<SecurityLogEntry>("/security-audit-log", params); }
+    catch (e) { toast.error(formatApiError(e)); return; }
     const headers = ["timestamp", "user_email", "event", "ip", "user_agent", "extra"];
     const csv = [headers.join(",")].concat(
-      rows.map(r => headers.map(h => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","))
+      all.map(r => headers.map(h => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","))
     ).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -127,8 +129,8 @@ export default function SecurityLog() {
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {rows.length === 0 && (
+            <TableBody className={loading && loaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
+              {loaded && rows.length === 0 && (
                 <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">No events match your filter</TableCell></TableRow>
               )}
               {rows.map((r) => (
@@ -151,7 +153,12 @@ export default function SecurityLog() {
             </TableBody>
           </Table>
         </div>
+        <Pagination {...paginationProps} />
       </Card>
     </div>
   );
+}
+
+export default function SecurityLogPage() {
+  return <Suspense fallback={null}><SecurityLog /></Suspense>;
 }

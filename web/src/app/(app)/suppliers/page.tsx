@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Pagination, usePagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -17,6 +18,8 @@ export default function Suppliers() {
   const canEdit = can("suppliers.manage");
   const [rows, setRows] = useState<Supplier[]>([]);
   const [f, setF] = useState<SupplierCreate>({ name: "", email: "", phone: "", destination: "", country: "" });
+
+  const pg = usePagination(rows);
 
   const load = async () => {
     try { const { data } = await api.get<Supplier[]>("/suppliers"); setRows(data); }
@@ -72,7 +75,7 @@ export default function Suppliers() {
             </TableHeader>
             <TableBody>
               {rows.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No suppliers yet</TableCell></TableRow>}
-              {rows.map(s => (
+              {pg.pageItems.map(s => (
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.name}</TableCell>
                   <TableCell>{s.email}</TableCell>
@@ -87,6 +90,7 @@ export default function Suppliers() {
             </TableBody>
           </Table>
         </div>
+        <Pagination {...pg.paginationProps} />
       </Card>
     </div>
   );

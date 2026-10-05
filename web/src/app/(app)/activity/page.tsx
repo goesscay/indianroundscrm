@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { api, formatApiError } from "@/lib/api";
+import { fetchAll, usePagedList } from "@/lib/usePagedList";
+import { Pagination } from "@/components/ui/pagination";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,22 +28,19 @@ const ACTION_COLOR: Record<string, string> = {
   add_master: "bg-slate-100 text-slate-800",
 };
 
-export default function ActivityLog() {
-  const [rows, setRows] = useState<ActivityEntry[]>([]);
+function ActivityLog() {
   const [facets, setFacets] = useState<ActivityFacets & { users: string[] }>({ actions: [], entities: [], users: [] });
-  const [loading, setLoading] = useState(true);
   const [f, setF] = useState({ user_email: "all", action: "all", entity: "all", date_from: "", date_to: "", q: "" });
+  const [appliedQ, setAppliedQ] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, string> = {};
-      Object.entries(f).forEach(([k, v]) => { if (v && v !== "all") params[k] = v; });
-      const { data } = await api.get<ActivityEntry[]>("/activity", { params });
-      setRows(data);
-    } catch (e) { toast.error(formatApiError(e)); }
-    finally { setLoading(false); }
-  };
+  const params = useMemo(() => {
+    const p: Record<string, string> = {};
+    Object.entries({ ...f, q: appliedQ }).forEach(([k, v]) => { if (v && v !== "all") p[k] = v; });
+    return p;
+  }, [f.user_email, f.action, f.entity, f.date_from, f.date_to, appliedQ]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { rows, total, loading, loaded, error, paginationProps } = usePagedList<ActivityEntry>("/activity", params);
+  useEffect(() => { if (error) toast.error(error); }, [error]);
+  const load = () => setAppliedQ(f.q);
 
   useEffect(() => {
     (async () => {
@@ -49,14 +48,15 @@ export default function ActivityLog() {
       catch { /* ignore */ }
     })();
   }, []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [f.user_email, f.action, f.entity, f.date_from, f.date_to]);
 
-  const clearFilters = () => setF({ user_email: "all", action: "all", entity: "all", date_from: "", date_to: "", q: "" });
+  const clearFilters = () => { setF({ user_email: "all", action: "all", entity: "all", date_from: "", date_to: "", q: "" }); setAppliedQ(""); };
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
+    let all: ActivityEntry[] = [];
+    try { all = await fetchAll<ActivityEntry>("/activity", params); }
+    catch (e) { toast.error(formatApiError(e)); return; }
     const headers = ["Timestamp", "User", "Action", "Entity", "Entity ID", "Details"];
-    const data = rows.map(r => [
+    const data = all.map(r => [
       (r.timestamp || "").slice(0, 19).replace("T", " "),
       r.user_name || r.user_email || "",
       r.action || "",
@@ -70,7 +70,7 @@ export default function ActivityLog() {
     a.href = URL.createObjectURL(blob);
     a.download = `activity-log-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
-    toast.success(`Exported ${rows.length} rows`);
+    toast.success(`Exported ${all.length} rows`);
   };
 
   const activeFilters = useMemo(() => {
@@ -83,7 +83,7 @@ export default function ActivityLog() {
         <div>
           <div className="label-caps">Audit trail</div>
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Activity Log</h1>
-          <p className="text-sm text-muted-foreground mt-2">{rows.length} record{rows.length !== 1 ? "s" : ""} · every action across the CRM is logged</p>
+          <p className="text-sm text-muted-foreground mt-2">{total.toLocaleString("en-IN")} record{total !== 1 ? "s" : ""} · every action across the CRM is logged</p>
         </div>
         <div className="flex gap-2">
           {activeFilters > 0 && (
@@ -91,7 +91,7 @@ export default function ActivityLog() {
               <X size={14} /> Clear filters ({activeFilters})
             </Button>
           )}
-          <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0} data-testid="export-activity-csv">
+          <Button variant="outline" onClick={exportCsv} disabled={total === 0} data-testid="export-activity-csv">
             <Download size={14} /> Export CSV
           </Button>
         </div>
@@ -164,14 +164,14 @@ export default function ActivityLog() {
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {loading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
-              {!loading && rows.length === 0 && (
+            <TableBody className={loading && loaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
+              {loading && !loaded && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
+              {loaded && rows.length === 0 && (
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">
                   No activity matches these filters.
                 </TableCell></TableRow>
               )}
-              {!loading && rows.map(r => (
+              {rows.map(r => (
                 <TableRow key={r.id} data-testid={`activity-row-${r.id}`}>
                   <TableCell className="font-mono text-xs whitespace-nowrap">{(r.timestamp || "").slice(0, 19).replace("T", " ")}</TableCell>
                   <TableCell className="font-medium">{r.user_name || r.user_email}</TableCell>
@@ -189,7 +189,12 @@ export default function ActivityLog() {
             </TableBody>
           </Table>
         </div>
+        <Pagination {...paginationProps} />
       </Card>
     </div>
   );
+}
+
+export default function ActivityPage() {
+  return <Suspense fallback={null}><ActivityLog /></Suspense>;
 }

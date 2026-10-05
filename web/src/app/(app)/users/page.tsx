@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Pagination, usePagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { DestinationAllocation, MasterItem, RoleDef, User, UserCreate } from "@/types";
@@ -103,6 +104,7 @@ export default function Users() {
   };
 
   const shownUsers = roleFilter === "all" ? users : users.filter(u => u.role === roleFilter);
+  const pg = usePagination(shownUsers, { resetKey: roleFilter });
 
   return (
     <div className="space-y-6" data-testid="users-page">
@@ -195,7 +197,7 @@ export default function Users() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {shownUsers.map(u => {
+              {pg.pageItems.map(u => {
                 const status = u.account_status || "active";
                 const isSelf = u.id === user.id;
                 return (
@@ -246,6 +248,7 @@ export default function Users() {
             </TableBody>
           </Table>
         </div>
+        <Pagination {...pg.paginationProps} />
         <div className="px-4 py-3 border-t border-border bg-secondary/30 flex items-center gap-2 text-xs text-muted-foreground">
           <Shield size={12} />
           Key: <KeyRound size={11} className="ml-1" /> Force reset · <UnlockIcon size={11} /> Unlock · <LogOut size={11} /> Kick sessions · <Trash2 size={11} /> Delete
