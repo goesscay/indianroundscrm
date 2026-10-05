@@ -440,3 +440,47 @@ export interface ChatMessageDeletedEvent {
 export interface ChatConversationUpdatedEvent {
   conversation_id: string;
 }
+
+// ---- Activities (tasks, calls, meetings) ----
+export type ActivityType = "task" | "call" | "meeting" | "email" | "follow_up";
+export type ActivityPriority = "low" | "medium" | "high";
+
+export interface ActivityUserRef { id: string; name: string }
+
+export interface Activity {
+  id: string;
+  type: ActivityType;
+  title: string;
+  details: string | null;
+  priority: ActivityPriority;
+  due_at: string | null;
+  completed_at: string | null;
+  done: boolean;
+  overdue: boolean;
+  assigned_to: ActivityUserRef | null;
+  created_by: ActivityUserRef | null;
+  completed_by: ActivityUserRef | null;
+  lead: { lead_id: string; customer_name: string } | null;
+  created_at: string;
+}
+
+export interface ActivityCounts {
+  open: number; overdue: number; today: number; upcoming: number; no_date: number; done: number;
+}
+
+export interface ActivityOptions {
+  users: { id: string; name: string; role: string }[];
+  types: string[];
+  priorities: string[];
+}
+
+export interface ActivityInput {
+  type?: ActivityType;
+  title?: string;
+  details?: string | null;
+  priority?: ActivityPriority;
+  due_at?: string | null;
+  assigned_to?: string | null;
+  lead_id?: string | null;
+  done?: boolean;
+}

@@ -81,6 +81,12 @@ class Permissions
             $g('security', 'Security', [
                 'view' => ['View security log', 'See the security audit log and all active sessions.'],
             ]),
+            $g('activities', 'Activities', [
+                'view' => ['View activities', 'Open the Activities page. Sees activities assigned to them, created by them or linked to leads they own.'],
+                'view_all' => ['View all activities', 'See every activity, whoever it is assigned to.'],
+                'create' => ['Create activities', 'Create tasks, calls, meetings, emails and follow-ups; edit, complete and delete the ones they created or that are assigned to them.'],
+                'manage' => ['Manage activities', 'Edit, complete and delete activities of anyone and assign them to other users.'],
+            ]),
             $g('ai', 'AI assistant', [
                 'use' => ['Use AI assistant', 'Open and use the AI assistant panel.'],
             ]),
@@ -117,13 +123,14 @@ class Permissions
             'sales' => [
                 'dashboard.view', 'leads.create', 'leads.edit_limited', 'leads.assignable', 'leads.notes',
                 'leads.contact_events', 'calendar.view', 'rsq.request', 'suppliers.view', 'master.view',
-                'ai.use', 'chat.use',
+                'ai.use', 'chat.use', 'activities.view', 'activities.create',
             ],
             'operations' => [
                 'dashboard.view', 'leads.view_all', 'leads.create', 'leads.edit', 'leads.edit_limited', 'leads.reassign',
                 'leads.notes', 'leads.contact_events', 'calendar.view', 'rsq.request', 'rsq.manage',
                 'supplier_mail.send', 'suppliers.view', 'suppliers.manage', 'supplier_dashboard.view',
                 'master.view', 'ai.use', 'chat.use',
+                'activities.view', 'activities.view_all', 'activities.create',
             ],
             default => [],
         };

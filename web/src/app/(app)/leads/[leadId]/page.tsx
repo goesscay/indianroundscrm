@@ -16,6 +16,7 @@ import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
 import SupplierTracker from "@/components/app/SupplierTracker";
 import LeadNotes from "@/components/app/LeadNotes";
 import FollowupCountdown from "@/components/app/FollowupCountdown";
+import LeadActivities from "@/components/activities/LeadActivities";
 import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -452,6 +453,8 @@ export default function LeadDetail() {
           </div>
         </Card>
       )}
+
+      {can("activities.view") && <LeadActivities leadId={lead.lead_id} customerName={lead.customer_name} />}
 
       <LeadNotes leadId={lead.lead_id} />
 

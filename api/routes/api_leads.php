@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Crm\ActivityController;
 use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\LeadController;
 use App\Http\Controllers\Crm\RsqController;
@@ -50,4 +51,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [DashboardController::class, 'notifications']);
     Route::middleware('perm:activity.view')->get('/activity', [DashboardController::class, 'activity']);
     Route::middleware('perm:activity.view')->get('/activity/facets', [DashboardController::class, 'activityFacets']);
+
+    // ---- Activities (tasks, calls, meetings, emails, follow-ups); static paths before {id}
+    Route::get('/activities/calendar', [ActivityController::class, 'calendar'])->middleware('perm:activities.view');
+    Route::get('/activities/options', [ActivityController::class, 'options'])->middleware('perm:activities.view,activities.create,activities.manage');
+    Route::get('/activities', [ActivityController::class, 'index'])->middleware('perm:activities.view');
+    Route::post('/activities', [ActivityController::class, 'store'])->middleware('perm:activities.create');
+    Route::get('/activities/{id}', [ActivityController::class, 'show'])->middleware('perm:activities.view');
+    Route::patch('/activities/{id}', [ActivityController::class, 'update'])->middleware('perm:activities.create,activities.manage');
+    Route::delete('/activities/{id}', [ActivityController::class, 'destroy'])->middleware('perm:activities.create,activities.manage');
+    Route::get('/leads/{lead_id}/activities', [ActivityController::class, 'forLead'])->middleware('perm:activities.view');
 });

@@ -11,7 +11,7 @@ import { useChatUnread } from "@/context/ChatUnreadContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  Calendar, Bell, Inbox, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
+  Calendar, ListChecks, Bell, Inbox, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAiPanel } from "@/components/ai/AiPanelContext";
@@ -32,6 +32,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard", group: "Workspace", perms: ["dashboard.view"] },
   { to: "/leads", label: "Leads", icon: ClipboardList, testId: "nav-leads", group: "Sales", perms: ["leads.view_all", "leads.create", "leads.edit", "leads.edit_limited"] },
+  { to: "/activities", label: "Activities", icon: ListChecks, testId: "nav-activities", group: "Sales", perms: ["activities.view"] },
   { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar", group: "Sales", perms: ["calendar.view"] },
   { to: "/chat", label: "Chat", icon: MessageSquare, testId: "nav-chat", group: "Team", perms: ["chat.use"] },
   { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard", group: "Operations", perms: ["supplier_dashboard.view"] },

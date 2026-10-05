@@ -53,9 +53,16 @@ Roles and permissions are admin-managed and data-driven.
 | GET /activity, /activity/facets | activity.view |
 | RSQ/supplier alerts in /notifications | rsq.manage |
 | (none yet) | ai.use is reserved for the upcoming AI assistant panel; no route requires it currently |
+| GET /activities, /activities/calendar, /activities/{id}, /leads/{id}/activities | activities.view (rows scoped: without activities.view_all only assigned-to-me / created-by-me / on my leads) |
+| GET /activities/options | activities.view, create or manage |
+| POST /activities | activities.create |
+| PATCH/DELETE /activities/{id} | activities.create or activities.manage (creator/assignee only unless activities.manage; 403 otherwise) |
+| (assigning to other users) | activities.manage (otherwise self or unassigned only) |
 | /chat/* | chat.use |
 | /chat/groups (create/rename/delete), moderating group messages | chat.create_groups |
 | leads.export | reserved (no export endpoint exists yet) |
+
+Migration `2026_10_07_100100` adds the default `activities.*` rows to the existing `sales`/`operations` roles (idempotent, never touches admin or custom roles).
 
 ## Default matrix (reproduces the pre-RBAC behaviour)
 X = granted. Admin has every permission implicitly.
@@ -91,5 +98,9 @@ X = granted. Admin has every permission implicitly.
 | activity.view | X | | |
 | security.view | X | | |
 | ai.use | X | X | X |
+| activities.view | X | X | X |
+| activities.view_all | X | | X |
+| activities.create | X | X | X |
+| activities.manage | X | | |
 | chat.use | X | X | X |
 | chat.create_groups | X | | |

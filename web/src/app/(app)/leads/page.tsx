@@ -87,9 +87,16 @@ function LeadList() {
             {can("leads.view_all") ? "All Leads" : "My Leads"}
           </h1>
         </div>
-        {can("leads.create") && (
-          <Button onClick={() => router.push("/leads/new")} data-testid="new-lead-btn">+ New Lead</Button>
-        )}
+        <div className="flex gap-2">
+          {can("leads.export") && (
+            <Button variant="outline" onClick={exportCsv} disabled={exporting} data-testid="export-csv">
+              <Download size={16} /> Export CSV
+            </Button>
+          )}
+          {can("leads.create") && (
+            <Button onClick={() => router.push("/leads/new")} data-testid="new-lead-btn">+ New Lead</Button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center" data-testid="leads-filters">
@@ -145,11 +152,6 @@ function LeadList() {
         {activeFilters > 0 && (
           <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="clear-filters">
             <X size={14} /> Clear filters
-          </Button>
-        )}
-        {can("leads.export") && (
-          <Button variant="outline" className="ml-auto" onClick={exportCsv} disabled={exporting} data-testid="export-csv">
-            <Download size={16} /> Export CSV
           </Button>
         )}
       </div>
