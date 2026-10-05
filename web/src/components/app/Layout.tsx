@@ -7,10 +7,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import { useChatUnread } from "@/context/ChatUnreadContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  Calendar, Bell, Inbox, Shield, Menu, X, PanelLeftClose, PanelLeftOpen,
+  Calendar, Bell, Inbox, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Notification, Role } from "@/types";
@@ -26,21 +27,22 @@ interface NavItem {
 const DASH: NavItem = { to: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard", group: "Workspace" };
 const LEADS: NavItem = { to: "/leads", label: "Leads", icon: ClipboardList, testId: "nav-leads", group: "Sales" };
 const CAL: NavItem = { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar", group: "Sales" };
+const CHAT: NavItem = { to: "/chat", label: "Chat", icon: MessageSquare, testId: "nav-chat", group: "Team" };
 const SUPD: NavItem = { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard", group: "Operations" };
 const SUPS: NavItem = { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers", group: "Operations" };
 const AI: NavItem = { to: "/ai", label: "AI Assistant", icon: Sparkles, testId: "nav-ai", group: "Tools" };
 
 const NAV: Record<Role, NavItem[]> = {
   admin: [
-    DASH, LEADS, CAL, SUPD, SUPS,
+    DASH, LEADS, CAL, CHAT, SUPD, SUPS,
     { to: "/users", label: "Users", icon: Users, testId: "nav-users", group: "Administration" },
     { to: "/master", label: "Master Data", icon: Database, testId: "nav-master", group: "Administration" },
     { to: "/activity", label: "Activity Log", icon: Activity, testId: "nav-activity", group: "Administration" },
     { to: "/security-log", label: "Security Log", icon: Shield, testId: "nav-security-log", group: "Administration" },
     AI,
   ],
-  operations: [DASH, LEADS, CAL, SUPD, SUPS, AI],
-  sales: [DASH, LEADS, CAL, AI],
+  operations: [DASH, LEADS, CAL, CHAT, SUPD, SUPS, AI],
+  sales: [DASH, LEADS, CAL, CHAT, AI],
 };
 
 const COLLAPSE_KEY = "ir-sidebar-collapsed";
@@ -50,6 +52,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const items = NAV[user.role] || [];
+  const { total: chatUnread } = useChatUnread();
   const [alerts, setAlerts] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false); // mobile drawer
   const [collapsed, setCollapsed] = useState(false); // desktop rail
@@ -129,13 +132,23 @@ export default function Layout({ children }: { children: ReactNode }) {
                 title={rail ? it.label : undefined}
                 data-testid={it.testId}
                 className={cn(
-                  "group flex items-center rounded text-[13px] font-medium transition-colors",
+                  "group relative flex items-center rounded text-[13px] font-medium transition-colors",
                   rail ? "justify-center h-9 w-9 mx-auto my-0.5" : "gap-2.5 px-3 py-2",
                   active ? "bg-neutral-900 text-white shadow-sm" : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950"
                 )}
               >
                 <it.icon size={16} className={active ? "text-white" : "text-neutral-400 group-hover:text-neutral-900"} />
-                {!rail && it.label}
+                {!rail && <span className="flex-1">{it.label}</span>}
+                {it.testId === "nav-chat" && chatUnread > 0 &&
+                  (rail ? (
+                    <span data-testid="chat-unread-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-neutral-900 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white">
+                      {chatUnread > 9 ? "9+" : chatUnread}
+                    </span>
+                  ) : (
+                    <span data-testid="chat-unread-badge" className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center", active ? "bg-white text-neutral-900" : "bg-neutral-900 text-white")}>
+                      {chatUnread > 99 ? "99+" : chatUnread}
+                    </span>
+                  ))}
               </Link>
             </div>
           );
@@ -259,6 +272,14 @@ export default function Layout({ children }: { children: ReactNode }) {
           <Menu size={20} />
         </button>
         <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-6 w-auto" />
+        <Link href="/chat" aria-label={`Chat${chatUnread > 0 ? `, ${chatUnread} unread` : ""}`} data-testid="chat-link-mobile" className="relative p-1.5 rounded hover:bg-neutral-100 ml-auto mr-1">
+          <MessageSquare size={18} />
+          {chatUnread > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-neutral-900 text-white text-[9px] font-bold rounded-sm min-w-[15px] h-[15px] flex items-center justify-center px-1">
+              {chatUnread > 99 ? "99+" : chatUnread}
+            </span>
+          )}
+        </Link>
         <button onClick={doLogout} className="p-1.5 -mr-1 rounded hover:bg-neutral-100" aria-label="Logout" data-testid="logout-btn-mobile">
           <LogOut size={18} />
         </button>

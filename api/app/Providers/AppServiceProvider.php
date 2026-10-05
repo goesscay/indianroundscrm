@@ -24,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Named limiters (separate buckets; per-account lockout lives in AuthController).
         RateLimiter::for('auth-login', fn (Request $r) => Limit::perMinute(60)->by('login|'.$r->ip()));
+        RateLimiter::for('chat-send', fn (Request $r) => Limit::perMinute(60)->by('chat|'.($r->user()?->id ?? $r->ip())));
         RateLimiter::for('auth-reset', fn (Request $r) => Limit::perMinute(30)->by('reset|'.$r->ip()));
     }
 }

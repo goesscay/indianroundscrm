@@ -342,3 +342,47 @@ export interface UpcomingFollowup {
   follow_up_at: string;
   overdue?: boolean;
 }
+
+// ---- Team chat ----
+export interface ChatUser {
+  id: string;
+  name: string;
+  role: Role | string;
+}
+
+export interface ChatLastMessage {
+  id: string;
+  body: string;
+  sender_id: string;
+  sender_name: string;
+  created_at: string;
+  deleted: boolean;
+}
+
+export interface Conversation {
+  id: string;
+  type: "direct" | "group";
+  name: string;
+  members: ChatUser[];
+  last_message: ChatLastMessage | null;
+  unread_count: number;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_name: string;
+  body: string;
+  created_at: string;
+  deleted: boolean;
+  /** Client-only state for optimistic sends. */
+  pending?: boolean;
+  failed?: boolean;
+}
+
+export interface ChatMessagesResponse {
+  messages: ChatMessage[];
+  has_more: boolean;
+}
