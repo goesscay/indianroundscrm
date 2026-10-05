@@ -111,17 +111,6 @@ export default function Login() {
               {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
-
-          <div className="mt-8 flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            Demo accounts
-            <span className="h-px flex-1 bg-border" />
-          </div>
-          <div className="mt-3 text-xs text-muted-foreground space-y-1 font-mono">
-            <div>admin@indianrounds.com / admin123</div>
-            <div>sales@indianrounds.com / Ir@2026Safe</div>
-            <div>ops@indianrounds.com / ops123</div>
-          </div>
         </div>
       </div>
     </div>
