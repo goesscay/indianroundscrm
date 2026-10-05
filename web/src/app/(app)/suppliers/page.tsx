@@ -6,10 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Plus } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { Supplier, SupplierCreate } from "@/types";
 
@@ -17,7 +18,10 @@ export default function Suppliers() {
   const { can } = useCurrentUser();
   const canEdit = can("suppliers.manage");
   const [rows, setRows] = useState<Supplier[]>([]);
-  const [f, setF] = useState<SupplierCreate>({ name: "", email: "", phone: "", destination: "", country: "" });
+  const EMPTY: SupplierCreate = { name: "", email: "", phone: "", destination: "", country: "" };
+  const [f, setF] = useState<SupplierCreate>(EMPTY);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const pg = usePagination(rows);
 
@@ -29,9 +33,15 @@ export default function Suppliers() {
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
-    try { await api.post("/suppliers", f); toast.success("Supplier added");
-      setF({ name: "", email: "", phone: "", destination: "", country: "" }); load(); }
-    catch (e) { toast.error(formatApiError(e)); }
+    setSaving(true);
+    try {
+      await api.post("/suppliers", f);
+      toast.success("Supplier added");
+      setF(EMPTY);
+      setOpen(false);
+      load();
+    } catch (e) { toast.error(formatApiError(e)); }
+    finally { setSaving(false); }
   };
 
   const remove = async (id: string) => {
@@ -42,25 +52,40 @@ export default function Suppliers() {
 
   return (
     <div className="space-y-6" data-testid="suppliers-page">
-      <div>
-        <div className="label-caps">Master data</div>
-        <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Suppliers</h1>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="label-caps">Master data</div>
+          <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Suppliers</h1>
+        </div>
+        {canEdit && (
+          <Button onClick={() => setOpen(true)} data-testid="s-add-btn">
+            <Plus size={15} /> Add supplier
+          </Button>
+        )}
       </div>
 
       {canEdit && (
-        <Card className="p-6 rounded-lg">
-          <h3 className="font-display text-xl font-bold mb-4">Add supplier</h3>
-          <form onSubmit={create} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
-            <div className="md:col-span-2"><Label className="label-caps">Name</Label><Input className="mt-1.5" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required data-testid="s-name" /></div>
-            <div className="md:col-span-2"><Label className="label-caps">Email</Label><Input type="email" className="mt-1.5" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required data-testid="s-email" /></div>
-            <div><Label className="label-caps">Phone</Label><Input className="mt-1.5" value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} data-testid="s-phone" /></div>
-            <div><Label className="label-caps">Destination</Label><Input className="mt-1.5" value={f.destination} onChange={e => setF({ ...f, destination: e.target.value })} data-testid="s-destination" /></div>
-            <div><Label className="label-caps">Country</Label><Input className="mt-1.5" value={f.country} onChange={e => setF({ ...f, country: e.target.value })} data-testid="s-country" /></div>
-            <div className="md:col-span-6 flex justify-end">
-              <Button type="submit" style={{ background: "#0A0A0A" }} data-testid="s-add">Add supplier</Button>
-            </div>
-          </form>
-        </Card>
+        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setF(EMPTY); }}>
+          <DialogContent className="sm:max-w-lg" data-testid="add-supplier-dialog">
+            <DialogHeader>
+              <DialogTitle className="font-display">Add supplier</DialogTitle>
+              <DialogDescription>Supplier details used when sending quote requests.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={create} className="space-y-4" data-testid="add-supplier-form">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2"><Label className="label-caps">Name</Label><Input className="mt-1.5" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required autoFocus data-testid="s-name" /></div>
+                <div className="sm:col-span-2"><Label className="label-caps">Email</Label><Input type="email" className="mt-1.5" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required data-testid="s-email" /></div>
+                <div><Label className="label-caps">Phone</Label><Input className="mt-1.5" value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} data-testid="s-phone" /></div>
+                <div><Label className="label-caps">Destination</Label><Input className="mt-1.5" value={f.destination} onChange={e => setF({ ...f, destination: e.target.value })} data-testid="s-destination" /></div>
+                <div className="sm:col-span-2"><Label className="label-caps">Country</Label><Input className="mt-1.5" value={f.country} onChange={e => setF({ ...f, country: e.target.value })} data-testid="s-country" /></div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button type="button" variant="outline" onClick={() => setOpen(false)} data-testid="s-cancel">Cancel</Button>
+                <Button type="submit" disabled={saving} data-testid="s-add">{saving ? "Adding…" : "Add supplier"}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       )}
 
       <Card className="rounded-lg overflow-hidden">
