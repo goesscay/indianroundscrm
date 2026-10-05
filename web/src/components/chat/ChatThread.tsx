@@ -18,6 +18,8 @@ interface Props {
   onManage: () => void;
   /** Called after sending or marking read so the list / unread badge can refresh. */
   onActivity: () => void;
+  /** Compact docked-window mode: no header (the window supplies its own). */
+  embedded?: boolean;
 }
 
 const POLL_MS = 3000;
@@ -34,7 +36,7 @@ function mergeMessages(cur: ChatMessage[], incoming: ChatMessage[]): ChatMessage
   return [...server, ...tmps];
 }
 
-export default function ChatThread({ conversation, meId, isAdmin, onBack, onManage, onActivity }: Props) {
+export default function ChatThread({ conversation, meId, isAdmin, onBack, onManage, onActivity, embedded = false }: Props) {
   const convId = conversation.id;
   const isGroup = conversation.type === "group";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -265,6 +267,7 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
 
   return (
     <section className="flex flex-col h-full min-h-0 bg-white" data-testid="chat-thread" aria-label={`Conversation with ${conversation.name}`}>
+      {!embedded && (
       <header className="flex items-center gap-2 px-3 h-14 shrink-0 border-b border-border">
         <button onClick={onBack} aria-label="Back to conversations" data-testid="chat-back" className="md:hidden p-1.5 -ml-1 rounded hover:bg-neutral-100">
           <ArrowLeft size={18} />
@@ -280,6 +283,7 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
           </Button>
         )}
       </header>
+      )}
 
       <div className="relative flex-1 min-h-0">
         <div ref={scrollRef} onScroll={onScroll} className="absolute inset-0 overflow-y-auto px-3 sm:px-4 py-3 bg-neutral-50/60" data-testid="chat-messages">
@@ -317,7 +321,8 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
                       <Trash2 size={13} />
                     </button>
                   )}
-                  <div className={cn("max-w-[85%] sm:max-w-[70%] px-3 py-1.5 rounded text-sm leading-snug break-words",
+                  <div className={cn("max-w-[85%]", embedded ? "" : "sm:max-w-[70%]",
+                    " px-3 py-1.5 rounded text-sm leading-snug break-words",
                     mine ? "bg-neutral-900 text-white" : "bg-white border border-border text-neutral-900",
                     m.pending && "opacity-60", m.failed && "ring-1 ring-red-500")}>
                     {showName && <div className="text-[11px] font-semibold text-neutral-500 mb-0.5">{m.sender_name}</div>}
@@ -365,14 +370,14 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
           onKeyDown={onKey}
           rows={1}
           maxLength={4000}
-          placeholder="Write a message (Enter to send, Shift+Enter for a new line)"
+          placeholder={embedded ? "Write a message" : "Write a message (Enter to send, Shift+Enter for a new line)"}
           aria-label="Message"
           data-testid="chat-input"
           className="flex-1 resize-none max-h-32 min-h-9 rounded border border-input bg-white px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:border-black"
           style={{ fieldSizing: "content" } as React.CSSProperties}
         />
         <Button onClick={send} disabled={!text.trim()} aria-label="Send message" data-testid="chat-send" className="h-9">
-          <Send /> <span className="hidden sm:inline">Send</span>
+          <Send /> <span className={embedded ? "sr-only" : "hidden sm:inline"}>Send</span>
         </Button>
       </footer>
     </section>

@@ -86,6 +86,15 @@ export default function ChatPage() {
     return s ? convs.filter((c) => c.name.toLowerCase().includes(s)) : convs;
   }, [convs, search]);
 
+  // Deep link: /chat?c=<id> opens that conversation (once the list has loaded).
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (!loaded || deepLinked.current) return;
+    deepLinked.current = true;
+    const id = new URLSearchParams(window.location.search).get("c");
+    if (id && convs.some((c) => c.id === id)) setActiveId(id);
+  }, [loaded, convs]);
+
   // If the open conversation vanished (group deleted), close it.
   useEffect(() => {
     if (loaded && activeId && !convs.some((c) => c.id === activeId)) setActiveId(null);
