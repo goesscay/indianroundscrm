@@ -67,6 +67,11 @@ body {
   color: #0A0A0A;
 }
 
+.dark body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
 .font-display {
   font-family: var(--font-inter-tight), var(--font-inter), sans-serif;
   letter-spacing: -0.02em;
@@ -105,25 +110,34 @@ body {
     --sidebar-border: 45 12% 90%;
   }
   .dark {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 4%;
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 14%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62% 45%;
+    --background: 0 0% 4.5%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 7.2%;
+    --card-foreground: 0 0% 93%;
+    --popover: 0 0% 8.5%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 6%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 62%;
+    --accent: 0 0% 13%;
+    --accent-foreground: 0 0% 93%;
+    --destructive: 0 72% 57%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 16%;
-    --input: 0 0% 16%;
-    --ring: 0 0% 83%;
+    --border: 0 0% 14%;
+    --input: 0 0% 17%;
+    --ring: 0 0% 70%;
+    --chart-1: 0 0% 93%;
+    --chart-2: 0 0% 72%;
+    --chart-3: 0 0% 55%;
+    --chart-4: 0 0% 38%;
+    --chart-5: 0 0% 26%;
+    --sidebar: 0 0% 5.5%;
+    --sidebar-foreground: 0 0% 88%;
+    --sidebar-border: 0 0% 14%;
+    color-scheme: dark;
   }
 
   /* Tailwind v3 preflight parity (v4 changed these defaults) */
@@ -174,6 +188,11 @@ body {
 ::selection { background: #0A0A0A; color: #fff; }
 * { scrollbar-width: thin; scrollbar-color: #c4c4c4 transparent; }
 .sidebar-scroll { scrollbar-color: #d4d4d0 transparent; }
+.dark ::selection { background: #E8E8E8; color: #0A0A0A; }
+.dark * { scrollbar-color: #3a3a3d transparent; }
+.dark .sidebar-scroll { scrollbar-color: #3a3a3d transparent; }
+.dark input::placeholder, .dark textarea::placeholder { color: #6b6b70; }
+.dark input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px hsl(var(--background)) inset; -webkit-text-fill-color: hsl(var(--foreground)); }
 
 /* Square-cut, flat surfaces */
 .rounded-full.pill-square { border-radius: 3px; }

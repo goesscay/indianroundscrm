@@ -68,7 +68,7 @@ function LeadList() {
             </Button>
           )}
           {can("leads.create") && (
-            <Button onClick={() => router.push("/leads/new")} style={{ background: "#0A0A0A" }} data-testid="new-lead-btn">+ New Lead</Button>
+            <Button onClick={() => router.push("/leads/new")} data-testid="new-lead-btn">+ New Lead</Button>
           )}
         </div>
       </div>
@@ -137,13 +137,13 @@ function LeadList() {
                         <>
                           <a href={`tel:+91${tenDigit}`} title="Call"
                              onClick={(e) => { e.stopPropagation(); logContact(l.lead_id, "call", l.phone); }}
-                             className="p-1 rounded hover:bg-[#0A0A0A]/10 text-[#0A0A0A]"
+                             className="p-1 rounded hover:bg-[#0A0A0A]/10 dark:hover:bg-white/10 text-[#0A0A0A] dark:text-foreground"
                              data-testid={`row-call-${l.lead_id}`}>
                             <Phone size={13} />
                           </a>
                           <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" title="WhatsApp"
                              onClick={(e) => { e.stopPropagation(); logContact(l.lead_id, "whatsapp", l.phone); }}
-                             className="p-1 rounded hover:bg-emerald-100 text-emerald-600"
+                             className="p-1 rounded hover:bg-emerald-100 dark:hover:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
                              data-testid={`row-wa-${l.lead_id}`}>
                             <MessageCircle size={13} />
                           </a>
@@ -155,7 +155,7 @@ function LeadList() {
                   <TableCell className="text-muted-foreground text-xs">{(l.travel_date || "").slice(0, 10)}</TableCell>
                   <TableCell><StatusPill status={l.lead_status} /></TableCell>
                   <TableCell className="text-right font-semibold">{INR(l.selling_amount)}</TableCell>
-                  <TableCell className="text-right" style={{ color: (l.profit || 0) >= 0 ? "#0F766E" : "#B91C1C" }}>
+                  <TableCell className={`text-right ${(l.profit || 0) >= 0 ? "text-[#0F766E] dark:text-emerald-400" : "text-[#B91C1C] dark:text-red-400"}`}>
                     {INR(l.profit)}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{l.staff_name}</TableCell>

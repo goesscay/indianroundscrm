@@ -7,6 +7,7 @@ import { useEffect, useState, useRef, type DragEvent, type HTMLAttributes } from
 import type { LucideIcon } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import FollowupCountdown from "@/components/app/FollowupCountdown";
@@ -20,11 +21,11 @@ const INR = (n: number | string | null | undefined) => "₹" + (Number(n) || 0).
 
 function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "primary" | "accent" | "amber" | "red" | "orange" }) {
   const tones: Record<string, string> = {
-    primary: "bg-[#EFEFEB] text-[#0A0A0A] border border-[#E0E0DA]",
-    accent: "bg-[#E5E5E5] text-[#0A0A0A]",
-    amber: "bg-amber-100 text-amber-900",
-    red: "bg-red-100 text-red-900",
-    orange: "bg-orange-100 text-orange-900",
+    primary: "bg-[#EFEFEB] text-[#0A0A0A] dark:text-foreground border border-[#E0E0DA] dark:bg-[#17171a] dark:text-foreground dark:border-[#26262a]",
+    accent: "bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100",
+    amber: "bg-amber-100 text-amber-900 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
+    red: "bg-red-100 text-red-900 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
+    orange: "bg-orange-100 text-orange-900 dark:bg-orange-950/60 dark:text-orange-300",
   };
   return (
     <div className={`p-3 rounded-md ${(tone && tones[tone]) || "bg-secondary"}`}>
@@ -46,8 +47,8 @@ interface KpiProps {
 function Kpi({ label, value, icon: Icon, tone = "default", testId, dragHandlers }: KpiProps) {
   const tones: Record<string, string> = {
     default: "bg-card",
-    primary: "bg-[#EFEFEB] text-[#0A0A0A] border border-[#E0E0DA]",
-    accent: "bg-[#E5E5E5] text-[#0A0A0A]",
+    primary: "bg-[#EFEFEB] text-[#0A0A0A] dark:text-foreground border border-[#E0E0DA] dark:bg-[#17171a] dark:text-foreground dark:border-[#26262a]",
+    accent: "bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100",
   };
   const isDark = false;
   return (
@@ -73,6 +74,13 @@ const DEFAULT_ORDER = ["total_leads", "today_leads", "booked", "quote_pending", 
 
 export default function Dashboard() {
   const { user, can } = useCurrentUser();
+  const { resolved } = useTheme();
+  const dk = resolved === "dark";
+  const chartGrid = dk ? "#26262a" : "#E2E8F0";
+  const chartAxis = dk ? "#9c9ca2" : "#666666";
+  const tipStyle = { backgroundColor: dk ? "#151517" : "#FFFFFF", border: `1px solid ${dk ? "#2a2a2e" : "#E5E5E5"}`, borderRadius: 4, color: dk ? "#ECECEC" : "#0A0A0A", fontSize: 12 };
+  const tipLabel = { color: dk ? "#ECECEC" : "#0A0A0A", fontWeight: 600 };
+  const tipItem = { color: dk ? "#D4D4D4" : "#262626" };
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [supSummary, setSupSummary] = useState<SupplierSummary | null>(null);
@@ -144,7 +152,9 @@ export default function Dashboard() {
   const onDragEnd = () => { dragIdx.current = null; };
 
   const statusChart = Object.entries(stats.status_counts || {}).map(([k, v]) => ({ name: k, value: v }));
-  const COLORS = ["#0A0A0A", "#525252", "#8A8A8A", "#BDBDBD", "#2E2E2E", "#6B6B6B", "#A3A3A3", "#D4D4D4"];
+  const COLORS = dk
+    ? ["#F2F2F2", "#B8B8BC", "#8A8A90", "#62626A", "#D6D6DA", "#9C9CA2", "#74747A", "#4A4A50"]
+    : ["#0A0A0A", "#525252", "#8A8A8A", "#BDBDBD", "#2E2E2E", "#6B6B6B", "#A3A3A3", "#D4D4D4"];
   const title = can("users.view") ? "Master Dashboard" : can("supplier_dashboard.view") ? "Operations Dashboard" : "My Dashboard";
 
   return (
@@ -160,7 +170,7 @@ export default function Dashboard() {
             <RotateCcw size={14} /> Reset layout
           </Button>
           {can("leads.create") && (
-            <Button onClick={() => router.push("/leads/new")} className="h-10 px-5" style={{ background: "#0A0A0A" }} data-testid="dashboard-new-lead">+ New Lead</Button>
+            <Button onClick={() => router.push("/leads/new")} className="h-10 px-5" data-testid="dashboard-new-lead">+ New Lead</Button>
           )}
         </div>
       </div>
@@ -219,7 +229,7 @@ export default function Dashboard() {
               const ten = digits.slice(-10);
               return (
                 <Link key={f.lead_id} href={`/leads/${f.lead_id}`}
-                      className={`p-3 rounded-md border transition-colors block ${f.overdue ? "border-red-300 bg-red-50" : "border-border hover:bg-secondary/40"}`}
+                      className={`p-3 rounded-md border transition-colors block ${f.overdue ? "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40" : "border-border hover:bg-secondary/40"}`}
                       data-testid={`followup-${f.lead_id}`}>
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-sm">{f.lead_id}</span>
@@ -233,12 +243,12 @@ export default function Dashboard() {
                       <span
                         role="button" tabIndex={0} aria-label="Call"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:+91${ten}`; }}
-                        className="text-[#0A0A0A] p-1 hover:bg-[#0A0A0A]/10 rounded cursor-pointer"
+                        className="text-[#0A0A0A] dark:text-foreground p-1 hover:bg-[#0A0A0A]/10 dark:hover:bg-white/10 rounded cursor-pointer"
                       ><Phone size={13} /></span>
                       <span
                         role="button" tabIndex={0} aria-label="WhatsApp"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`https://wa.me/91${ten}`, "_blank", "noopener,noreferrer"); }}
-                        className="text-emerald-600 p-1 hover:bg-emerald-100 rounded cursor-pointer"
+                        className="text-emerald-600 dark:text-emerald-400 p-1 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 rounded cursor-pointer"
                       ><MessageCircle size={13} /></span>
                     </div>
                   )}
@@ -256,14 +266,14 @@ export default function Dashboard() {
           <div className="h-64 mt-4">
             <ResponsiveContainer>
               <LineChart data={stats.monthly || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="month" fontSize={12} />
-                <YAxis fontSize={12} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="leads" stroke="#0A0A0A" strokeWidth={2} />
-                <Line type="monotone" dataKey="revenue" stroke="#8A8A8A" strokeWidth={2} />
-                <Line type="monotone" dataKey="profit" stroke="#8B5CF6" strokeWidth={2} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                <XAxis dataKey="month" fontSize={12} stroke={chartAxis} tick={{ fill: chartAxis }} />
+                <YAxis fontSize={12} stroke={chartAxis} tick={{ fill: chartAxis }} />
+                <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} itemStyle={tipItem} cursor={{ fill: dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }} />
+                <Legend wrapperStyle={{ color: chartAxis, fontSize: 12 }} />
+                <Line type="monotone" dataKey="leads" stroke={dk ? "#F2F2F2" : "#0A0A0A"} strokeWidth={2} />
+                <Line type="monotone" dataKey="revenue" stroke={dk ? "#7A7A82" : "#8A8A8A"} strokeWidth={2} />
+                <Line type="monotone" dataKey="profit" stroke={dk ? "#A78BFA" : "#8B5CF6"} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -275,10 +285,10 @@ export default function Dashboard() {
           <div className="h-64 mt-4">
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={statusChart} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80}>
+                <Pie data={statusChart} stroke={dk ? "#121214" : "#FFFFFF"} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80}>
                   {statusChart.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} itemStyle={tipItem} cursor={{ fill: dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -303,11 +313,11 @@ export default function Dashboard() {
           <div className="h-56 mt-4">
             <ResponsiveContainer>
               <BarChart data={stats.top_destinations || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="destination" fontSize={11} />
-                <YAxis fontSize={11} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#0A0A0A" radius={[6, 6, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                <XAxis dataKey="destination" fontSize={11} stroke={chartAxis} tick={{ fill: chartAxis }} />
+                <YAxis fontSize={11} stroke={chartAxis} tick={{ fill: chartAxis }} />
+                <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} itemStyle={tipItem} cursor={{ fill: dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }} />
+                <Bar dataKey="count" fill={dk ? "#E8E8EA" : "#0A0A0A"} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -322,7 +332,7 @@ export default function Dashboard() {
               {leaderboard.map((r, i) => (
                 <div key={r.staff_id} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-md flex items-center justify-center font-black text-sm ${i === 0 ? "bg-[#E5E5E5] text-[#0A0A0A]" : "bg-secondary"}`}>
+                    <div className={`w-8 h-8 rounded-md flex items-center justify-center font-black text-sm ${i === 0 ? "bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100" : "bg-secondary"}`}>
                       {i + 1}
                     </div>
                     <div>
@@ -348,11 +358,10 @@ export default function Dashboard() {
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
               {can("leads.create") && (
-                <Link href="/leads/new"><Button className="h-11" style={{ background: "#0A0A0A" }} data-testid="quick-new-lead">+ Create Lead</Button></Link>
+                <Link href="/leads/new"><Button className="h-11" data-testid="quick-new-lead">+ Create Lead</Button></Link>
               )}
               <Link href="/leads"><Button variant="outline" className="h-11" data-testid="quick-view-leads">View Leads</Button></Link>
               <Link href="/calendar"><Button variant="outline" className="h-11">Calendar</Button></Link>
-              <Link href="/ai"><Button variant="outline" className="h-11" data-testid="quick-ai">AI Assistant</Button></Link>
             </div>
           </Card>
         )}

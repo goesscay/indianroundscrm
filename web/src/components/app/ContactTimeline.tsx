@@ -3,6 +3,7 @@
 import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useTheme } from "@/context/ThemeContext";
 import { Card } from "@/components/ui/card";
 import type { ComponentType } from "react";
 import type { ContactEvent } from "@/types";
@@ -23,6 +24,7 @@ const LABELS: Record<string, string> = {
 
 export default function ContactTimeline({ leadId, refreshKey }: { leadId: string; refreshKey?: number }) {
   const [events, setEvents] = useState<ContactEvent[]>([]);
+  const dk = useTheme().resolved === "dark";
   const lm = useLoadMore(events, 10);
   useEffect(() => {
     (async () => {
@@ -34,7 +36,7 @@ export default function ContactTimeline({ leadId, refreshKey }: { leadId: string
   return (
     <Card className="p-6 rounded-lg lg:col-span-3" data-testid="contact-timeline">
       <div className="flex items-center gap-2 mb-4">
-        <Activity size={18} className="text-[#0A0A0A]" />
+        <Activity size={18} className="text-[#0A0A0A] dark:text-foreground" />
         <h3 className="font-display text-xl font-bold">Contact History</h3>
         <span className="label-caps ml-auto">{events.length} interaction{events.length !== 1 ? "s" : ""}</span>
       </div>
@@ -44,7 +46,7 @@ export default function ContactTimeline({ leadId, refreshKey }: { leadId: string
         <div className="space-y-3">
           {lm.visible.map((e) => {
             const Icon = ICONS[e.kind] || Activity;
-            const color = COLORS[e.kind] || "#64748B";
+            const color = e.kind === "call" && dk ? "#F2F2F2" : COLORS[e.kind] || "#64748B";
             const label = LABELS[e.kind] || e.kind;
             return (
               <div key={e.id} className="flex gap-3 items-start" data-testid={`timeline-${e.id}`}>

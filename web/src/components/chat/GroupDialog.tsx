@@ -133,9 +133,9 @@ export default function GroupDialog({ open, onOpenChange, group, meId, onSaved, 
         {chosen.length > 0 && (
           <div className="flex flex-wrap gap-1.5" data-testid="group-selected">
             {chosen.map((u) => (
-              <span key={u.id} className="inline-flex items-center gap-1 border border-border bg-neutral-50 pl-2 pr-1 py-0.5 text-xs rounded">
+              <span key={u.id} className="inline-flex items-center gap-1 border border-border bg-neutral-50 dark:bg-white/5 pl-2 pr-1 py-0.5 text-xs rounded">
                 {u.name}
-                <button type="button" onClick={() => toggle(u)} aria-label={`Remove ${u.name}`} className="p-0.5 hover:bg-neutral-200 rounded">
+                <button type="button" onClick={() => toggle(u)} aria-label={`Remove ${u.name}`} className="p-0.5 hover:bg-neutral-200 dark:hover:bg-white/15 rounded">
                   <X size={12} />
                 </button>
               </span>
@@ -150,7 +150,7 @@ export default function GroupDialog({ open, onOpenChange, group, meId, onSaved, 
         </div>
         <DialogFooter className="gap-2 sm:justify-between">
           {manage ? (
-            <Button type="button" variant="outline" onClick={remove} disabled={busy} data-testid="delete-group-btn" className="text-red-700 border-red-200 hover:bg-red-50">
+            <Button type="button" variant="outline" onClick={remove} disabled={busy} data-testid="delete-group-btn" className="text-red-700 dark:text-red-300 border-red-200 dark:border-red-900 hover: bg-red-50 dark:hover:bg-red-950/50">
               <Trash2 /> Delete group
             </Button>
           ) : (

@@ -82,7 +82,7 @@ class Permissions
                 'view' => ['View security log', 'See the security audit log and all active sessions.'],
             ]),
             $g('ai', 'AI assistant', [
-                'use' => ['Use AI tools', 'Generate itineraries and quote recommendations.'],
+                'use' => ['Use AI assistant', 'Open and use the AI assistant panel.'],
             ]),
             $g('chat', 'Team chat', [
                 'use' => ['Use team chat', 'Send and receive direct and group messages.'],

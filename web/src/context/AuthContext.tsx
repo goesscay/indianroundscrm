@@ -133,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
           data-testid="inactivity-modal"
         >
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-[92%] p-6 border border-border">
+          <div className="bg-card rounded-xl shadow-xl max-w-md w-[92%] p-6 border border-border">
             <div className="label-caps">Security</div>
             <h3 className="font-display text-2xl font-bold mt-1">Your session is about to expire</h3>
             <p className="text-sm text-muted-foreground mt-2">
@@ -150,8 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               <button
                 onClick={stayLoggedIn}
                 data-testid="idle-stay"
-                className="h-10 px-5 rounded-md text-white font-semibold text-sm"
-                style={{ background: "#0A0A0A" }}
+                className="h-10 px-5 rounded-md bg-primary text-primary-foreground font-semibold text-sm"
               >
                 Stay Logged In
               </button>

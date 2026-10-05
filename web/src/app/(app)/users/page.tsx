@@ -16,11 +16,11 @@ import type { DestinationAllocation, MasterItem, RoleDef, User, UserCreate } fro
 import { Trash2, KeyRound, Unlock as UnlockIcon, Shield, LogOut, UserPlus } from "lucide-react";
 
 const STATUS_STYLES: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-800",
-  inactive: "bg-gray-100 text-gray-700",
-  suspended: "bg-red-100 text-red-800",
-  locked: "bg-amber-100 text-amber-800",
-  password_reset_required: "bg-amber-100 text-amber-800",
+  active: "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+  inactive: "bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-neutral-300",
+  suspended: "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
+  locked: "bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
+  password_reset_required: "bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
 };
 
 export default function Users() {
@@ -227,7 +227,7 @@ export default function Users() {
                         </Button>
                         {status === "locked" && (
                           <Button size="sm" variant="ghost" onClick={() => unlock(u)} title="Unlock account" data-testid={`u-unlock-${u.id}`}>
-                            <UnlockIcon size={14} className="text-amber-600" />
+                            <UnlockIcon size={14} className="text-amber-600 dark:text-amber-400" />
                           </Button>
                         )}
                         {!isSelf && (
@@ -277,7 +277,7 @@ export default function Users() {
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" style={{ background: "#0A0A0A" }} data-testid="a-save">Set allocation</Button>
+          <Button type="submit" data-testid="a-save">Set allocation</Button>
         </form>
         <div className="flex flex-wrap gap-2">
           {allocations.length === 0 && <div className="text-sm text-muted-foreground">No allocations yet.</div>}
@@ -286,7 +286,7 @@ export default function Users() {
               <span className="font-semibold text-sm">{a.destination}</span>
               <span className="text-muted-foreground">→</span>
               <span className="font-medium text-sm">{a.consultant_name}</span>
-              <span className="font-mono font-bold text-[#0A0A0A] text-xs">{a.consultant_code}</span>
+              <span className="font-mono font-bold text-[#0A0A0A] dark:text-foreground text-xs">{a.consultant_code}</span>
               <button onClick={() => removeAllocation(a.id)} className="text-muted-foreground hover:text-destructive ml-1"><Trash2 size={12} /></button>
             </span>
           ))}

@@ -72,20 +72,20 @@ export default function ResetPassword() {
           )}
           {status === "invalid" && (
             <div className="text-center py-4" data-testid="rp-invalid">
-              <div className="w-12 h-12 rounded bg-red-100 mx-auto flex items-center justify-center">
-                <ShieldAlert className="text-red-600" size={28} />
+              <div className="w-12 h-12 rounded bg-red-100 mx-auto dark:bg-red-950/60 flex items-center justify-center">
+                <ShieldAlert className="text-red-600 dark:text-red-400" size={28} />
               </div>
               <h2 className="font-display text-2xl mt-4">Link not valid</h2>
               <p className="text-sm text-muted-foreground mt-2">{errMsg || "This reset link is invalid, used, or expired."}</p>
-              <Button asChild className="mt-6 w-full" style={{ background: "#0A0A0A" }}>
+              <Button asChild className="mt-6 w-full">
                 <Link href="/forgot-password">Request a new link</Link>
               </Button>
             </div>
           )}
           {status === "success" && (
             <div className="text-center py-4" data-testid="rp-success">
-              <div className="w-12 h-12 rounded bg-emerald-100 mx-auto flex items-center justify-center">
-                <ShieldCheck className="text-emerald-600" size={28} />
+              <div className="w-12 h-12 rounded bg-emerald-100 mx-auto dark:bg-emerald-950/60 flex items-center justify-center">
+                <ShieldCheck className="text-emerald-600 dark:text-emerald-400" size={28} />
               </div>
               <h2 className="font-display text-2xl mt-4">Password reset</h2>
               <p className="text-sm text-muted-foreground mt-2">Redirecting to sign in…</p>
@@ -115,7 +115,7 @@ export default function ResetPassword() {
                   {rules.map(r => {
                     const pass = r.test(pw);
                     return (
-                      <div key={r.key} className={`flex items-center gap-1.5 ${pass ? "text-emerald-700" : "text-muted-foreground"}`}
+                      <div key={r.key} className={`flex items-center gap-1.5 ${pass ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}
                            data-testid={`rp-rule-${r.key}-${pass ? "pass" : "fail"}`}>
                         {pass ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                         {r.label}
@@ -125,7 +125,7 @@ export default function ResetPassword() {
                 </div>
               </div>
               <Button type="submit" disabled={busy || !allPass || !match}
-                      style={{ background: "#0A0A0A" }} className="w-full h-10 text-sm font-semibold"
+                      className="w-full h-10 text-sm font-semibold"
                       data-testid="rp-submit">
                 {busy ? "Saving…" : "Set new password →"}
               </Button>

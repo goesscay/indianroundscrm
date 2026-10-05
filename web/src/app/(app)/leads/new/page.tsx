@@ -322,18 +322,18 @@ export default function LeadForm() {
             <F label="Departure From"><SelectMaster options={master.departure_city} value={f.departure_from} onChange={set("departure_from")} placeholder="City" testId="f-departure" /></F>
           </div>
           {duplicates.length > 0 && (
-            <div className="mt-4 p-4 rounded-md border border-amber-300 bg-amber-50" data-testid="duplicate-warning">
-              <div className="flex items-center gap-2 text-amber-900 font-semibold text-sm">
+            <div className="mt-4 p-4 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40" data-testid="duplicate-warning">
+              <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-semibold text-sm">
                 <AlertTriangle size={16} /> Possible duplicate — {duplicates.length} existing lead(s) match this phone/email
               </div>
               <div className="mt-2 space-y-1">
                 {duplicates.slice(0, 3).map((d) => (
-                  <div key={d.lead_id} className="text-xs text-amber-900 font-mono">
+                  <div key={d.lead_id} className="text-xs text-amber-900 dark:text-amber-300 font-mono">
                     <span className="font-bold">{d.lead_id}</span> · {d.customer_name} · {d.destination} · {d.lead_status} · by {d.staff_name}
                   </div>
                 ))}
               </div>
-              <div className="text-[11px] text-amber-800 mt-2">You can still submit — this is just a warning.</div>
+              <div className="text-[11px] text-amber-800 dark:text-amber-300 mt-2">You can still submit — this is just a warning.</div>
             </div>
           )}
           {dupBusy && <div className="text-xs text-muted-foreground mt-2">Checking for duplicates…</div>}
@@ -402,7 +402,7 @@ export default function LeadForm() {
                   const sel = f.stay_cities.find(sc => sc.city === city);
                   return (
                     <label key={city}
-                           className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${sel ? "border-[#0A0A0A] bg-[#0A0A0A]/5" : "border-border hover:bg-secondary/40"}`}
+                           className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${sel ? "border-[#0A0A0A] dark:border-white/70 bg-[#0A0A0A]/5 dark:bg-white/5" : "border-border hover:bg-secondary/40"}`}
                            data-testid={`f-city-${city}`}>
                       <Checkbox checked={!!sel} onCheckedChange={(v) => toggleCity(city, !!v)} />
                       <span className="flex-1 text-sm font-medium">{city}</span>
@@ -440,7 +440,7 @@ export default function LeadForm() {
             {f.stay_cities.filter(sc => !availableCities.includes(sc.city)).length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3" data-testid="f-custom-city-chips">
                 {f.stay_cities.filter(sc => !availableCities.includes(sc.city)).map(sc => (
-                  <span key={sc.city} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#0A0A0A]/10 text-sm border border-[#0A0A0A]/30">
+                  <span key={sc.city} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#0A0A0A]/10 dark:bg-white/10 text-sm border border-[#0A0A0A]/30 dark:border-white/30">
                     <span className="font-medium">{sc.city}</span>
                     <Input type="number" min="1" max="30" value={sc.nights || ""}
                            onChange={(e) => setCityNights(sc.city, e.target.value)}
@@ -452,7 +452,7 @@ export default function LeadForm() {
             )}
 
             {nightsMismatch && (
-              <div className="mt-4 p-3 rounded-md border border-amber-300 bg-amber-50 text-xs text-amber-900" data-testid="stay-mismatch-warning">
+              <div className="mt-4 p-3 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40 text-xs text-amber-900 dark:text-amber-300" data-testid="stay-mismatch-warning">
                 <AlertTriangle size={12} className="inline -mt-0.5 mr-1" />
                 Stay nights ({totalStayNights}N) do not match the selected trip duration ({nights}N).
                 Please check the details. You can still save — this is a warning only.
@@ -508,12 +508,12 @@ export default function LeadForm() {
           <p className="text-xs text-muted-foreground mb-4">Required for international travel processing.</p>
           <div className="flex gap-3 flex-wrap">
             <button type="button" onClick={() => setPassport(true)}
-                    className={`px-6 h-11 rounded-md border font-semibold text-sm transition-colors ${f.passport_available === true ? "bg-emerald-500 text-white border-emerald-500" : "bg-white border-border hover:bg-secondary"}`}
+                    className={`px-6 h-11 rounded-md border font-semibold text-sm transition-colors ${f.passport_available === true ? "bg-emerald-500 text-white border-emerald-500" : "bg-card border-border hover:bg-secondary"}`}
                     data-testid="f-passport-yes">
               YES
             </button>
             <button type="button" onClick={() => setPassport(false)}
-                    className={`px-6 h-11 rounded-md border font-semibold text-sm transition-colors ${f.passport_available === false ? "bg-red-500 text-white border-red-500" : "bg-white border-border hover:bg-secondary"}`}
+                    className={`px-6 h-11 rounded-md border font-semibold text-sm transition-colors ${f.passport_available === false ? "bg-red-500 text-white border-red-500" : "bg-card border-border hover:bg-secondary"}`}
                     data-testid="f-passport-no">
               NO
             </button>
@@ -554,7 +554,7 @@ export default function LeadForm() {
 
         <div className="flex justify-end gap-3 pb-24">
           <Button type="button" variant="outline" onClick={() => { setF(EMPTY); setAgeErrors({}); }} data-testid="reset-btn">Reset</Button>
-          <Button type="submit" disabled={busy || !!validPhone(f.phone)} className="px-8" style={{ background: "#0A0A0A" }} data-testid="submit-lead">
+          <Button type="submit" disabled={busy || !!validPhone(f.phone)} className="px-8" data-testid="submit-lead">
             {busy ? "Saving…" : "Create Lead →"}
           </Button>
         </div>
@@ -563,7 +563,7 @@ export default function LeadForm() {
       <Dialog open={!!blockDialog} onOpenChange={(o) => !o && setBlockDialog(null)}>
         <DialogContent data-testid="dup-block-dialog">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-700">
+            <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
               <AlertTriangle size={18} /> Lead already exists
             </DialogTitle>
           </DialogHeader>
@@ -581,7 +581,7 @@ export default function LeadForm() {
             <Button variant="outline" onClick={() => setBlockDialog(null)}>Cancel</Button>
             <Button onClick={() => { const lid = blockDialog?.existing?.lead_id; setBlockDialog(null); if (lid) router.push(`/leads/${lid}`); }} data-testid="open-existing-lead">Open Existing</Button>
             {can("users.manage") && (
-              <Button style={{ background: "#0A0A0A" }} onClick={() => { setBlockDialog(null); submit(null, true); }} data-testid="force-create-lead">
+              <Button onClick={() => { setBlockDialog(null); submit(null, true); }} data-testid="force-create-lead">
                 Create anyway (Admin)
               </Button>
             )}

@@ -14,20 +14,20 @@ import type { SecurityLogEntry } from "@/types";
 import { Shield, Search, RefreshCw, Download } from "lucide-react";
 
 const EVENT_STYLES: Record<string, string> = {
-  login_success: "bg-emerald-100 text-emerald-800",
-  login_google: "bg-emerald-100 text-emerald-800",
-  login_failed: "bg-amber-100 text-amber-800",
-  login_locked: "bg-red-100 text-red-800",
-  login_blocked_locked: "bg-red-100 text-red-800",
-  logout: "bg-gray-100 text-gray-800",
-  password_changed: "bg-blue-100 text-blue-800",
-  password_reset_requested: "bg-blue-100 text-blue-800",
-  password_reset_completed: "bg-blue-100 text-blue-800",
-  admin_force_reset: "bg-purple-100 text-purple-800",
-  admin_status_change: "bg-purple-100 text-purple-800",
-  admin_session_terminated: "bg-purple-100 text-purple-800",
-  admin_unlock: "bg-purple-100 text-purple-800",
-  session_revoked: "bg-gray-100 text-gray-800",
+  login_success: "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+  login_google: "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+  login_failed: "bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
+  login_locked: "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
+  login_blocked_locked: "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
+  logout: "bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-neutral-300",
+  password_changed: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+  password_reset_requested: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+  password_reset_completed: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+  admin_force_reset: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+  admin_status_change: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+  admin_session_terminated: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+  admin_unlock: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+  session_revoked: "bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-neutral-300",
 };
 
 const EVENT_OPTIONS = [
@@ -109,7 +109,7 @@ function SecurityLog() {
                    placeholder="sales@indianrounds.com" data-testid="sl-user" />
           </div>
           <div className="flex items-end">
-            <Button onClick={load} disabled={busy} className="w-full h-10" style={{ background: "#0A0A0A" }} data-testid="sl-filter">
+            <Button onClick={load} disabled={busy} className="w-full h-10" data-testid="sl-filter">
               <Search size={14} /> Filter
             </Button>
           </div>
@@ -141,7 +141,7 @@ function SecurityLog() {
                     <div className="text-xs text-muted-foreground">{r.user_email}</div>
                   </TableCell>
                   <TableCell>
-                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${EVENT_STYLES[r.event] || "bg-gray-100"}`}>
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${EVENT_STYLES[r.event] || "bg-gray-100 dark:bg-neutral-800"}`}>
                       {r.event}
                     </span>
                   </TableCell>

@@ -27,7 +27,7 @@ export default function UserPicker({ users, selected = [], onToggle, multi = fal
   return (
     <div data-testid={testId}>
       <div className="relative mb-2">
-        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-400" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people" aria-label="Search people" className="pl-8" data-testid={`${testId}-search`} />
       </div>
       <div className="max-h-64 overflow-y-auto border border-border divide-y divide-border rounded">
@@ -42,14 +42,14 @@ export default function UserPicker({ users, selected = [], onToggle, multi = fal
               onClick={() => onToggle(u)}
               aria-pressed={multi ? on : undefined}
               data-testid={`${testId}-user-${u.id}`}
-              className={cn("w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-neutral-50", on && "bg-neutral-50")}
+              className={cn("w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-neutral-50 dark:hover:bg-white/5", on && "bg-neutral-50 dark:bg-white/5")}
             >
-              <span className="w-8 h-8 shrink-0 rounded bg-neutral-900 text-white text-[11px] font-bold flex items-center justify-center">{initials(u.name)}</span>
+              <span className="w-8 h-8 shrink-0 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-[11px] font-bold flex items-center justify-center">{initials(u.name)}</span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-neutral-900 truncate">{u.name}</span>
-                <span className="block text-[10px] uppercase tracking-widest text-neutral-400">{u.role}</span>
+                <span className="block text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{u.name}</span>
+                <span className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-400">{u.role}</span>
               </span>
-              {multi && on && <Check size={16} className="text-neutral-900" />}
+              {multi && on && <Check size={16} className="text-neutral-900 dark:text-neutral-100" />}
             </button>
           );
         })}

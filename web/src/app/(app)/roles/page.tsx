@@ -22,10 +22,10 @@ const BADGE = "inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] fon
 function RoleBadges({ role }: { role: RoleDef }) {
   return (
     <span className="inline-flex flex-wrap gap-1">
-      <span className={cn(BADGE, role.is_system ? "bg-neutral-100 text-neutral-600" : "bg-neutral-900 text-white")}>
+      <span className={cn(BADGE, role.is_system ? "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400" : "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900")}>
         {role.is_system ? "System" : "Custom"}
       </span>
-      {role.all_permissions && <span className={cn(BADGE, "bg-emerald-50 text-emerald-700")}>Full access</span>}
+      {role.all_permissions && <span className={cn(BADGE, "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300")}>Full access</span>}
     </span>
   );
 }
@@ -232,7 +232,7 @@ export default function RolesPage() {
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Roles & Permissions</h1>
           <p className="text-sm text-muted-foreground mt-2">Control what each role can see and do. Changes apply to every user with the role.</p>
         </div>
-        <Button onClick={openNew} style={{ background: "#0A0A0A" }} data-testid="role-new">
+        <Button onClick={openNew} data-testid="role-new">
           <Plus size={16} /> New role
         </Button>
       </div>
@@ -250,8 +250,8 @@ export default function RolesPage() {
                   onClick={() => selectRole(r.id)}
                   data-testid={`role-item-${r.slug}`}
                   className={cn(
-                    "w-full text-left px-4 py-3 transition-colors hover:bg-neutral-50",
-                    r.id === selectedId && "bg-neutral-100 shadow-[inset_3px_0_0_#0A0A0A]"
+                    "w-full text-left px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-white/5",
+                    r.id === selectedId && "bg-neutral-100 dark:bg-white/10 shadow-[inset_3px_0_0_#0A0A0A] dark:shadow-[inset_3px_0_0_#ECECEC]"
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -338,11 +338,11 @@ export default function RolesPage() {
               </Card>
 
               {fullAccess && (
-                <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4" data-testid="role-full-access">
-                  <ShieldCheck size={18} className="text-emerald-700 mt-0.5 shrink-0" />
-                  <div className="text-sm text-emerald-900">
+                <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/40 p-4" data-testid="role-full-access">
+                  <ShieldCheck size={18} className="text-emerald-700 dark:text-emerald-300 mt-0.5 shrink-0" />
+                  <div className="text-sm text-emerald-900 dark:text-emerald-300">
                     <div className="font-semibold">Full access</div>
-                    <div className="text-emerald-800">This role always has every permission, including any added in future. It cannot be edited.</div>
+                    <div className="text-emerald-800 dark:text-emerald-300">This role always has every permission, including any added in future. It cannot be edited.</div>
                   </div>
                 </div>
               )}
@@ -390,7 +390,7 @@ export default function RolesPage() {
                         <ul>
                           {g.items.map((i) => (
                             <li key={i.key}>
-                              <label className={cn("flex items-start gap-3 px-4 py-2.5 hover:bg-neutral-50", fullAccess ? "cursor-default" : "cursor-pointer")}>
+                              <label className={cn("flex items-start gap-3 px-4 py-2.5 hover:bg-neutral-50 dark:hover:bg-white/5", fullAccess ? "cursor-default" : "cursor-pointer")}>
                                 <Checkbox
                                   className="mt-0.5"
                                   checked={fullAccess || perms.has(i.key)}
@@ -401,7 +401,7 @@ export default function RolesPage() {
                                 <span className="min-w-0">
                                   <span className="block text-sm font-medium">{i.label}</span>
                                   {i.description && <span className="block text-xs text-muted-foreground">{i.description}</span>}
-                                  <span className="block text-[10px] font-mono text-neutral-400 mt-0.5">{i.key}</span>
+                                  <span className="block text-[10px] font-mono text-neutral-400 dark:text-neutral-400 mt-0.5">{i.key}</span>
                                 </span>
                               </label>
                             </li>
@@ -418,7 +418,7 @@ export default function RolesPage() {
                   <h3 className="font-display text-lg font-bold">
                     Users with this role <span className="text-muted-foreground font-normal text-sm">({roleUsers.length})</span>
                   </h3>
-                  <Link href="/users" className="text-sm font-medium underline underline-offset-2 hover:text-neutral-600" data-testid="role-users-link">
+                  <Link href="/users" className="text-sm font-medium underline underline-offset-2 hover:text-neutral-600 dark:hover:text-neutral-300" data-testid="role-users-link">
                     Manage users
                   </Link>
                 </div>
@@ -432,7 +432,7 @@ export default function RolesPage() {
                           <span className="font-medium">{u.name || u.email}</span>
                           <span className="text-muted-foreground text-xs ml-2 break-all">{u.email}</span>
                         </span>
-                        {u.active === false && <span className={cn(BADGE, "bg-neutral-100 text-neutral-500")}>Inactive</span>}
+                        {u.active === false && <span className={cn(BADGE, "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400")}>Inactive</span>}
                       </li>
                     ))}
                   </ul>
@@ -442,7 +442,7 @@ export default function RolesPage() {
 
               {dirty && (
                 <div className="sticky bottom-3 z-20" data-testid="role-unsaved-bar">
-                  <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg bg-neutral-900 text-white px-4 py-3 shadow-lg">
+                  <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg bg-neutral-900 text-white dark:bg-neutral-800 dark:border dark:border-neutral-700 px-4 py-3 shadow-lg">
                     <span className="text-sm">You have unsaved changes</span>
                     <span className="flex gap-2">
                       <Button
@@ -505,7 +505,7 @@ export default function RolesPage() {
               <Button type="button" variant="outline" onClick={() => setNewOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" style={{ background: "#0A0A0A" }} disabled={creating || !newName.trim()} data-testid="role-new-submit">
+              <Button type="submit" disabled={creating || !newName.trim()} data-testid="role-new-submit">
                 {creating ? "Creating…" : "Create role"}
               </Button>
             </DialogFooter>
@@ -521,7 +521,7 @@ export default function RolesPage() {
             <DialogDescription>This cannot be undone. Roles with assigned users cannot be deleted.</DialogDescription>
           </DialogHeader>
           {delError && (
-            <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" data-testid="role-delete-error">
+            <div className="rounded border border-red-200 dark:border-red-900 bg-red-50 dark:border-red-900 dark:bg-red-950/40 px-3 py-2 text-sm text-red-800 dark:text-red-300" data-testid="role-delete-error">
               {delError}
             </div>
           )}

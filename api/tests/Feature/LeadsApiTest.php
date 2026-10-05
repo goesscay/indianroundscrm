@@ -236,12 +236,6 @@ class LeadsApiTest extends TestCase
         $this->assertSame(50, (int) $lb[0]['conversion_rate']);
         $this->assertNotEmpty($this->getJson('/api/activity?action=create_lead')->assertOk()->json());
         $this->getJson('/api/activity/facets')->assertOk()->assertJsonStructure(['actions', 'entities', 'users']);
-
-        // AI: 503 without a key
-        putenv('ANTHROPIC_API_KEY=');
-        $_ENV['ANTHROPIC_API_KEY'] = '';
-        $this->postJson('/api/ai/itinerary', ['destination' => 'Bali'])->assertStatus(503)->assertJsonStructure(['detail']);
-        $this->postJson('/api/ai/quote-recommend', ['destination' => 'Bali'])->assertStatus(503);
     }
 
     public function test_requires_authentication(): void

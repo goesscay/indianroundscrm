@@ -20,7 +20,7 @@ import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { Lead, LeadUpdate, Supplier, SupplierMailHistory, SupplierMailPreview, SupplierMailSendResult, User } from "@/types";
-import { Mail, MessageCircle, Sparkles, ArrowLeft, Phone, Copy, MessageSquare, UserCog } from "lucide-react";
+import { Mail, MessageCircle, ArrowLeft, Phone, Copy, MessageSquare, UserCog } from "lucide-react";
 
 const INR = (n: number | string | null | undefined) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
 
@@ -43,9 +43,6 @@ export default function LeadDetail() {
   const [consultants, setConsultants] = useState<User[]>([]);
   const [assignTo, setAssignTo] = useState("");
   const [reassignReason, setReassignReason] = useState("");
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiContent, setAiContent] = useState("");
-  const [aiBusy, setAiBusy] = useState(false);
   const [nrsqOpen, setNrsqOpen] = useState(false);
   const [nrsqForm, setNrsqForm] = useState<{ package_selected: string; selling_amount: string | number }>({ package_selected: "", selling_amount: "" });
 
@@ -155,23 +152,6 @@ export default function LeadDetail() {
     } catch (e) { toast.error(formatApiError(e)); }
   };
 
-  const runAI = async (type: string) => {
-    setAiBusy(true); setAiContent(""); setAiOpen(true);
-    try {
-      const endpoint = type === "itinerary" ? "/ai/itinerary" : "/ai/quote-recommend";
-      const payload = {
-        destination: lead.destination,
-        days: 5, budget: lead.budget, package_type: lead.package_type || "Family",
-        adults: lead.adults, children: lead.children,
-        hotel_category: lead.hotel_category || "4 Star",
-        meal_plan: lead.meal_plan || "AP",
-      };
-      const { data } = await api.post<{ content: string }>(endpoint, payload);
-      setAiContent(data.content);
-    } catch (e) { setAiContent("Error: " + formatApiError(e)); }
-    finally { setAiBusy(false); }
-  };
-
   const canReassign = can("leads.reassign");
 
   const openReassign = async () => {
@@ -225,10 +205,10 @@ export default function LeadDetail() {
           <div className="flex gap-2 flex-wrap">
             {canQuote && !lead.quote_type && (
               <>
-                <Button onClick={() => setNrsqOpen(true)} className="h-11" style={{ background: "#E5E5E5", color: "#0A0A0A" }} data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
+                <Button onClick={() => setNrsqOpen(true)} className="h-11 bg-[#E5E5E5] text-[#0A0A0A] hover:bg-[#E5E5E5] dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700" data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
                   ⚡ NRSQ
                 </Button>
-                <Button onClick={canOps ? openMail : createRsqRequest} className="h-11" style={{ background: "#0A0A0A" }} data-testid="rsq-btn" title={canOps ? "Compose supplier email now" : "Request Ops team to fetch supplier quotes"}>
+                <Button onClick={canOps ? openMail : createRsqRequest} className="h-11" data-testid="rsq-btn" title={canOps ? "Compose supplier email now" : "Request Ops team to fetch supplier quotes"}>
                   <Mail size={16} /> RSQ
                 </Button>
               </>
@@ -239,17 +219,17 @@ export default function LeadDetail() {
               </Button>
             )}
             {canOps && lead.quote_type === "rsq" && (
-              <Button onClick={openMail} className="h-11" style={{ background: "#0A0A0A" }} data-testid="send-mail-btn">
+              <Button onClick={openMail} className="h-11" data-testid="send-mail-btn">
                 <Mail size={16} /> Supplier Mail
               </Button>
             )}
             {!canOps && lead.quote_type === "rsq" && lead.rsq_status === "new" && (
-              <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold" data-testid="rsq-waiting-ops">
+              <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs font-semibold" data-testid="rsq-waiting-ops">
                 <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> Awaiting Ops to send mail
               </span>
             )}
             {lead.rsq_status === "pending_reply" && (
-              <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-red-300 bg-red-50 text-red-800 text-xs font-semibold" data-testid="rsq-pending-reply">
+              <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40 text-red-800 dark:text-red-300 text-xs font-semibold" data-testid="rsq-pending-reply">
                 <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" /> Awaiting supplier reply
               </span>
             )}
@@ -258,12 +238,6 @@ export default function LeadDetail() {
                 <MessageCircle size={16} /> WhatsApp
               </Button>
             </a>
-            <Button variant="outline" className="h-11" onClick={() => runAI("itinerary")} data-testid="ai-itinerary-btn">
-              <Sparkles size={16} /> AI Itinerary
-            </Button>
-            <Button variant="outline" className="h-11" onClick={() => runAI("quote")} data-testid="ai-quote-btn">
-              <Sparkles size={16} /> AI Quote
-            </Button>
           </div>
       </div>
 
@@ -374,8 +348,7 @@ export default function LeadDetail() {
             </div>
             <div>
               <Label className="label-caps">Profit</Label>
-              <div className="mt-1.5 h-10 flex items-center px-3 border border-border rounded-md font-semibold"
-                   style={{ color: (lead.profit || 0) >= 0 ? "#0F766E" : "#B91C1C" }}
+              <div className={`mt-1.5 h-10 flex items-center px-3 border border-border rounded-md font-semibold ${(lead.profit || 0) >= 0 ? "text-[#0F766E] dark:text-emerald-400" : "text-[#B91C1C] dark:text-red-400"}`}
                    data-testid="profit-display">
                 {INR(lead.profit)}
               </div>
@@ -411,7 +384,7 @@ export default function LeadDetail() {
           <h3 className="font-display text-xl font-bold mb-4">Supplier mail history</h3>          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}
           <div className="space-y-3">
             {historyLm.visible.map((h) => (
-              <div key={h.id} className="border-l-2 border-[#0A0A0A] pl-3 py-1">
+              <div key={h.id} className="border-l-2 border-[#0A0A0A] dark:border-white/70 pl-3 py-1">
                 <div className="text-sm font-semibold">{h.subject}</div>
                 <div className="label-caps mt-0.5">{(h.sent_at || "").slice(0, 16).replace("T", " ")}</div>
                 <div className="text-xs text-muted-foreground mt-1">
@@ -419,9 +392,9 @@ export default function LeadDetail() {
                 </div>
                 <div className="text-[10px] mt-1">
                   <span className={`px-1.5 py-0.5 rounded font-semibold ${
-                    h.status === "sent" ? "bg-emerald-100 text-emerald-800" :
-                    h.status === "failed" ? "bg-red-100 text-red-800" :
-                    "bg-amber-100 text-amber-800"
+                    h.status === "sent" ? "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300" :
+                    h.status === "failed" ? "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300" :
+                    "bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300"
                   }`}>
                     {h.status === "sent" ? `SENT via ${h.provider || "resend"}` :
                      h.status === "failed" ? "FAILED" : "SIMULATED"}
@@ -446,10 +419,10 @@ export default function LeadDetail() {
               For pre-packaged trips with fixed pricing, use <b>NRSQ</b>. For customized itineraries or live supplier pricing, use <b>RSQ</b>.
             </p>
             <div className="flex justify-center gap-3 mt-4 flex-wrap">
-              <Button onClick={() => setNrsqOpen(true)} className="h-11 px-6" style={{ background: "#E5E5E5", color: "#0A0A0A" }} data-testid="nrsq-cta">
+              <Button onClick={() => setNrsqOpen(true)} className="h-11 px-6 bg-[#E5E5E5] text-[#0A0A0A] hover:bg-[#E5E5E5] dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700" data-testid="nrsq-cta">
                 ⚡ NRSQ — Instant Quote
               </Button>
-              <Button onClick={canOps ? openMail : createRsqRequest} className="h-11 px-6" style={{ background: "#0A0A0A" }} data-testid="rsq-cta">
+              <Button onClick={canOps ? openMail : createRsqRequest} className="h-11 px-6" data-testid="rsq-cta">
                 <Mail size={16} /> {canOps ? "RSQ — Compose Supplier Mail" : "RSQ — Request Ops Team"}
               </Button>
             </div>
@@ -462,7 +435,7 @@ export default function LeadDetail() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <div className="label-caps flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-[#E5E5E5] text-[#0A0A0A] rounded font-bold">NRSQ</span>
+                <span className="px-2 py-0.5 bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100 rounded font-bold">NRSQ</span>
                 No Requirement Supplier Quotation
               </div>
               <h3 className="font-display text-xl font-bold mt-1">
@@ -489,7 +462,7 @@ export default function LeadDetail() {
         <DialogContent data-testid="nrsq-dialog">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <span className="px-2 py-0.5 bg-[#E5E5E5] text-[#0A0A0A] rounded text-xs font-bold">NRSQ</span>
+              <span className="px-2 py-0.5 bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100 rounded text-xs font-bold">NRSQ</span>
               Generate Instant Quote
             </DialogTitle>
           </DialogHeader>
@@ -515,7 +488,7 @@ export default function LeadDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNrsqOpen(false)}>Cancel</Button>
-            <Button onClick={saveNrsq} style={{ background: "#E5E5E5", color: "#0A0A0A" }} data-testid="nrsq-save">
+            <Button onClick={saveNrsq} className="bg-[#E5E5E5] text-[#0A0A0A] hover:bg-[#E5E5E5] dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700" data-testid="nrsq-save">
               Generate Quote & Send
             </Button>
           </DialogFooter>
@@ -549,7 +522,7 @@ export default function LeadDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReassignOpen(false)}>Cancel</Button>
-            <Button onClick={doReassign} style={{ background: "#0A0A0A" }} data-testid="reassign-save">Reassign</Button>
+            <Button onClick={doReassign} data-testid="reassign-save">Reassign</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -607,19 +580,8 @@ export default function LeadDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMailOpen(false)}>Cancel</Button>
-            <Button onClick={send} style={{ background: "#0A0A0A" }} data-testid="mail-send">Send Enquiry</Button>
+            <Button onClick={send} data-testid="mail-send">Send Enquiry</Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* AI Dialog */}
-      <Dialog open={aiOpen} onOpenChange={setAiOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="ai-dialog">
-          <DialogHeader><DialogTitle>AI Assistant</DialogTitle></DialogHeader>
-          {aiBusy && <div className="text-sm text-muted-foreground">Thinking with Claude Sonnet 4.5…</div>}
-          {!aiBusy && aiContent && (
-            <div className="whitespace-pre-wrap text-sm leading-relaxed">{aiContent}</div>
-          )}
         </DialogContent>
       </Dialog>
     </div>

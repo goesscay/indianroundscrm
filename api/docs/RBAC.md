@@ -52,7 +52,7 @@ Roles and permissions are admin-managed and data-driven.
 | GET /dashboard/leaderboard | dashboard.leaderboard |
 | GET /activity, /activity/facets | activity.view |
 | RSQ/supplier alerts in /notifications | rsq.manage |
-| POST /ai/* | ai.use |
+| (none yet) | ai.use is reserved for the upcoming AI assistant panel; no route requires it currently |
 | /chat/* | chat.use |
 | /chat/groups (create/rename/delete), moderating group messages | chat.create_groups |
 | leads.export | reserved (no export endpoint exists yet) |

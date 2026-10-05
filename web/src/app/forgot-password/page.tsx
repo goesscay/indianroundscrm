@@ -47,15 +47,15 @@ export default function ForgotPassword() {
                          placeholder="you@indianrounds.com" className="mt-1.5 h-10" data-testid="fp-email" autoFocus />
                 </div>
                 <Button type="submit" disabled={busy} className="w-full h-10 text-sm font-semibold"
-                        style={{ background: "#0A0A0A" }} data-testid="fp-submit">
+                        data-testid="fp-submit">
                   {busy ? "Sending…" : "Send reset link →"}
                 </Button>
               </form>
             </>
           ) : (
             <div className="text-center py-4" data-testid="fp-success">
-              <div className="w-12 h-12 rounded bg-emerald-100 mx-auto flex items-center justify-center">
-                <CheckCircle2 className="text-emerald-600" size={28} />
+              <div className="w-12 h-12 rounded bg-emerald-100 mx-auto dark:bg-emerald-950/60 flex items-center justify-center">
+                <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={28} />
               </div>
               <h2 className="font-display text-2xl mt-4">Check your email</h2>
               <p className="text-sm text-muted-foreground mt-2">

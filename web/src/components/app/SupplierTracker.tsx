@@ -19,16 +19,16 @@ const SUPPLIER_STATUSES = [
   "Quote Rejected","Quote Accepted","Supplier Declined","No Response","Booking Confirmed",
 ];
 const STATUS_COLOR: Record<string, string> = {
-  "Email Not Sent":     "bg-slate-200 text-slate-700",
-  "Email Sent":         "bg-blue-100 text-blue-800",
-  "Awaiting Reply":     "bg-amber-100 text-amber-800",
-  "Follow-up Required": "bg-orange-100 text-orange-800",
-  "Quote Received":     "bg-emerald-100 text-emerald-800",
-  "Quote Rejected":     "bg-red-100 text-red-800",
-  "Quote Accepted":     "bg-[#E5E5E5] text-[#0A0A0A]",
-  "Supplier Declined":  "bg-rose-100 text-rose-800",
-  "No Response":        "bg-slate-300 text-slate-800",
-  "Booking Confirmed":  "bg-[#0A0A0A] text-white",
+  "Email Not Sent":     "bg-slate-200 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300",
+  "Email Sent":         "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+  "Awaiting Reply":     "bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
+  "Follow-up Required": "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
+  "Quote Received":     "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+  "Quote Rejected":     "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
+  "Quote Accepted":     "bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100",
+  "Supplier Declined":  "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+  "No Response":        "bg-slate-300 text-slate-800 dark:bg-neutral-700 dark:text-neutral-200",
+  "Booking Confirmed":  "bg-[#0A0A0A] text-white dark:bg-white dark:text-neutral-900",
 };
 
 interface TrackerForm {
@@ -124,10 +124,10 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
                     <div className="text-xs text-muted-foreground">{r.supplier_email}</div>
                   </td>
                   <td className="py-3 px-2">
-                    <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUS_COLOR[r.status] || "bg-slate-100"}`}>
+                    <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUS_COLOR[r.status] || "bg-slate-100 dark:bg-neutral-800"}`}>
                       {r.status}
                     </span>
-                    {overdue && <div className="text-[10px] text-red-600 font-bold mt-1">🔴 {r.hours_since_email}h overdue</div>}
+                    {overdue && <div className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-1">🔴 {r.hours_since_email}h overdue</div>}
                   </td>
                   <td className="py-3 px-2 text-xs">
                     <div>{r.hours_since_email}h ago</div>
@@ -143,7 +143,7 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
                     <a href={`mailto:${r.supplier_email}`}><Button size="sm" variant="outline" title="Email"><Mail size={12} /></Button></a>
                     <a href={`tel:${r.supplier_email}`}><Button size="sm" variant="outline" title="Call"><Phone size={12} /></Button></a>
                     {waPhone && <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer"><Button size="sm" variant="outline" title="WhatsApp customer"><MessageCircle size={12} /></Button></a>}
-                    <Button size="sm" onClick={() => openEdit(r)} style={{ background: "#0A0A0A" }} data-testid={`edit-${r.sequence}`}>
+                    <Button size="sm" onClick={() => openEdit(r)} data-testid={`edit-${r.sequence}`}>
                       <FileText size={12} /> Update
                     </Button>
                   </td>
@@ -194,7 +194,7 @@ export default function SupplierTracker({ leadId, leadPhone }: { leadId: string;
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={save} style={{ background: "#0A0A0A" }} data-testid="upd-save">Save Response</Button>
+            <Button onClick={save} data-testid="upd-save">Save Response</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

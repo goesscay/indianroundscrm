@@ -61,7 +61,7 @@ function ChangePassword() {
       <div className={isForced ? "w-full max-w-md" : "max-w-2xl mx-auto space-y-6"}>
         {isForced && (
           <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-amber-100 text-amber-800 text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300 text-xs font-semibold">
               <Shield size={14} /> Password Reset Required
             </div>
             <p className="text-sm text-muted-foreground mt-3">
@@ -107,7 +107,7 @@ function ChangePassword() {
                 {rules.map(r => {
                   const pass = r.test(pw);
                   return (
-                    <div key={r.key} className={`flex items-center gap-1.5 ${pass ? "text-emerald-700" : "text-muted-foreground"}`}
+                    <div key={r.key} className={`flex items-center gap-1.5 ${pass ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}
                          data-testid={`rule-${r.key}-${pass ? "pass" : "fail"}`}>
                       {pass ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                       {r.label}
@@ -124,7 +124,7 @@ function ChangePassword() {
                 </Button>
               )}
               <Button type="submit" disabled={busy || !allPass || !match}
-                      style={{ background: "#0A0A0A" }} data-testid="cp-submit">
+                      data-testid="cp-submit">
                 {busy ? "Saving…" : "Change Password"}
               </Button>
             </div>

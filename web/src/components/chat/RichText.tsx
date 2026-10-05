@@ -35,7 +35,7 @@ function renderLine(line: string, keyPrefix: string, mine: boolean): ReactNode[]
 }
 
 function cn2(mine: boolean) {
-  return mine ? "underline underline-offset-2 text-white font-medium break-all" : "underline underline-offset-2 text-neutral-900 font-medium break-all";
+  return mine ? "underline underline-offset-2 text-white dark:text-neutral-900 font-medium break-all" : "underline underline-offset-2 text-neutral-900 dark:text-neutral-100 font-medium break-all";
 }
 
 /** Safe text renderer: preserves line breaks, linkifies lead ids and URLs. No raw HTML. */

@@ -34,7 +34,7 @@ export interface PaginationProps {
 }
 
 const btn =
-  "inline-flex h-8 min-w-8 items-center justify-center rounded border border-border bg-white px-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:border-black disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white";
+  "inline-flex h-8 min-w-8 items-center justify-center rounded border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:border-black dark:focus-visible:border-white/60 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-card";
 
 export function Pagination({
   page, pageSize, total, onPageChange, onPageSizeChange,
@@ -51,7 +51,7 @@ export function Pagination({
     <nav
       aria-label="Pagination"
       data-testid="pagination"
-      className={cn("flex flex-col gap-3 border-t border-border bg-white px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between", className)}
+      className={cn("flex flex-col gap-3 border-t border-border bg-card px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between", className)}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span data-testid="pagination-summary" aria-live="polite">
@@ -64,7 +64,7 @@ export function Pagination({
               value={pageSize}
               disabled={disabled}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-8 rounded border border-input bg-white px-2 text-xs text-foreground focus-visible:outline-none focus-visible:border-black disabled:opacity-50"
+              className="h-8 rounded border border-input bg-card px-2 text-xs text-foreground focus-visible:outline-none focus-visible:border-black dark:focus-visible:border-white/60 disabled:opacity-50"
               data-testid="page-size"
               aria-label="Rows per page"
             >
@@ -83,7 +83,7 @@ export function Pagination({
             <button
               key={n} type="button" onClick={() => go(n)} disabled={disabled}
               aria-label={`Page ${n}`} aria-current={n === cur ? "page" : undefined}
-              className={cn(btn, n === cur && "border-[#0A0A0A] bg-[#0A0A0A] text-white hover:bg-[#0A0A0A] disabled:hover:bg-[#0A0A0A]")}
+              className={cn(btn, n === cur && "border-[#0A0A0A] bg-[#0A0A0A] text-white hover:bg-[#0A0A0A] disabled:hover:bg-[#0A0A0A] dark:border-white dark:bg-white dark:text-neutral-900 dark:hover:bg-white dark:disabled:hover:bg-white")}
               data-testid={`page-${n}`}
             >{n}</button>
           )
@@ -148,7 +148,7 @@ export function LoadMore({ lm, className }: { lm: Pick<ReturnType<typeof useLoad
   return (
     <div className={cn("flex items-center justify-center gap-3 pt-2 text-xs", className)} data-testid="load-more">
       {lm.remaining > 0 && (
-        <button type="button" onClick={lm.more} className="rounded border border-border bg-white px-3 py-1.5 font-medium hover:bg-secondary focus-visible:outline-none focus-visible:border-black" data-testid="load-more-btn">
+        <button type="button" onClick={lm.more} className="rounded border border-border bg-card px-3 py-1.5 font-medium hover:bg-secondary focus-visible:outline-none focus-visible:border-black dark:focus-visible:border-white/60" data-testid="load-more-btn">
           Load {Math.min(lm.step, lm.remaining)} more <span className="text-muted-foreground">({lm.remaining} remaining)</span>
         </button>
       )}

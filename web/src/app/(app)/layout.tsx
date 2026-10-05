@@ -4,6 +4,7 @@ import { ChatRealtimeProvider } from "@/context/ChatRealtimeContext";
 import { ChatUnreadProvider } from "@/context/ChatUnreadContext";
 import { ChatDockProvider } from "@/context/ChatDockContext";
 import ChatDock from "@/components/chat/ChatDock";
+import { AiPanelProvider } from "@/components/ai/AiPanelContext";
 import Layout from "@/components/app/Layout";
 
 // Authenticated app shell (sidebar + content). Any signed-in role may enter;
@@ -14,7 +15,9 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       <ChatRealtimeProvider>
         <ChatUnreadProvider>
           <ChatDockProvider>
-            <Layout>{children}</Layout>
+            <AiPanelProvider>
+              <Layout>{children}</Layout>
+            </AiPanelProvider>
             <ChatDock />
           </ChatDockProvider>
         </ChatUnreadProvider>

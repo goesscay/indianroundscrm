@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
+import { useTheme } from "@/context/ThemeContext";
 
 function fmt(secs: number) {
   const abs = Math.abs(secs);
@@ -15,6 +16,7 @@ function fmt(secs: number) {
 }
 
 export default function FollowupCountdown({ iso }: { iso: string }) {
+  const dk = useTheme().resolved === "dark";
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -24,7 +26,13 @@ export default function FollowupCountdown({ iso }: { iso: string }) {
   const secs = Math.floor((target - now) / 1000);
   const overdue = secs < 0;
   const soon = !overdue && secs < 3600;
-  const style = overdue
+  const style = dk
+    ? overdue
+      ? { background: "#2a1010", color: "#f87171", border: "#5a1f1f" }
+      : soon
+      ? { background: "#2a2008", color: "#f2c96b", border: "#4a3a12" }
+      : { background: "#0f1b2e", color: "#93c5fd", border: "#1e3a5f" }
+    : overdue
     ? { background: "#FEE2E2", color: "#B91C1C", border: "#FCA5A5" }
     : soon
     ? { background: "#FEF3C7", color: "#92400E", border: "#FDE68A" }

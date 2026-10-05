@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Crm\AiController;
 use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\LeadController;
 use App\Http\Controllers\Crm\RsqController;
@@ -50,8 +49,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [DashboardController::class, 'notifications']);
     Route::middleware('perm:activity.view')->get('/activity', [DashboardController::class, 'activity']);
     Route::middleware('perm:activity.view')->get('/activity/facets', [DashboardController::class, 'activityFacets']);
-
-    // ---- AI
-    Route::post('/ai/itinerary', [AiController::class, 'itinerary'])->middleware('perm:ai.use');
-    Route::post('/ai/quote-recommend', [AiController::class, 'quoteRecommend'])->middleware('perm:ai.use');
 });

@@ -313,16 +313,16 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
   };
 
   return (
-    <section className="flex flex-col h-full min-h-0 bg-white" data-testid="chat-thread" aria-label={`Conversation with ${conversation.name}`}>
+    <section className="flex flex-col h-full min-h-0 bg-card" data-testid="chat-thread" aria-label={`Conversation with ${conversation.name}`}>
       {!embedded && (
       <header className="flex items-center gap-2 px-3 h-14 shrink-0 border-b border-border">
-        <button onClick={onBack} aria-label="Back to conversations" data-testid="chat-back" className="md:hidden p-1.5 -ml-1 rounded hover:bg-neutral-100">
+        <button onClick={onBack} aria-label="Back to conversations" data-testid="chat-back" className="md:hidden p-1.5 -ml-1 rounded hover:bg-neutral-100 dark:hover:bg-white/10">
           <ArrowLeft size={18} />
         </button>
-        <div className="w-9 h-9 shrink-0 rounded bg-neutral-900 text-white text-xs font-bold flex items-center justify-center">{initials(conversation.name)}</div>
+        <div className="w-9 h-9 shrink-0 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-xs font-bold flex items-center justify-center">{initials(conversation.name)}</div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-neutral-900 truncate" data-testid="chat-thread-name">{conversation.name}</div>
-          {isGroup && <div className="text-[11px] text-neutral-500">{conversation.members.length} members</div>}
+          <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate" data-testid="chat-thread-name">{conversation.name}</div>
+          {isGroup && <div className="text-[11px] text-neutral-500 dark:text-neutral-400">{conversation.members.length} members</div>}
         </div>
         <LiveDot />
         {isGroup && isAdmin && (
@@ -334,7 +334,7 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
       )}
 
       <div className="relative flex-1 min-h-0">
-        <div ref={scrollRef} onScroll={onScroll} className="absolute inset-0 overflow-y-auto px-3 sm:px-4 py-3 bg-neutral-50/60" data-testid="chat-messages">
+        <div ref={scrollRef} onScroll={onScroll} className="absolute inset-0 overflow-y-auto px-3 sm:px-4 py-3 bg-neutral-50/60 dark:bg-black/20" data-testid="chat-messages">
           {hasMore && (
             <div className="text-center mb-3">
               <Button variant="outline" size="sm" onClick={loadOlder} disabled={loadingMore} data-testid="chat-load-older">
@@ -342,9 +342,9 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
               </Button>
             </div>
           )}
-          {loading && <div className="text-center text-sm text-neutral-400 py-8">Loading messages...</div>}
+          {loading && <div className="text-center text-sm text-neutral-400 dark:text-neutral-400 py-8">Loading messages...</div>}
           {!loading && messages.length === 0 && (
-            <div className="text-center text-sm text-neutral-400 py-12" data-testid="chat-empty">No messages yet. Say hello.</div>
+            <div className="text-center text-sm text-neutral-400 dark:text-neutral-400 py-12" data-testid="chat-empty">No messages yet. Say hello.</div>
           )}
           {messages.map((m, idx) => {
             const mine = m.sender_id === meId;
@@ -358,42 +358,42 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
                 {showDay && (
                   <div className="flex items-center gap-3 my-3" data-testid="chat-day-sep">
                     <div className="flex-1 border-t border-border" />
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">{dayLabel(m.created_at)}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-400">{dayLabel(m.created_at)}</span>
                     <div className="flex-1 border-t border-border" />
                   </div>
                 )}
                 <div className={cn("group flex mb-1.5", mine ? "justify-end" : "justify-start")} data-testid={`chat-msg-${m.id}`}>
                   {canDelete && mine && (
                     <button onClick={() => remove(m)} aria-label="Delete message" data-testid={`chat-delete-${m.id}`}
-                            className="self-center mr-1 p-1 rounded text-neutral-400 hover:text-red-700 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100">
+                            className="self-center mr-1 p-1 rounded text-neutral-400 dark:text-neutral-400 hover:text-red-700 dark:hover:text-red-400 hover:bg-neutral-100 dark:hover:bg-white/10 opacity-0 group-hover:opacity-100 focus:opacity-100">
                       <Trash2 size={13} />
                     </button>
                   )}
                   <div className={cn("max-w-[85%]", embedded ? "" : "sm:max-w-[70%]",
                     " px-3 py-1.5 rounded text-sm leading-snug break-words",
-                    mine ? "bg-neutral-900 text-white" : "bg-white border border-border text-neutral-900",
+                    mine ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900" : "bg-card border border-border text-neutral-900 dark:text-neutral-100",
                     m.pending && "opacity-60", m.failed && "ring-1 ring-red-500")}>
-                    {showName && <div className="text-[11px] font-semibold text-neutral-500 mb-0.5">{m.sender_name}</div>}
+                    {showName && <div className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 mb-0.5">{m.sender_name}</div>}
                     {m.deleted ? (
-                      <span className={cn("italic text-[13px]", mine ? "text-neutral-300" : "text-neutral-400")}>Message deleted</span>
+                      <span className={cn("italic text-[13px]", mine ? "text-neutral-300 dark:text-neutral-600" : "text-neutral-400 dark:text-neutral-400")}>Message deleted</span>
                     ) : (
                       <div className="whitespace-pre-wrap">
                         <RichText text={m.body} mine={mine} />
                       </div>
                     )}
-                    <div className={cn("text-[10px] mt-0.5 text-right", mine ? "text-neutral-400" : "text-neutral-400")}>
+                    <div className={cn("text-[10px] mt-0.5 text-right", mine ? "text-neutral-400 dark:text-neutral-600" : "text-neutral-400 dark:text-neutral-400")}>
                       {m.pending ? "Sending..." : m.failed ? "Not sent" : timeLabel(m.created_at)}
                     </div>
                   </div>
                   {canDelete && !mine && (
                     <button onClick={() => remove(m)} aria-label="Delete message" data-testid={`chat-delete-${m.id}`}
-                            className="self-center ml-1 p-1 rounded text-neutral-400 hover:text-red-700 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100">
+                            className="self-center ml-1 p-1 rounded text-neutral-400 dark:text-neutral-400 hover:text-red-700 dark:hover:text-red-400 hover:bg-neutral-100 dark:hover:bg-white/10 opacity-0 group-hover:opacity-100 focus:opacity-100">
                       <Trash2 size={13} />
                     </button>
                   )}
                 </div>
                 {m.failed && (
-                  <div className="flex justify-end gap-3 text-[11px] text-red-700 mb-1.5" data-testid="chat-failed">
+                  <div className="flex justify-end gap-3 text-[11px] text-red-700 dark:text-red-300 mb-1.5" data-testid="chat-failed">
                     <span>Failed to send.</span>
                     <button onClick={() => retry(m)} className="inline-flex items-center gap-1 underline" data-testid="chat-retry"><RotateCw size={11} /> Retry</button>
                     <button onClick={() => discard(m)} className="underline">Discard</button>
@@ -405,13 +405,13 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
         </div>
         {showJump && (
           <button onClick={jump} data-testid="chat-new-messages"
-                  className="absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 bg-neutral-900 text-white text-xs font-medium px-3 py-1.5 rounded">
+                  className="absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-xs font-medium px-3 py-1.5 rounded">
             <ArrowDown size={13} /> New messages
           </button>
         )}
       </div>
 
-      <footer className="shrink-0 border-t border-border p-2.5 flex items-end gap-2 bg-white">
+      <footer className="shrink-0 border-t border-border p-2.5 flex items-end gap-2 bg-card">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -421,7 +421,7 @@ export default function ChatThread({ conversation, meId, isAdmin, onBack, onMana
           placeholder={embedded ? "Write a message" : "Write a message (Enter to send, Shift+Enter for a new line)"}
           aria-label="Message"
           data-testid="chat-input"
-          className="flex-1 resize-none max-h-32 min-h-9 rounded border border-input bg-white px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:border-black"
+          className="flex-1 resize-none max-h-32 min-h-9 rounded border border-input bg-card dark:bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:border-black dark:focus-visible:border-white/60"
           style={{ fieldSizing: "content" } as React.CSSProperties}
         />
         <Button onClick={send} disabled={!text.trim()} aria-label="Send message" data-testid="chat-send" className="h-9">

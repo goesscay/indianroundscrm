@@ -14,6 +14,8 @@ import {
   Calendar, Bell, Inbox, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAiPanel } from "@/components/ai/AiPanelContext";
+import ThemeMenu from "@/components/app/ThemeMenu";
 import type { Notification } from "@/types";
 
 interface NavItem {
@@ -34,7 +36,6 @@ const NAV: NavItem[] = [
   { to: "/chat", label: "Chat", icon: MessageSquare, testId: "nav-chat", group: "Team", perms: ["chat.use"] },
   { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard", group: "Operations", perms: ["supplier_dashboard.view"] },
   { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers", group: "Operations", perms: ["suppliers.view"] },
-  { to: "/ai", label: "AI Assistant", icon: Sparkles, testId: "nav-ai", group: "Tools", perms: ["ai.use"] },
   { to: "/users", label: "Users", icon: Users, testId: "nav-users", group: "Administration", perms: ["users.view"] },
   { to: "/roles", label: "Roles & Permissions", icon: ShieldCheck, testId: "nav-roles", group: "Administration", perms: ["roles.manage"] },
   { to: "/master", label: "Master Data", icon: Database, testId: "nav-master", group: "Administration", perms: ["master.view"] },
@@ -120,7 +121,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 (rail ? (
                   <div className="mx-2 my-2 border-t border-sidebar-border first:hidden" />
                 ) : (
-                  <div className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+                  <div className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     {it.group}
                   </div>
                 ))}
@@ -131,18 +132,18 @@ export default function Layout({ children }: { children: ReactNode }) {
                 className={cn(
                   "group relative flex items-center rounded text-[13px] font-medium transition-colors",
                   rail ? "justify-center h-9 w-9 mx-auto my-0.5" : "gap-2.5 px-3 py-2",
-                  active ? "bg-neutral-900 text-white shadow-sm" : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950"
+                  active ? "bg-primary text-primary-foreground shadow-sm" : "text-sidebar-foreground/70 hover:bg-accent hover:text-foreground"
                 )}
               >
-                <it.icon size={16} className={active ? "text-white" : "text-neutral-400 group-hover:text-neutral-900"} />
+                <it.icon size={16} className={active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"} />
                 {!rail && <span className="flex-1">{it.label}</span>}
                 {it.testId === "nav-chat" && chatUnread > 0 &&
                   (rail ? (
-                    <span data-testid="chat-unread-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-neutral-900 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white">
+                    <span data-testid="chat-unread-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-sidebar">
                       {chatUnread > 9 ? "9+" : chatUnread}
                     </span>
                   ) : (
-                    <span data-testid="chat-unread-badge" className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center", active ? "bg-white text-neutral-900" : "bg-neutral-900 text-white")}>
+                    <span data-testid="chat-unread-badge" className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center", active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground")}>
                       {chatUnread > 99 ? "99+" : chatUnread}
                     </span>
                   ))}
@@ -157,10 +158,10 @@ export default function Layout({ children }: { children: ReactNode }) {
   const bell = (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="relative p-1.5 rounded text-neutral-500 hover:text-neutral-950 hover:bg-neutral-100" data-testid="bell-btn" title="Notifications">
+        <button className="relative p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent" data-testid="bell-btn" title="Notifications">
           <Bell size={16} />
           {alerts.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-neutral-900 text-white text-[9px] font-bold rounded-sm min-w-[15px] h-[15px] flex items-center justify-center px-1">
+            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[9px] font-bold rounded-sm min-w-[15px] h-[15px] flex items-center justify-center px-1">
               {alerts.length}
             </span>
           )}
@@ -194,6 +195,8 @@ export default function Layout({ children }: { children: ReactNode }) {
     </Popover>
   );
 
+  const { openAi } = useAiPanel();
+  const aiAllowed = can("ai.use");
   const [menuOpenD, setMenuOpenD] = useState(false); // desktop header
   const [menuOpenM, setMenuOpenM] = useState(false); // mobile top bar
   const pageTitle =
@@ -204,35 +207,35 @@ export default function Layout({ children }: { children: ReactNode }) {
     <Popover open={menuOpen} onOpenChange={setMenuOpen}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-2 pl-1.5 pr-2 py-1 rounded hover:bg-neutral-100 transition-colors"
+          className="flex items-center gap-2 pl-1.5 pr-2 py-1 rounded hover:bg-accent transition-colors"
           data-testid="user-menu-btn" aria-label="Account menu"
         >
-          <span className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center text-[11px] font-bold">{initials}</span>
+          <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[11px] font-bold">{initials}</span>
           <span className="hidden lg:block text-left leading-tight">
-            <span className="block text-[13px] font-semibold text-neutral-900 max-w-[140px] truncate">{user.name || user.email}</span>
-            <span className="block text-[10px] uppercase tracking-widest text-neutral-400">{user.role_name || user.role}</span>
+            <span className="block text-[13px] font-semibold text-foreground max-w-[140px] truncate">{user.name || user.email}</span>
+            <span className="block text-[10px] uppercase tracking-widest text-muted-foreground">{user.role_name || user.role}</span>
           </span>
-          <ChevronDown size={14} className="hidden lg:block text-neutral-400" />
+          <ChevronDown size={14} className="hidden lg:block text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-64 p-0" data-testid="user-menu">
         <div className="p-3 border-b border-border">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 shrink-0 rounded-full bg-neutral-900 text-white flex items-center justify-center text-sm font-bold">{initials}</span>
+            <span className="w-10 h-10 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">{initials}</span>
             <div className="min-w-0">
               <div className="text-sm font-semibold truncate">{user.name || user.email}</div>
               <div className="text-xs text-muted-foreground truncate">{user.email}</div>
-              <span className="inline-block mt-1 text-[10px] uppercase tracking-widest font-semibold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600">{user.role_name || user.role}</span>
+              <span className="inline-block mt-1 text-[10px] uppercase tracking-widest font-semibold px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{user.role_name || user.role}</span>
             </div>
           </div>
         </div>
         <div className="p-1.5">
           <Link href="/profile" onClick={() => setMenuOpen(false)} data-testid="profile-link"
-                className="flex items-center gap-2.5 px-2.5 py-2 rounded text-[13px] font-medium text-neutral-700 hover:bg-neutral-100">
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded text-[13px] font-medium text-foreground hover:bg-accent">
             <UserIcon size={15} /> My profile
           </Link>
           <button onClick={doLogout} data-testid="logout-btn"
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded text-[13px] font-medium text-neutral-700 hover:bg-neutral-100">
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded text-[13px] font-medium text-foreground hover:bg-accent">
             <LogOut size={15} /> Logout
           </button>
         </div>
@@ -252,17 +255,19 @@ export default function Layout({ children }: { children: ReactNode }) {
       >
         {collapsed ? (
           <div className="flex flex-col items-center gap-2 pt-4 pb-3 border-b border-sidebar-border">
-            <img src="/logo-mark-dark.png" alt="Indian Rounds" className="w-7 h-auto" />
+            <img src="/logo-mark-dark.png" alt="Indian Rounds" className="w-7 h-auto dark:hidden" />
+            <img src="/logo-mark.png" alt="Indian Rounds" className="w-7 h-auto hidden dark:block" />
             <button onClick={toggleCollapsed} title="Expand sidebar" aria-label="Expand sidebar" data-testid="sidebar-toggle"
-                    className="p-1.5 rounded text-neutral-500 hover:text-neutral-950 hover:bg-neutral-100">
+                    className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
               <PanelLeftOpen size={16} />
             </button>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2 pl-4 pr-2 h-14 border-b border-sidebar-border">
-            <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left" />
+            <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left dark:hidden" />
+            <img src="/logo-word.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left hidden dark:block" />
             <button onClick={toggleCollapsed} title="Collapse sidebar" aria-label="Collapse sidebar" data-testid="sidebar-toggle"
-                    className="p-1.5 rounded text-neutral-500 hover:text-neutral-950 hover:bg-neutral-100">
+                    className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
               <PanelLeftClose size={16} />
             </button>
           </div>
@@ -271,20 +276,27 @@ export default function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 bg-sidebar text-neutral-900 border-b border-sidebar-border h-12 px-3 flex items-center justify-between">
-        <button onClick={() => setOpen(true)} className="p-1.5 -ml-1 rounded hover:bg-neutral-100" aria-label="Open menu" data-testid="mobile-menu-btn">
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 bg-sidebar text-foreground border-b border-sidebar-border h-12 px-3 flex items-center justify-between">
+        <button onClick={() => setOpen(true)} className="p-1.5 -ml-1 rounded hover:bg-accent" aria-label="Open menu" data-testid="mobile-menu-btn">
           <Menu size={20} />
         </button>
-        <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-6 w-auto" />
-        {can("chat.use") && <Link href="/chat" aria-label={`Chat${chatUnread > 0 ? `, ${chatUnread} unread` : ""}`} data-testid="chat-link-mobile" className="relative p-1.5 rounded hover:bg-neutral-100 ml-auto mr-1">
+        <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-6 w-auto dark:hidden" />
+            <img src="/logo-word.png" alt="Indian Rounds" className="h-6 w-auto hidden dark:block" />
+        {can("chat.use") && <Link href="/chat" aria-label={`Chat${chatUnread > 0 ? `, ${chatUnread} unread` : ""}`} data-testid="chat-link-mobile" className="relative p-1.5 rounded hover:bg-accent ml-auto mr-1">
           <MessageSquare size={18} />
           {chatUnread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-neutral-900 text-white text-[9px] font-bold rounded-sm min-w-[15px] h-[15px] flex items-center justify-center px-1">
+            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[9px] font-bold rounded-sm min-w-[15px] h-[15px] flex items-center justify-center px-1">
               {chatUnread > 99 ? "99+" : chatUnread}
             </span>
           )}
         </Link>}
+        {aiAllowed && (
+          <button onClick={openAi} data-testid="ai-open-btn-mobile" aria-label="Open Rounds AI" className="p-1.5 rounded hover:bg-accent">
+            <Sparkles size={18} />
+          </button>
+        )}
         {bell}
+        <ThemeMenu />
         {renderUserMenu(menuOpenM, setMenuOpenM)}
       </div>
 
@@ -294,8 +306,9 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <aside className="relative w-64 max-w-[80%] h-full flex flex-col bg-sidebar text-sidebar-foreground shadow-2xl border-r border-sidebar-border">
             <div className="flex items-center justify-between pl-4 pr-2 h-14 border-b border-sidebar-border">
-              <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left" />
-              <button onClick={() => setOpen(false)} className="p-1.5 rounded text-neutral-500 hover:bg-neutral-100" aria-label="Close menu">
+              <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left dark:hidden" />
+            <img src="/logo-word.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left hidden dark:block" />
+              <button onClick={() => setOpen(false)} className="p-1.5 rounded text-muted-foreground hover:bg-accent" aria-label="Close menu">
                 <X size={18} />
               </button>
             </div>
@@ -306,10 +319,17 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Desktop header */}
-        <header className="hidden md:flex sticky top-0 z-30 h-14 items-center justify-between gap-4 px-6 bg-white border-b border-border" data-testid="app-header">
-          <h2 className="font-display text-[15px] tracking-tight text-neutral-900 truncate">{pageTitle}</h2>
+        <header className="hidden md:flex sticky top-0 z-30 h-14 items-center justify-between gap-4 px-6 bg-sidebar border-b border-border" data-testid="app-header">
+          <h2 className="font-display text-[15px] tracking-tight text-foreground truncate">{pageTitle}</h2>
           <div className="flex items-center gap-1.5">
+            {aiAllowed && (
+              <button onClick={openAi} data-testid="ai-open-btn" title="Rounds AI (Ctrl+J)"
+                      className="flex items-center gap-1.5 h-8 px-2.5 mr-1 rounded border border-border text-[13px] font-medium text-foreground hover:bg-accent">
+                <Sparkles size={14} /> AI
+              </button>
+            )}
             {bell}
+            <ThemeMenu />
             <span className="w-px h-6 bg-border mx-1" />
             {renderUserMenu(menuOpenD, setMenuOpenD)}
           </div>

@@ -115,7 +115,7 @@ function DestinationCitiesEditor() {
             <Input value={newCity} onChange={e => setNewCity(e.target.value)}
                    onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addCity())}
                    placeholder={`Add a city to ${selDest}…`} data-testid="dc-new-city" />
-            <Button onClick={addCity} style={{ background: "#0A0A0A" }} data-testid="dc-add"><Plus size={14} /> Add</Button>
+            <Button onClick={addCity} data-testid="dc-add"><Plus size={14} /> Add</Button>
           </div>}
           <div className="space-y-1.5">
             {cities.length === 0 && <div className="text-xs text-muted-foreground py-4 text-center border border-dashed rounded-md">No cities yet — add above</div>}
@@ -182,7 +182,7 @@ export default function MasterData() {
           <div className="flex-1 min-w-[200px]">
             <Input value={value} onChange={e => setValue(e.target.value)} placeholder="Add new value…" data-testid="m-value" />
           </div>
-          <Button type="submit" style={{ background: "#0A0A0A" }} data-testid="m-add">Add</Button>
+          <Button type="submit" data-testid="m-add">Add</Button>
         </form>}
       </Card>
 

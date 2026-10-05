@@ -15,17 +15,17 @@ import { Download, Filter, X } from "lucide-react";
 import type { ActivityEntry, ActivityFacets } from "@/types";
 
 const ACTION_COLOR: Record<string, string> = {
-  create_lead: "bg-emerald-100 text-emerald-800",
-  update_lead: "bg-blue-100 text-blue-800",
-  reassign_lead: "bg-purple-100 text-purple-800",
-  delete_lead: "bg-red-100 text-red-800",
-  create_user: "bg-emerald-100 text-emerald-800",
-  update_user: "bg-blue-100 text-blue-800",
-  delete_user: "bg-red-100 text-red-800",
-  send_supplier_mail: "bg-cyan-100 text-cyan-800",
-  update_supplier_response: "bg-teal-100 text-teal-800",
-  set_allocation: "bg-indigo-100 text-indigo-800",
-  add_master: "bg-slate-100 text-slate-800",
+  create_lead: "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+  update_lead: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+  reassign_lead: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+  delete_lead: "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
+  create_user: "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+  update_user: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+  delete_user: "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
+  send_supplier_mail: "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300",
+  update_supplier_response: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
+  set_allocation: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
+  add_master: "bg-slate-100 text-slate-800 dark:bg-neutral-800 dark:text-neutral-300",
 };
 
 function ActivityLog() {
@@ -146,7 +146,7 @@ function ActivityLog() {
             <div className="flex gap-1 mt-1.5">
               <Input placeholder="lead ID / user name" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })}
                 onKeyDown={(e) => e.key === "Enter" && load()} className="h-9" data-testid="fil-q" />
-              <Button onClick={load} size="sm" className="h-9" style={{ background: "#0A0A0A" }} data-testid="fil-search">Go</Button>
+              <Button onClick={load} size="sm" className="h-9" data-testid="fil-search">Go</Button>
             </div>
           </div>
         </div>

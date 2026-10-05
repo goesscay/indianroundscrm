@@ -37,7 +37,7 @@ function useIsDesktop(): boolean {
 
 function Avatar({ conv }: { conv: Conversation }) {
   return (
-    <span className="w-10 h-10 shrink-0 rounded bg-neutral-900 text-white text-[11px] font-bold flex items-center justify-center">
+    <span className="w-10 h-10 shrink-0 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-[11px] font-bold flex items-center justify-center">
       {conv.type === "group" ? <Users size={16} /> : initials(conv.name)}
     </span>
   );
@@ -57,18 +57,18 @@ const DockConvRow = memo(function DockConvRow({ c, meId, open, onOpen }: { c: Co
       type="button"
       onClick={() => onOpen(c)}
       data-testid={`chat-dock-conv-${c.id}`}
-      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-neutral-50"
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-neutral-50 dark:hover:bg-white/5"
     >
       <Avatar conv={c} />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
-          <span className={cn("text-sm truncate", unread ? "font-bold text-neutral-950" : "font-semibold text-neutral-900")}>{c.name}</span>
-          <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(lm?.created_at ?? c.updated_at)}</span>
+          <span className={cn("text-sm truncate", unread ? "font-bold text-neutral-950 dark:text-white" : "font-semibold text-neutral-900 dark:text-neutral-100")}>{c.name}</span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-400 shrink-0">{relativeTime(lm?.created_at ?? c.updated_at)}</span>
         </span>
         <span className="flex items-center justify-between gap-2 mt-0.5">
-          <span className={cn("text-xs truncate", unread ? "text-neutral-800" : "text-neutral-500")}>{preview}</span>
+          <span className={cn("text-xs truncate", unread ? "text-neutral-800 dark:text-neutral-200" : "text-neutral-500 dark:text-neutral-400")}>{preview}</span>
           {unread && (
-            <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-sm bg-neutral-900 text-white text-[10px] font-bold flex items-center justify-center">
+            <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-sm bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-[10px] font-bold flex items-center justify-center">
               {c.unread_count > 99 ? "99+" : c.unread_count}
             </span>
           )}
@@ -170,11 +170,11 @@ function DockInner() {
             data-testid={`chat-dock-window-${w.conversationId}`}
             aria-label={`Chat with ${conv.name}`}
             className={cn(
-              "pointer-events-auto flex flex-col bg-white border border-border border-b-0 shadow-[0_2px_12px_rgba(0,0,0,0.12)]",
+              "pointer-events-auto flex flex-col bg-card border border-border border-b-0 shadow-[0_2px_12px_rgba(0,0,0,0.12)]",
               w.minimized ? "w-56 h-10" : "w-80 h-[420px]"
             )}
           >
-            <header className="flex items-center gap-1.5 px-2 h-10 shrink-0 bg-neutral-900 text-white">
+            <header className="flex items-center gap-1.5 px-2 h-10 shrink-0 bg-neutral-900 text-white dark:bg-neutral-800 dark:text-neutral-100">
               <button
                 type="button"
                 onClick={() => toggleMinimize(w.conversationId)}
@@ -225,9 +225,9 @@ function DockInner() {
           aria-label="Chat"
           data-testid="chat-dock-panel"
           onKeyDown={onPanelKey}
-          className="pointer-events-auto w-80 h-[420px] flex flex-col bg-white border border-border border-b-0 shadow-[0_2px_12px_rgba(0,0,0,0.12)]"
+          className="pointer-events-auto w-80 h-[420px] flex flex-col bg-card border border-border border-b-0 shadow-[0_2px_12px_rgba(0,0,0,0.12)]"
         >
-          <header className="flex items-center gap-1.5 px-3 h-10 shrink-0 bg-neutral-900 text-white">
+          <header className="flex items-center gap-1.5 px-3 h-10 shrink-0 bg-neutral-900 text-white dark:bg-neutral-800 dark:text-neutral-100">
             <MessageSquare size={14} />
             <span className="text-sm font-semibold flex-1 flex items-center gap-1.5">Chat <LiveDot /></span>
             <Link href="/chat" aria-label="Open full view" title="Open full view" data-testid="chat-dock-full" className="p-1 rounded-sm hover:bg-white/15">
@@ -249,14 +249,14 @@ function DockInner() {
               )}
             </div>
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-400" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search conversations" aria-label="Search conversations" className="pl-8 h-8" data-testid="chat-dock-search" />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-border" role="list" aria-label="Conversations" data-testid="chat-dock-list">
-            {!loaded && <div className="p-4 text-sm text-neutral-400">Loading...</div>}
+            {!loaded && <div className="p-4 text-sm text-neutral-400 dark:text-neutral-400">Loading...</div>}
             {loaded && filtered.length === 0 && (
-              <div className="p-6 text-center text-sm text-neutral-400">{convs.length === 0 ? "No conversations yet." : "No matches"}</div>
+              <div className="p-6 text-center text-sm text-neutral-400 dark:text-neutral-400">{convs.length === 0 ? "No conversations yet." : "No matches"}</div>
             )}
             {filtered.map((c) => (
               <DockConvRow key={c.id} c={c} meId={user.id} open={openIds.has(c.id)} onOpen={openWindow} />
@@ -270,7 +270,7 @@ function DockInner() {
           aria-label={total > 0 ? `Open chat, ${total} unread` : "Open chat"}
           data-testid="chat-dock-toggle"
           className={cn(
-            "pointer-events-auto flex items-center gap-2 w-56 h-10 px-3 bg-neutral-900 text-white border border-neutral-900 border-b-0 text-sm font-semibold hover:bg-neutral-800",
+            "pointer-events-auto flex items-center gap-2 w-56 h-10 px-3 bg-neutral-900 text-white dark:bg-neutral-800 dark:text-neutral-100 border border-neutral-900 dark:border-neutral-700 border-b-0 text-sm font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-700",
             pulse && "animate-pulse"
           )}
         >

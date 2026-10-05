@@ -23,10 +23,10 @@ interface Lane {
 }
 
 const LANES: Lane[] = [
-  { key: "new", label: "New Requests", icon: Mail, accent: "border-l-amber-400 bg-amber-50/40", dot: "bg-amber-500", pulse: true, hint: "Awaiting Ops to send supplier mail" },
-  { key: "pending_reply", label: "Pending Supplier Replies", icon: Clock, accent: "border-l-red-400 bg-red-50/40", dot: "bg-red-500", pulse: true, hint: "Mail sent — waiting for supplier" },
-  { key: "response_received", label: "Responses Received", icon: MessageSquare, accent: "border-l-blue-400 bg-blue-50/40", dot: "bg-blue-500", pulse: false, hint: "Reply received — review & quote customer" },
-  { key: "completed", label: "Completed", icon: CheckCircle2, accent: "border-l-emerald-400 bg-emerald-50/40", dot: "bg-emerald-500", pulse: false, hint: "Quote sent / booked / closed" },
+  { key: "new", label: "New Requests", icon: Mail, accent: "border-l-amber-400 bg-amber-50/40 dark:bg-amber-950/20", dot: "bg-amber-500", pulse: true, hint: "Awaiting Ops to send supplier mail" },
+  { key: "pending_reply", label: "Pending Supplier Replies", icon: Clock, accent: "border-l-red-400 bg-red-50/40 dark:bg-red-950/20", dot: "bg-red-500", pulse: true, hint: "Mail sent — waiting for supplier" },
+  { key: "response_received", label: "Responses Received", icon: MessageSquare, accent: "border-l-blue-400 bg-blue-50/40 dark:bg-blue-950/20", dot: "bg-blue-500", pulse: false, hint: "Reply received — review & quote customer" },
+  { key: "completed", label: "Completed", icon: CheckCircle2, accent: "border-l-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20", dot: "bg-emerald-500", pulse: false, hint: "Quote sent / booked / closed" },
 ];
 
 const fmtDate = (iso?: string | null) => {
@@ -44,7 +44,7 @@ function LaneCard({ lane, items }: { lane: Lane; items: RsqRequest[] }) {
         <div className="flex items-center gap-2">
           <Icon size={18} />
           <div className="font-display font-bold">{lane.label}</div>
-          <span className={`inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full text-xs font-bold bg-white border border-border`}>{items.length}</span>
+          <span className={`inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full text-xs font-bold bg-card border border-border`}>{items.length}</span>
         </div>
       </div>
       <div className="text-[11px] text-muted-foreground mb-3">{lane.hint}</div>
@@ -56,7 +56,7 @@ function LaneCard({ lane, items }: { lane: Lane; items: RsqRequest[] }) {
         )}
         {lm.visible.map((r) => (
           <Link key={r.id || r.lead_id} href={`/leads/${r.lead_id}`} className="block" data-testid={`rsq-card-${r.lead_id}`}>
-            <div className="p-3 bg-white rounded-md border border-border hover:border-[#0A0A0A] hover:shadow-sm transition-all">
+            <div className="p-3 bg-card rounded-md border border-border hover:border-[#0A0A0A] dark:hover:border-white/70 hover:shadow-sm transition-all">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export default function SupplierDashboard() {
           </div>
           <div className="text-right hidden sm:block">
             <div className="text-xs text-muted-foreground">Completed</div>
-            <div className="font-display font-black text-2xl leading-none text-emerald-600">{totals.completed}</div>
+            <div className="font-display font-black text-2xl leading-none text-emerald-600 dark:text-emerald-400">{totals.completed}</div>
           </div>
           <Button variant="outline" onClick={load} data-testid="refresh-btn">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh

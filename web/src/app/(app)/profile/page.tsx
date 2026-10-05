@@ -12,11 +12,11 @@ import type { SessionInfo, User } from "@/types";
 import { Shield, Key, LogOut, User as UserIcon, Mail, Phone, Briefcase, Monitor, X } from "lucide-react";
 
 const STATUS_STYLES: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-800",
-  inactive: "bg-gray-100 text-gray-800",
-  suspended: "bg-red-100 text-red-800",
-  locked: "bg-amber-100 text-amber-800",
-  password_reset_required: "bg-amber-100 text-amber-800",
+  active: "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+  inactive: "bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-neutral-300",
+  suspended: "bg-red-100 text-red-800 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
+  locked: "bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
+  password_reset_required: "bg-amber-100 text-amber-800 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
 };
 
 const fmt = (iso?: string | null) => {
@@ -85,13 +85,13 @@ export default function Profile() {
 
       <Card className="p-6 rounded-lg">
         <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-display font-black text-2xl" style={{ background: "#0A0A0A" }}>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center bg-primary text-primary-foreground font-display font-black text-2xl">
             {(data.name || data.email || "?").charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="font-display font-black text-2xl">{data.name || "—"}</div>
-              <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded ${STATUS_STYLES[status] || "bg-gray-100"}`} data-testid="profile-status">
+              <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded ${STATUS_STYLES[status] || "bg-gray-100 dark:bg-neutral-800"}`} data-testid="profile-status">
                 {status.replaceAll("_", " ")}
               </span>
             </div>
@@ -126,7 +126,7 @@ export default function Profile() {
         </div>
         <div className="space-y-2">
           <Link href="/change-password" className="block">
-            <div className="flex items-center justify-between p-4 rounded-md border border-border hover:border-[#0A0A0A] hover:bg-secondary/40 transition-colors" data-testid="profile-change-password">
+            <div className="flex items-center justify-between p-4 rounded-md border border-border hover:border-[#0A0A0A] dark:hover:border-white/70 hover:bg-secondary/40 transition-colors" data-testid="profile-change-password">
               <div>
                 <div className="font-semibold text-sm">Change Password</div>
                 <div className="text-xs text-muted-foreground">Update your password. Requires current password.</div>
@@ -157,13 +157,13 @@ export default function Profile() {
         <div className="space-y-2">
           {sessions.map(s => (
             <div key={s.jti}
-                 className={`flex items-center justify-between p-3 rounded-md border ${s.is_current ? "border-[#0A0A0A] bg-[#0A0A0A]/5" : "border-border"}`}
+                 className={`flex items-center justify-between p-3 rounded-md border ${s.is_current ? "border-[#0A0A0A] dark:border-white/70 bg-[#0A0A0A]/5 dark:bg-white/5" : "border-border"}`}
                  data-testid={`session-${s.jti}`}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <div className="font-semibold text-sm">{s.device || "Unknown device"}</div>
                   {s.is_current && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300">
                       Current
                     </span>
                   )}
