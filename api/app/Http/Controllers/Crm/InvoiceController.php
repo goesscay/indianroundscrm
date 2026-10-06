@@ -551,7 +551,8 @@ class InvoiceController extends Controller
             'Total (incl. taxes)', $inv->total, $pdf);
         $failed = ($res['status'] ?? '') === 'failed';
         DB::table('invoice_emails')->insert(['doc_type' => 'invoice', 'doc_id' => $inv->id, 'to_list' => implode(', ', $d['to']), 'subject' => $d['subject'],
-            'status' => $res['status'], 'error' => $res['error'] ?? null, 'sent_by' => $user->id, 'created_at' => now()]);
+            'status' => $res['status'], 'error' => $res['error'] ?? null, 'sent_by' => $user->id, 'created_at' => now(),
+            'internet_message_id' => $res['internet_message_id'] ?? null, 'conversation_id' => $res['conversation_id'] ?? null]);
         ActivityLogger::log($user, $failed ? 'invoice_email_failed' : 'invoice_email_sent', 'invoice', $inv->id, null, ['to' => $d['to'], 'status' => $res['status']]);
         if ($failed) {
             Fail::http(502, 'The e-mail could not be sent: '.($res['error'] ?? 'unknown error'));

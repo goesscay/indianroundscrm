@@ -115,7 +115,8 @@ class Reminders
         $res = CustomerMail::send($to, $cc, $subject, $message, "Payment reminder · {$inv->invoice_no}", $rows, 'Balance due', $inv->balance(), $pdf);
         $failed = ($res['status'] ?? '') === 'failed';
         DB::table('invoice_emails')->insert(['doc_type' => 'invoice', 'doc_id' => $inv->id, 'to_list' => implode(', ', $to), 'subject' => $subject,
-            'status' => $res['status'], 'error' => $res['error'] ?? null, 'sent_by' => $userId, 'created_at' => now(), 'kind' => 'reminder', 'trigger' => $trigger]);
+            'status' => $res['status'], 'error' => $res['error'] ?? null, 'sent_by' => $userId, 'created_at' => now(), 'kind' => 'reminder', 'trigger' => $trigger,
+            'internet_message_id' => $res['internet_message_id'] ?? null, 'conversation_id' => $res['conversation_id'] ?? null]);
         if (! $failed) {
             $inv->forceFill(['reminder_count' => $inv->reminder_count + 1, 'last_reminder_at' => now()])->save();
         }

@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import PaymentDialog from "@/components/crm/PaymentDialog";
 import CreditNoteDialog from "@/components/crm/CreditNoteDialog";
+import CustomerReplies from "@/components/crm/CustomerReplies";
 import SendDocDialog from "@/components/crm/SendDocDialog";
 import { INR2, PayPill, fmtDate, modeLabel } from "@/components/crm/shared";
 import type { Invoice } from "@/types";
@@ -229,6 +230,7 @@ export default function InvoiceDetail() {
               {hasMoney && can("invoices.issue") && <p className="text-xs text-muted-foreground">An invoice with payments cannot be cancelled. Credit the full amount instead.</p>}
             </Card>
           )}
+          <CustomerReplies base={`/invoices/${x.id}`} />
           {draft && can("invoices.delete", "invoices.create") && <Button variant="ghost" size="sm" className="text-destructive" onClick={remove} data-testid="invoice-delete"><Trash2 size={14} /> Delete draft</Button>}
         </div>
       </div>

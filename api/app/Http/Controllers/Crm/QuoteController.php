@@ -521,7 +521,8 @@ class QuoteController extends Controller
         $res = MailSender::send($d['to'], $d['subject'], $this->htmlBody($quote, $d['message']), $d['cc'] ?? [], [], true, $attachments);
         $failed = ($res['status'] ?? '') === 'failed';
         QuoteEmail::create(['quote_id' => $quote->id, 'to_list' => implode(', ', $d['to']), 'subject' => $d['subject'], 'status' => $res['status'],
-            'error' => $res['error'] ?? null, 'with_pdf' => $withPdf, 'sent_by' => $user->id, 'created_at' => now()]);
+            'error' => $res['error'] ?? null, 'with_pdf' => $withPdf, 'sent_by' => $user->id, 'created_at' => now(),
+            'internet_message_id' => $res['internet_message_id'] ?? null, 'conversation_id' => $res['conversation_id'] ?? null]);
         ActivityLogger::log($user, $failed ? 'quote_email_failed' : 'quote_email_sent', 'quote', $quote->id, null, ['to' => $d['to'], 'status' => $res['status']]);
         if ($failed) {
             Fail::http(502, 'The e-mail could not be sent: '.($res['error'] ?? 'unknown error'));

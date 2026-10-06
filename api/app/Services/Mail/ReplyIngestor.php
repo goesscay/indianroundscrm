@@ -2,6 +2,7 @@
 
 namespace App\Services\Mail;
 
+use App\Models\CustomerReply;
 use App\Models\LeadSupplier;
 use App\Models\SupplierReply;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -20,6 +21,8 @@ class ReplyIngestor
         private ReplyClassifier $classifier,
         private ReplyProcessor $processor,
         private AttachmentStore $attachments,
+        private CustomerReplyMatcher $customerMatcher,
+        private CustomerReplyProcessor $customerProcessor,
     ) {
     }
 
@@ -37,11 +40,23 @@ class ReplyIngestor
 
             return self::DUPLICATE;
         }
+        $customerReply = CustomerReply::where('graph_message_id', $m->id)->first();
+        if ($customerReply) {
+            $this->finishCustomer($customerReply, $m);
+
+            return self::DUPLICATE;
+        }
 
         $text = ReplyText::toPlain($m->body, $m->bodyType);
         $kind = $this->classifier->classify($m);
         $match = $this->matcher->match($m);
         $tracker = null;
+
+        // A customer answering a quote / invoice mail: a traced thread wins; otherwise only when it is not a supplier reply.
+        $cust = $kind === 'normal' ? $this->customerMatcher->match($m) : null;
+        if ($cust && (in_array($cust['by'], ['thread', 'reference'], true) || ! $match->found())) {
+            return $this->storeCustomerReply($m, $text, $cust);
+        }
 
         if ($kind === 'bounce') {
             $status = $match->found() ? 'bounce' : 'unmatched';
@@ -89,6 +104,44 @@ class ReplyIngestor
         $this->finish($reply, $m);
 
         return $status;
+    }
+
+    /** @param  array{customer_id:int,deal_id:?int,quote_id:?int,invoice_id:?int,by:string}  $c */
+    private function storeCustomerReply(InboundMessage $m, string $text, array $c): string
+    {
+        try {
+            $reply = CustomerReply::create([
+                'customer_id' => $c['customer_id'], 'deal_id' => $c['deal_id'], 'quote_id' => $c['quote_id'], 'invoice_id' => $c['invoice_id'],
+                'graph_message_id' => $m->id, 'internet_message_id' => $m->internetMessageId, 'conversation_id' => $m->conversationId,
+                'from_email' => mb_substr($m->fromEmail, 0, 255), 'from_name' => mb_substr($m->fromName, 0, 255),
+                'subject' => mb_substr($m->subject, 0, 998), 'body_text' => $text, 'body_preview' => ReplyText::preview($text, 300),
+                'received_at' => $m->receivedAt, 'matched_by' => $c['by'],
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            return self::DUPLICATE; // another poller won the race
+        }
+        $this->finishCustomer($reply, $m);
+
+        return 'customer';
+    }
+
+    private function finishCustomer(CustomerReply $reply, InboundMessage $m): void
+    {
+        if ($reply->notified_at === null) {
+            try {
+                $this->customerProcessor->handle($reply);
+            } catch (\Throwable $e) {
+                Log::error('Customer reply processing failed: '.$e->getMessage(), ['reply_id' => $reply->id]);
+            }
+        }
+        $category = (string) config('services.microsoft.processed_category', 'ERP-Processed');
+        if (! in_array($category, $m->categories, true)) {
+            try {
+                $this->transport->markProcessed($m->id);
+            } catch (\Throwable $e) {
+                Log::warning('Could not mark mail as processed: '.$e->getMessage());
+            }
+        }
     }
 
     /** Side effects + mark the mailbox message as processed (both safe to repeat). */

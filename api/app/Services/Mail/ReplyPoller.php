@@ -50,7 +50,7 @@ class ReplyPoller
                     }
                     if (! in_array($res, [ReplyIngestor::OWN, ReplyIngestor::DUPLICATE], true)) {
                         $sum['new']++;
-                        $res === 'matched' && $sum['matched']++;
+                        in_array($res, ['matched', 'customer'], true) && $sum['matched']++;
                         $res === 'unmatched' && $sum['unmatched']++;
                     }
                 }

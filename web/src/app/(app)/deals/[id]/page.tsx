@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DealDialog from "@/components/crm/DealDialog";
+import CustomerReplies from "@/components/crm/CustomerReplies";
 import { DealBooksCard, RecordActivities, RecordInvoices, RecordNotes, RecordQuotes } from "@/components/crm/RecordPanels";
 import { INR, STAGES, StagePill, TRIP_STATUSES, fmtDate } from "@/components/crm/shared";
 import type { Deal, DealStage } from "@/types";
@@ -153,6 +154,7 @@ export default function DealDetail() {
           <RecordQuotes filter={{ deal_id: d.id }} newHref={`/quotes/new?deal=${d.id}`} />
           <DealBooksCard dealId={d.id} />
           <RecordInvoices filter={{ deal_id: d.id }} newHref={`/invoices/new?deal=${d.id}`} />
+          <CustomerReplies base={`/deals/${d.id}`} />
           <RecordActivities base={`/deals/${d.id}`} link={{ deal_id: d.id, customer_id: d.customer_id }} />
           <RecordNotes base={`/deals/${d.id}`} canWrite={canEdit} />
         </div>

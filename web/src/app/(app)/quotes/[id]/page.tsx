@@ -1,5 +1,6 @@
 "use client";
 
+import CustomerReplies from "@/components/crm/CustomerReplies";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -192,6 +193,7 @@ export default function QuoteDetail() {
               ))}
             </ul>
           </Card>
+          <CustomerReplies base={`/quotes/${x.id}`} />
           {draft && can("quotes.delete", "quotes.create") && <Button variant="ghost" size="sm" className="text-destructive" onClick={remove} data-testid="quote-delete"><Trash2 size={14} /> Delete draft</Button>}
         </div>
       </div>

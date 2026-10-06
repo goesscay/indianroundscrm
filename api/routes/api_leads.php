@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Crm\ActivityController;
 use App\Http\Controllers\Crm\CustomerController;
+use App\Http\Controllers\Crm\CustomerReplyController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
 use App\Http\Controllers\Crm\AccountController;
@@ -97,6 +98,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/customers', [CustomerController::class, 'index'])->middleware('perm:customers.view');
     Route::post('/customers', [CustomerController::class, 'store'])->middleware('perm:customers.create');
     Route::get('/customers/{id}', [CustomerController::class, 'show'])->middleware('perm:customers.view');
+    Route::get('/customers/{id}/replies', [CustomerReplyController::class, 'customer'])->middleware('perm:customers.view');
+    Route::get('/deals/{id}/replies', [CustomerReplyController::class, 'deal'])->middleware('perm:deals.view');
+    Route::get('/quotes/{id}/replies', [CustomerReplyController::class, 'quote'])->middleware('perm:quotes.view');
+    Route::get('/invoices/{id}/replies', [CustomerReplyController::class, 'invoice'])->middleware('perm:invoices.view');
     Route::patch('/customers/{id}', [CustomerController::class, 'update'])->middleware('perm:customers.edit');
     Route::delete('/customers/{id}', [CustomerController::class, 'destroy'])->middleware('perm:customers.delete');
     Route::get('/customers/{id}/notes', [CustomerController::class, 'notes'])->middleware('perm:customers.view');
