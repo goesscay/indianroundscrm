@@ -6,6 +6,7 @@ use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
 use App\Http\Controllers\Crm\AccountController;
 use App\Http\Controllers\Crm\FinanceController;
+use App\Http\Controllers\Crm\HomeController;
 use App\Http\Controllers\Crm\InvoiceController;
 use App\Http\Controllers\Crm\JournalController;
 use App\Http\Controllers\Crm\PackageController;
@@ -69,6 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('perm:mail.manage')->post('/mail/poll', [MailAdminController::class, 'poll']);
 
     // ---- Dashboard & reporting
+    Route::get('/dashboard/overview', [HomeController::class, 'overview'])->middleware('perm:dashboard.view');
     Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->middleware('perm:dashboard.view');
     Route::middleware('perm:dashboard.leaderboard')->get('/dashboard/leaderboard', [DashboardController::class, 'leaderboard']);
     Route::get('/notifications', [DashboardController::class, 'notifications']);

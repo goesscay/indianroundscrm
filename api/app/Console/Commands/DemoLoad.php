@@ -414,6 +414,9 @@ class DemoLoad extends Command
             $closed = $this->today->copy()->subDays(2 + $k * 9)->setTime(12, 0);
             $d->closed_at = $closed;
             $d->expected_close = $closed->toDateString();
+            if ($k % 4 === 1) { // a few trips leave in the next three weeks so the dashboard shows departures
+                $d->travel_date = $this->d(3 + $k);
+            }
             $d->save();
         }
     }

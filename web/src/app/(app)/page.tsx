@@ -2,370 +2,312 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { DashboardStats, LeaderboardRow, SupplierSummary, UpcomingFollowup } from "@/types";
-import { useEffect, useState, useRef, type DragEvent, type HTMLAttributes } from "react";
-import type { LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AlertTriangle, ArrowRight, CalendarCheck, CheckCircle2, Clock, Phone, PlaneTakeoff, RefreshCw } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import FollowupCountdown from "@/components/app/FollowupCountdown";
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  PieChart, Pie, Cell, LineChart, Line, Legend
-} from "recharts";
-import { TrendingUp, Users2, IndianRupee, CalendarClock, Clock, CheckCircle2, XCircle, Layers, GripVertical, RotateCcw, Phone, MessageCircle } from "lucide-react";
+import { INR, fmtDate, inrShort } from "@/components/crm/shared";
 
-const INR = (n: number | string | null | undefined) => "₹" + (Number(n) || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
-
-function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "primary" | "accent" | "amber" | "red" | "orange" }) {
-  const tones: Record<string, string> = {
-    primary: "bg-[#EFEFEB] text-[#0A0A0A] dark:text-foreground border border-[#E0E0DA] dark:bg-[#17171a] dark:text-foreground dark:border-[#26262a]",
-    accent: "bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100",
-    amber: "bg-amber-100 text-amber-900 dark:text-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
-    red: "bg-red-100 text-red-900 dark:text-red-300 dark:bg-red-950/60 dark:text-red-300",
-    orange: "bg-orange-100 text-orange-900 dark:bg-orange-950/60 dark:text-orange-300",
-  };
-  return (
-    <div className={`p-3 rounded-md ${(tone && tones[tone]) || "bg-secondary"}`}>
-      <div className={`label-caps opacity-80`}>{label}</div>
-      <div className="font-display font-black text-2xl tracking-tight mt-1">{value}</div>
-    </div>
-  );
+interface Kpi { key: string; label: string; value: number; format: "inr" | "number"; sub?: string; tone?: "warn" | null; href?: string }
+interface FocusItem { kind: "task" | "followup"; id: string; type: string; title: string; sub: string | null; due_at: string; overdue: boolean; href: string; phone?: string }
+interface Overview {
+  kpis: Kpi[];
+  focus: { items: FocusItem[]; total: number; overdue: number } | null;
+  pipeline: { stages: { stage: string; label: string; count: number; value: number }[]; lost: number } | null;
+  target: { label: string; target: number; won: number; pct: number | null; days_left: number; scope: "team" | "you" } | null;
+  months: { label: string; won: number; leads: number }[] | null;
+  departures: { id: string; name: string; customer: string | null; destination: string | null; travel_date: string; days: number; pax: number; trip_status: string | null; balance_due: number }[] | null;
+  collections: { items: { id: string; invoice_no: string | null; customer: string | null; balance: number; due_date: string | null; overdue: boolean; days: number | null }[]; total: number; amount: number } | null;
+  payments: { id: string; receipt_no: string; customer: string | null; invoice_no: string | null; amount: number; date: string }[] | null;
+  leaderboard: { name: string; deals: number; value: number }[] | null;
+  destinations: { destination: string; deals: number; value: number }[] | null;
+  supplier: { awaiting: number; overdue: number; unmatched: number; replies_today: number } | null;
 }
 
-interface KpiProps {
-  label: string;
-  value: string | number;
-  icon: LucideIcon;
-  tone?: "default" | "primary" | "accent";
-  testId: string;
-  dragHandlers?: HTMLAttributes<HTMLDivElement>;
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-function Kpi({ label, value, icon: Icon, tone = "default", testId, dragHandlers }: KpiProps) {
-  const tones: Record<string, string> = {
-    default: "bg-card",
-    primary: "bg-[#EFEFEB] text-[#0A0A0A] dark:text-foreground border border-[#E0E0DA] dark:bg-[#17171a] dark:text-foreground dark:border-[#26262a]",
-    accent: "bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100",
-  };
-  const isDark = false;
+function Widget({ title, action, children, className, testId }: { title: string; action?: { href: string; label: string }; children: ReactNode; className?: string; testId?: string }) {
   return (
-    <Card
-      className={`p-4 rounded-lg border border-border ${tones[tone]} transition-all hover:-translate-y-0.5 hover:shadow-sm relative group cursor-move`}
-      data-testid={testId}
-      draggable
-      {...dragHandlers}
-    >
-      <GripVertical size={14} className={`absolute top-2 right-2 opacity-0 group-hover:opacity-60 transition-opacity ${isDark ? "text-white" : "text-muted-foreground"}`} />
-      <div className="flex items-start justify-between">
-        <div>
-          <div className={`label-caps ${isDark ? "text-white/70!" : ""}`}>{label}</div>
-          <div className={`kpi-value mt-2 ${isDark ? "" : "text-foreground"}`}>{value}</div>
-        </div>
-        <Icon size={22} className={isDark ? "opacity-70" : "text-muted-foreground"} />
+    <Card className={cn("flex flex-col rounded-lg p-5", className)} data-testid={testId}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="font-display text-base font-bold">{title}</h3>
+        {action && <Link href={action.href} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">{action.label} <ArrowRight size={12} /></Link>}
       </div>
+      {children}
     </Card>
   );
 }
 
-const DEFAULT_ORDER = ["total_leads", "today_leads", "booked", "quote_pending", "revenue", "profit", "followups", "cancelled"];
+const Empty = ({ children }: { children: ReactNode }) => <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>;
+
+function dueLabel(iso: string): string {
+  const d = new Date(iso);
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - t.getTime()) / 86400000);
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (days === 0) return `Today, ${time}`;
+  if (days === -1) return `Yesterday, ${time}`;
+  if (days < 0) return `${-days} days ago`;
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
 
 export default function Dashboard() {
   const { user, can } = useCurrentUser();
-  const { resolved } = useTheme();
-  const dk = resolved === "dark";
-  const chartGrid = dk ? "#26262a" : "#E2E8F0";
-  const chartAxis = dk ? "#9c9ca2" : "#666666";
-  const tipStyle = { backgroundColor: dk ? "#151517" : "#FFFFFF", border: `1px solid ${dk ? "#2a2a2e" : "#E5E5E5"}`, borderRadius: 4, color: dk ? "#ECECEC" : "#0A0A0A", fontSize: 12 };
-  const tipLabel = { color: dk ? "#ECECEC" : "#0A0A0A", fontWeight: 600 };
-  const tipItem = { color: dk ? "#D4D4D4" : "#262626" };
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
-  const [supSummary, setSupSummary] = useState<SupplierSummary | null>(null);
-  const [followups, setFollowups] = useState<UpcomingFollowup[]>([]);
-  const [err, setErr] = useState("");
   const router = useRouter();
-  const storageKey = `ir_kpi_order_${user.id}`;
-  const [order, setOrder] = useState(() => {
-    try { return (JSON.parse(localStorage.getItem(storageKey) ?? "null") as string[] | null) || DEFAULT_ORDER; }
-    catch { return DEFAULT_ORDER; }
-  });
-  const dragIdx = useRef<number | null>(null);
+  const { resolved } = useTheme();
+  const dark = resolved === "dark";
+  const [d, setD] = useState<Overview | null>(null);
+  const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(order)); }, [order, storageKey]);
-
-  const canView = can("dashboard.view");
+  const load = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true);
+    try { const { data } = await api.get<Overview>("/dashboard/overview"); setD(data); setError(""); }
+    catch (e) { setError(formatApiError(e)); }
+    finally { setRefreshing(false); }
+  }, []);
   useEffect(() => {
-    if (!canView) return;
-    (async () => {
-      try {
-        const { data } = await api.get<DashboardStats>("/dashboard/stats");
-        setStats(data);
-        if (can("users.view")) {
-          const lb = await api.get<LeaderboardRow[]>("/dashboard/leaderboard");
-          setLeaderboard(lb.data);
-        }
-        if (can("supplier_dashboard.view")) {
-          try { const sup = await api.get<SupplierSummary>("/lead-suppliers/dashboard/summary"); setSupSummary(sup.data); } catch { /* ignore */ }
-        }
-        try { const fu = await api.get<UpcomingFollowup[]>("/followups/upcoming?hours=72"); setFollowups(fu.data); } catch { /* ignore */ }
-      } catch (e) { setErr(formatApiError(e)); }
-    })();
-  }, [can, canView]);
+    void load();
+    const t = setInterval(() => void load(), 120_000);
+    return () => clearInterval(t);
+  }, [load]);
 
-  if (!canView) {
-    return (
-      <div className="space-y-2" data-testid="dashboard-page">
-        <div className="label-caps">Overview</div>
-        <h1 className="font-display text-3xl font-black tracking-tight">Welcome back, {user.name}</h1>
-        <p className="text-sm text-muted-foreground">Use the menu to open the areas available to your role.</p>
-      </div>
-    );
-  }
-  if (!stats) return <div className="text-muted-foreground text-sm">Loading dashboard…{err && ` · ${err}`}</div>;
-
-  const kpiMap: Record<string, Omit<KpiProps, "dragHandlers">> = {
-    total_leads: { label: "Total Leads", value: stats.total_leads, icon: Layers, testId: "kpi-total-leads" },
-    today_leads: { label: "Today's Leads", value: stats.today_leads, icon: CalendarClock, tone: "primary", testId: "kpi-today" },
-    booked: { label: "Booked", value: stats.booked, icon: CheckCircle2, tone: "accent", testId: "kpi-booked" },
-    quote_pending: { label: "Quote Pending", value: stats.quote_pending, icon: Clock, testId: "kpi-quote-pending" },
-    revenue: { label: "Revenue", value: INR(stats.revenue), icon: IndianRupee, testId: "kpi-revenue" },
-    profit: { label: "Profit", value: INR(stats.profit), icon: TrendingUp, testId: "kpi-profit" },
-    followups: { label: "Follow-ups Today", value: stats.followups_today, icon: Users2, testId: "kpi-followups" },
-    cancelled: { label: "Cancelled", value: stats.cancelled, icon: XCircle, testId: "kpi-cancelled" },
-  };
-
-  const onDragStart = (i: number) => (e: DragEvent<HTMLDivElement>) => { dragIdx.current = i; e.dataTransfer.effectAllowed = "move"; };
-  const onDragOver = (i: number) => (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (dragIdx.current === null || dragIdx.current === i) return;
-    setOrder((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(dragIdx.current as number, 1);
-      next.splice(i, 0, moved);
-      dragIdx.current = i;
-      return next;
-    });
-  };
-  const onDragEnd = () => { dragIdx.current = null; };
-
-  const statusChart = Object.entries(stats.status_counts || {}).map(([k, v]) => ({ name: k, value: v }));
-  const COLORS = dk
-    ? ["#F2F2F2", "#B8B8BC", "#8A8A90", "#62626A", "#D6D6DA", "#9C9CA2", "#74747A", "#4A4A50"]
-    : ["#0A0A0A", "#525252", "#8A8A8A", "#BDBDBD", "#2E2E2E", "#6B6B6B", "#A3A3A3", "#D4D4D4"];
-  const title = can("users.view") ? "Master Dashboard" : can("supplier_dashboard.view") ? "Operations Dashboard" : "My Dashboard";
+  const first = (user.name || "").split(" ")[0] || "there";
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const grid = dark ? "#26262a" : "#E6E6E1";
+  const axis = dark ? "#9c9ca2" : "#6b6b6b";
 
   return (
     <div className="space-y-6" data-testid="dashboard-page">
-      <div className="flex items-end justify-between flex-wrap gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="label-caps">Overview</div>
-          <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">{title}</h1>
-          <p className="text-sm text-muted-foreground mt-2">Welcome back, {user.name}. Drag KPI cards to reorder.</p>
+          <div className="label-caps">{today}</div>
+          <h1 className="mt-1 font-display text-3xl font-black tracking-tight sm:text-4xl">{greeting()}, {first}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Here is what needs your attention today.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setOrder(DEFAULT_ORDER)} data-testid="reset-kpi-order">
-            <RotateCcw size={14} /> Reset layout
-          </Button>
-          {can("leads.create") && (
-            <Button onClick={() => router.push("/leads/new")} className="h-10 px-5" data-testid="dashboard-new-lead">+ New Lead</Button>
-          )}
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" aria-label="Refresh" onClick={() => void load(true)} data-testid="dashboard-refresh"><RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /></Button>
+          {can("quotes.create") && <Button variant="outline" onClick={() => router.push("/quotes/new")} data-testid="dashboard-new-quote">+ Quote</Button>}
+          {can("leads.create") && <Button onClick={() => router.push("/leads/new")} data-testid="dashboard-new-lead">+ New lead</Button>}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {order.filter(k => kpiMap[k]).map((k, i) => (
-          <Kpi key={k} {...kpiMap[k]} dragHandlers={{
-            onDragStart: onDragStart(i),
-            onDragOver: onDragOver(i),
-            onDragEnd,
-          }} />
-        ))}
-      </div>
+      {error && <div className="text-sm text-destructive">{error}</div>}
+      {!d && !error && <div className="py-16 text-center text-sm text-muted-foreground">Loading…</div>}
 
-      {supSummary && can("supplier_dashboard.view") && (
-        <Card className="p-6 rounded-lg" data-testid="supplier-summary">
-          <div className="label-caps">Supplier operations</div>
-          <h3 className="font-display text-xl font-bold mt-1 mb-4">Response tracker · live</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-            <Metric label="Sent today" value={supSummary.sent_today} tone="primary" />
-            <Metric label="Awaiting" value={supSummary.awaiting_replies} tone="amber" />
-            <Metric label="Quotes today" value={supSummary.quotes_received_today} tone="accent" />
-            <Metric label="Overdue >24h" value={supSummary.overdue} tone="red" />
-            <Metric label="Need f/up" value={supSummary.need_followup} tone="orange" />
-            <Metric label="Avg reply" value={`${supSummary.avg_response_hours}h`} />
-            <Metric label="No-email supp." value={supSummary.suppliers_no_email} />
-          </div>
-          {(supSummary.top_fastest?.length ?? 0) > 0 && (
-            <div className="mt-4">
-              <div className="label-caps mb-2">Fastest responders</div>
-              <div className="flex flex-wrap gap-2">
-                {supSummary.top_fastest?.map((f, i) => (
-                  <span key={i} className="text-xs px-2.5 py-1 rounded-md bg-secondary font-medium">
-                    <span className="font-bold">{f.name}</span> · {f.avg_hours}h · {f.replies} replies
-                  </span>
-                ))}
-              </div>
+      {d && (
+        <>
+          {d.kpis.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6" data-testid="dashboard-kpis">
+              {d.kpis.map((k) => {
+                const body = (
+                  <Card className={cn("h-full rounded-lg p-4 transition-shadow hover:shadow-sm", k.tone === "warn" && "border-amber-300 dark:border-amber-900")} data-testid={`kpi-${k.key}`}>
+                    <div className="label-caps">{k.label}</div>
+                    <div className="mt-1.5 font-display text-2xl font-black tracking-tight">{k.format === "inr" ? inrShort(k.value) : k.value.toLocaleString("en-IN")}</div>
+                    {k.sub && <div className={cn("mt-0.5 text-xs", k.tone === "warn" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>{k.sub}</div>}
+                  </Card>
+                );
+                return k.href ? <Link key={k.key} href={k.href} className="block">{body}</Link> : <div key={k.key}>{body}</div>;
+              })}
             </div>
           )}
-        </Card>
+
+          <div className="grid gap-6 lg:grid-cols-12">
+            {d.focus && (
+              <Widget title="Today's focus" action={{ href: "/activities", label: "All tasks" }} className="lg:col-span-7" testId="widget-focus">
+                {d.focus.items.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground"><CheckCircle2 size={28} className="text-emerald-600" /> You are all caught up. Nothing is due today.</div>
+                ) : (
+                  <>
+                    {d.focus.overdue > 0 && <p className="mb-2 flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400"><AlertTriangle size={13} /> {d.focus.overdue} overdue</p>}
+                    <ul className="divide-y divide-border">
+                      {d.focus.items.map((f) => (
+                        <li key={`${f.kind}-${f.id}`}>
+                          <Link href={f.href} className="-mx-2 flex items-center gap-3 rounded px-2 py-2.5 hover:bg-secondary/50" data-testid={`focus-${f.kind}-${f.id}`}>
+                            <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full", f.overdue ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300" : "bg-secondary text-muted-foreground")}>
+                              {f.kind === "followup" ? <Phone size={14} /> : <CalendarCheck size={14} />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{f.title}</span>
+                              {f.sub && <span className="block truncate text-xs text-muted-foreground">{f.sub}</span>}
+                            </span>
+                            <span className={cn("shrink-0 text-xs", f.overdue ? "font-medium text-red-600 dark:text-red-400" : "text-muted-foreground")}>{dueLabel(f.due_at)}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                    {d.focus.total > d.focus.items.length && <p className="mt-2 text-xs text-muted-foreground">+ {d.focus.total - d.focus.items.length} more</p>}
+                  </>
+                )}
+              </Widget>
+            )}
+
+            {d.pipeline && (
+              <Widget title="Sales pipeline" action={{ href: "/deals", label: "Open board" }} className={d.focus ? "lg:col-span-5" : "lg:col-span-12"} testId="widget-pipeline">
+                {(() => {
+                  const max = Math.max(1, ...d.pipeline.stages.map((s) => s.value));
+                  return (
+                    <ul className="space-y-3">
+                      {d.pipeline.stages.map((s) => (
+                        <li key={s.stage} data-testid={`pipeline-${s.stage}`}>
+                          <div className="mb-1 flex items-baseline justify-between text-sm"><span className="font-medium">{s.label} <span className="text-xs font-normal text-muted-foreground">· {s.count}</span></span><span className="font-semibold">{inrShort(s.value)}</span></div>
+                          <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className={cn("h-full rounded-full", s.stage === "won" ? "bg-emerald-500" : s.stage === "negotiation" ? "bg-amber-500" : s.stage === "quoted" ? "bg-sky-500" : "bg-slate-400")} style={{ width: `${Math.max(s.value > 0 ? 3 : 0, (s.value / max) * 100)}%` }} /></div>
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
+                {d.pipeline.lost > 0 && <p className="mt-4 text-xs text-muted-foreground">{d.pipeline.lost} deal{d.pipeline.lost === 1 ? "" : "s"} lost this financial year.</p>}
+              </Widget>
+            )}
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-12">
+            {(d.target || d.months) && (
+              <Widget title="Sales performance" action={can("forecasts.view") ? { href: "/forecasts", label: "Forecasts" } : undefined} className="lg:col-span-7" testId="widget-performance">
+                {d.target && (
+                  <div className="mb-4" data-testid="target-progress">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <div className="text-sm"><span className="font-semibold">{d.target.label}</span> <span className="text-muted-foreground">· {d.target.days_left} days left · {d.target.scope === "team" ? "team" : "your"} target</span></div>
+                      <div className="text-sm"><span className="font-display text-xl font-black">{inrShort(d.target.won)}</span>{d.target.target > 0 && <span className="text-muted-foreground"> of {inrShort(d.target.target)}</span>}</div>
+                    </div>
+                    {d.target.target > 0 ? (
+                      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuenow={Math.min(100, d.target.pct ?? 0)} aria-valuemin={0} aria-valuemax={100}><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, d.target.pct ?? 0)}%` }} /></div>
+                    ) : <p className="mt-1 text-xs text-muted-foreground">No target set for this quarter.</p>}
+                    {d.target.pct != null && <p className="mt-1 text-xs text-muted-foreground">{d.target.pct}% of the quarter&apos;s target</p>}
+                  </div>
+                )}
+                {d.months && (
+                  <div className="h-48" data-testid="chart-months">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={d.months} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
+                        <CartesianGrid stroke={grid} vertical={false} />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: axis, fontSize: 12 }} />
+                        <YAxis tickLine={false} axisLine={false} width={52} tick={{ fill: axis, fontSize: 11 }} tickFormatter={(v: number) => inrShort(v)} />
+                        <Tooltip cursor={{ fill: dark ? "#ffffff10" : "#00000008" }} formatter={(v) => [INR(Number(v)), "Won"]} contentStyle={{ borderRadius: 6, fontSize: 12 }} />
+                        <Bar dataKey="won" fill={dark ? "#ececee" : "#0A0A0A"} radius={[3, 3, 0, 0]} maxBarSize={36} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </Widget>
+            )}
+
+            {d.departures && (
+              <Widget title="Departing soon" action={{ href: "/deals", label: "All deals" }} className="lg:col-span-5" testId="widget-departures">
+                {d.departures.length === 0 ? <Empty>No trips leave in the next three weeks.</Empty> : (
+                  <ul className="divide-y divide-border">
+                    {d.departures.map((t) => (
+                      <li key={t.id}>
+                        <Link href={`/deals/${t.id}`} className="-mx-2 flex items-center gap-3 rounded px-2 py-2.5 hover:bg-secondary/50" data-testid={`departure-${t.id}`}>
+                          <span className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded bg-secondary text-center leading-none"><span className="text-sm font-bold">{t.days}</span><span className="text-[9px] uppercase text-muted-foreground">{t.days === 1 ? "day" : "days"}</span></span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-1.5 truncate text-sm font-medium"><PlaneTakeoff size={13} className="shrink-0 text-muted-foreground" />{t.destination ?? t.name}</span>
+                            <span className="block truncate text-xs text-muted-foreground">{t.customer} · {t.pax} pax · {fmtDate(t.travel_date)}</span>
+                          </span>
+                          {t.balance_due > 0 && <span className="shrink-0 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300" title="Balance still to collect">{inrShort(t.balance_due)} due</span>}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Widget>
+            )}
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-12">
+            {d.collections && (
+              <Widget title="Payments to chase" action={can("invoices.view") ? { href: "/invoices?status=overdue", label: "Invoices" } : undefined} className="lg:col-span-5" testId="widget-collections">
+                {d.collections.items.length === 0 ? <Empty>No payments are overdue or due this week.</Empty> : (
+                  <>
+                    <ul className="divide-y divide-border">
+                      {d.collections.items.map((c) => (
+                        <li key={c.id}>
+                          <Link href={`/invoices/${c.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded px-2 py-2.5 hover:bg-secondary/50" data-testid={`collect-${c.id}`}>
+                            <span className="min-w-0"><span className="block truncate text-sm font-medium">{c.customer}</span><span className="block text-xs text-muted-foreground"><span className="font-mono">{c.invoice_no}</span>{c.due_date ? ` · ${c.overdue ? "was due" : "due"} ${fmtDate(c.due_date)}` : ""}</span></span>
+                            <span className="shrink-0 text-right"><span className="block text-sm font-semibold">{inrShort(c.balance)}</span>{c.overdue && <span className="text-[11px] font-medium text-red-600 dark:text-red-400">Overdue</span>}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                    {d.collections.total > d.collections.items.length && <p className="mt-2 text-xs text-muted-foreground">+ {d.collections.total - d.collections.items.length} more · {inrShort(d.collections.amount)} in total</p>}
+                  </>
+                )}
+              </Widget>
+            )}
+
+            {d.payments && (
+              <Widget title="Recent payments" action={{ href: "/receipts", label: "Receipts" }} className="lg:col-span-4" testId="widget-payments">
+                {d.payments.length === 0 ? <Empty>No payments recorded yet.</Empty> : (
+                  <ul className="divide-y divide-border">
+                    {d.payments.map((p) => (
+                      <li key={p.id}>
+                        <Link href={`/receipts/${p.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded px-2 py-2.5 hover:bg-secondary/50">
+                          <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.customer}</span><span className="block text-xs text-muted-foreground">{fmtDate(p.date)}{p.invoice_no ? ` · ${p.invoice_no}` : " · advance"}</span></span>
+                          <span className="shrink-0 text-sm font-semibold text-emerald-600 dark:text-emerald-400">+ {inrShort(p.amount)}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Widget>
+            )}
+
+            {(d.leaderboard || d.destinations) && (
+              <Widget title={d.leaderboard && d.leaderboard.length > 0 ? "Top performers this month" : "Top destinations"} className={cn(d.collections || d.payments ? "lg:col-span-3" : "lg:col-span-12")} testId="widget-ranking">
+                {d.leaderboard && d.leaderboard.length > 0 ? (
+                  <ol className="space-y-2.5">
+                    {d.leaderboard.map((r, i) => (
+                      <li key={r.name} className="flex items-center gap-3 text-sm" data-testid={`leader-${i}`}>
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold">{i + 1}</span>
+                        <span className="min-w-0 flex-1"><span className="block truncate font-medium">{r.name}</span><span className="text-xs text-muted-foreground">{r.deals} deal{r.deals === 1 ? "" : "s"}</span></span>
+                        <span className="font-semibold">{inrShort(r.value)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : d.destinations && d.destinations.length > 0 ? (
+                  <ol className="space-y-2.5">
+                    {d.destinations.map((r, i) => (
+                      <li key={r.destination} className="flex items-center gap-3 text-sm">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold">{i + 1}</span>
+                        <span className="min-w-0 flex-1 truncate font-medium">{r.destination}</span><span className="font-semibold">{inrShort(r.value)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <Empty>Nothing to rank yet.</Empty>}
+              </Widget>
+            )}
+          </div>
+
+          {d.supplier && (
+            <Card className="flex flex-wrap items-center justify-between gap-4 rounded-lg p-4" data-testid="widget-supplier">
+              <div className="flex items-center gap-2 text-sm font-semibold"><Clock size={16} className="text-muted-foreground" /> Supplier desk</div>
+              <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                <span><span className="font-display text-lg font-black">{d.supplier.awaiting}</span> <span className="text-muted-foreground">awaiting a quote</span></span>
+                <span className={d.supplier.overdue ? "text-amber-700 dark:text-amber-400" : ""}><span className="font-display text-lg font-black">{d.supplier.overdue}</span> <span className="text-muted-foreground">overdue over 24 h</span></span>
+                <span><span className="font-display text-lg font-black">{d.supplier.replies_today}</span> <span className="text-muted-foreground">replies today</span></span>
+                <span><span className="font-display text-lg font-black">{d.supplier.unmatched}</span> <span className="text-muted-foreground">unmatched</span></span>
+              </div>
+              <div className="flex gap-3 text-xs">
+                {can("supplier_dashboard.view") && <Link href="/supplier-dashboard" className="underline underline-offset-2">Supplier dashboard</Link>}
+                {can("rsq.manage") && <Link href="/supplier-inbox" className="underline underline-offset-2">Inbox</Link>}
+              </div>
+            </Card>
+          )}
+
+          {d.kpis.length === 0 && !d.focus && !d.pipeline && !d.supplier && (
+            <Card className="rounded-lg p-10 text-center text-sm text-muted-foreground">Nothing to show here yet. Use the menu on the left to get started.</Card>
+          )}
+        </>
       )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-6 rounded-lg lg:col-span-3" data-testid="followup-timer">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <div className="label-caps">Task timer</div>
-              <h3 className="font-display text-xl font-bold mt-1">Follow-ups (next 72h)</h3>
-            </div>
-            <span className="label-caps">{followups.length} pending</span>
-          </div>
-          {followups.length === 0 && <div className="text-sm text-muted-foreground py-4">No follow-ups scheduled. Set follow-up date & time on any lead.</div>}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {followups.slice(0, 12).map((f) => {
-              const digits = (f.phone || "").replace(/\D/g, "");
-              const ten = digits.slice(-10);
-              return (
-                <Link key={f.lead_id} href={`/leads/${f.lead_id}`}
-                      className={`p-3 rounded-md border transition-colors block ${f.overdue ? "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40" : "border-border hover:bg-secondary/40"}`}
-                      data-testid={`followup-${f.lead_id}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-sm">{f.lead_id}</span>
-                    <FollowupCountdown iso={f.follow_up_at} />
-                  </div>
-                  <div className="font-medium text-sm mt-1 truncate">{f.customer_name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{f.destination} · {f.lead_status}</div>
-                  {ten.length === 10 && (
-                    <div className="flex gap-1 mt-2">
-                      {/* Not <a>: this card is already a link, and nested anchors are invalid HTML. */}
-                      <span
-                        role="button" tabIndex={0} aria-label="Call"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:+91${ten}`; }}
-                        className="text-[#0A0A0A] dark:text-foreground p-1 hover:bg-[#0A0A0A]/10 dark:hover:bg-white/10 rounded cursor-pointer"
-                      ><Phone size={13} /></span>
-                      <span
-                        role="button" tabIndex={0} aria-label="WhatsApp"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`https://wa.me/91${ten}`, "_blank", "noopener,noreferrer"); }}
-                        className="text-emerald-600 dark:text-emerald-400 p-1 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 rounded cursor-pointer"
-                      ><MessageCircle size={13} /></span>
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-6 lg:col-span-2 rounded-lg" data-testid="chart-monthly">
-          <div className="label-caps">Monthly performance</div>
-          <h3 className="font-display text-xl font-bold mt-1">Leads · Revenue · Profit</h3>
-          <div className="h-64 mt-4">
-            <ResponsiveContainer>
-              <LineChart data={stats.monthly || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
-                <XAxis dataKey="month" fontSize={12} stroke={chartAxis} tick={{ fill: chartAxis }} />
-                <YAxis fontSize={12} stroke={chartAxis} tick={{ fill: chartAxis }} />
-                <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} itemStyle={tipItem} cursor={{ fill: dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }} />
-                <Legend wrapperStyle={{ color: chartAxis, fontSize: 12 }} />
-                <Line type="monotone" dataKey="leads" stroke={dk ? "#F2F2F2" : "#0A0A0A"} strokeWidth={2} />
-                <Line type="monotone" dataKey="revenue" stroke={dk ? "#7A7A82" : "#8A8A8A"} strokeWidth={2} />
-                <Line type="monotone" dataKey="profit" stroke={dk ? "#A78BFA" : "#8B5CF6"} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        <Card className="p-6 rounded-lg" data-testid="chart-status">
-          <div className="label-caps">Pipeline</div>
-          <h3 className="font-display text-xl font-bold mt-1">By status</h3>
-          <div className="h-64 mt-4">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={statusChart} stroke={dk ? "#121214" : "#FFFFFF"} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80}>
-                  {statusChart.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} itemStyle={tipItem} cursor={{ fill: dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-3 space-y-1 max-h-24 overflow-y-auto">
-            {statusChart.map((s, i) => (
-              <div key={s.name} className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
-                  {s.name}
-                </span>
-                <span className="font-semibold">{s.value}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-6 rounded-lg" data-testid="chart-destinations">
-          <div className="label-caps">Top destinations</div>
-          <h3 className="font-display text-xl font-bold mt-1">Where they want to go</h3>
-          <div className="h-56 mt-4">
-            <ResponsiveContainer>
-              <BarChart data={stats.top_destinations || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
-                <XAxis dataKey="destination" fontSize={11} stroke={chartAxis} tick={{ fill: chartAxis }} />
-                <YAxis fontSize={11} stroke={chartAxis} tick={{ fill: chartAxis }} />
-                <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} itemStyle={tipItem} cursor={{ fill: dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }} />
-                <Bar dataKey="count" fill={dk ? "#E8E8EA" : "#0A0A0A"} radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        {can("users.view") && (
-          <Card className="p-6 rounded-lg lg:col-span-2" data-testid="leaderboard">
-            <div className="label-caps">Team</div>
-            <h3 className="font-display text-xl font-bold mt-1">Sales leaderboard</h3>
-            <div className="mt-4 divide-y divide-border">
-              {leaderboard.length === 0 && <div className="text-sm text-muted-foreground py-4">No leads yet.</div>}
-              {leaderboard.map((r, i) => (
-                <div key={r.staff_id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-md flex items-center justify-center font-black text-sm ${i === 0 ? "bg-[#E5E5E5] text-[#0A0A0A] dark:bg-neutral-800 dark:text-neutral-100" : "bg-secondary"}`}>
-                      {i + 1}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm">{r.staff_name || "Unknown"}</div>
-                      <div className="label-caps">{r.leads} leads · {r.booked} booked · {r.conversion_rate}%</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-display font-black text-lg tracking-tight">{INR(r.revenue)}</div>
-                    <div className="label-caps">revenue</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {!can("users.view") && (
-          <Card className="p-6 rounded-lg lg:col-span-2 flex flex-col justify-between" data-testid="quick-actions">
-            <div>
-              <div className="label-caps">Quick actions</div>
-              <h3 className="font-display text-xl font-bold mt-1">What next?</h3>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-3">
-              {can("leads.create") && (
-                <Link href="/leads/new"><Button className="h-11" data-testid="quick-new-lead">+ Create Lead</Button></Link>
-              )}
-              <Link href="/leads"><Button variant="outline" className="h-11" data-testid="quick-view-leads">View Leads</Button></Link>
-              <Link href="/calendar"><Button variant="outline" className="h-11">Calendar</Button></Link>
-            </div>
-          </Card>
-        )}
-      </div>
     </div>
   );
 }
