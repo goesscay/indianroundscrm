@@ -113,7 +113,7 @@ class Permissions
                 'view' => ['View supplier dashboard', 'See the supplier response tracker summary.'],
             ]),
             $g('master', 'Master data', [
-                'view' => ['View master data', 'Read dropdown values, destination cities and allocations.'],
+                'view' => ['View master data', 'Open the Master Data page and read its lists. Not needed for the lead form: anyone who can create or edit leads always gets the dropdown values.'],
                 'manage' => ['Manage master data', 'Add or remove master values and edit destination cities.'],
             ]),
             $g('allocations', 'Allocations', [
@@ -176,7 +176,7 @@ class Permissions
             'admin' => self::keys(),
             'sales' => [
                 'dashboard.view', 'leads.create', 'leads.edit_limited', 'leads.assignable', 'leads.notes',
-                'leads.contact_events', 'calendar.view', 'rsq.request', 'suppliers.view', 'master.view',
+                'leads.contact_events', 'calendar.view', 'rsq.request', 'suppliers.view',
                 'ai.use', 'chat.use', 'activities.view', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.create', 'customers.edit',
                 'deals.view', 'deals.create', 'deals.edit', 'forecasts.view',
@@ -187,7 +187,7 @@ class Permissions
                 'dashboard.view', 'leads.view_all', 'leads.create', 'leads.edit', 'leads.edit_limited', 'leads.reassign',
                 'leads.notes', 'leads.contact_events', 'calendar.view', 'rsq.request', 'rsq.manage',
                 'supplier_mail.send', 'suppliers.view', 'suppliers.manage', 'supplier_dashboard.view',
-                'master.view', 'ai.use', 'chat.use',
+                'ai.use', 'chat.use',
                 'activities.view', 'activities.view_all', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',
                 'deals.view', 'deals.view_all', 'deals.create', 'deals.edit', 'forecasts.view', 'forecasts.view_all',

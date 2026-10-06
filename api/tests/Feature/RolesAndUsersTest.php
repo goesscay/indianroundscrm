@@ -51,8 +51,9 @@ class RolesAndUsersTest extends TestCase
         $s = ['name' => 'S', 'email' => 's@x.com'];
         $this->api('POST', '/api/suppliers', $s, 'sales')->assertStatus(403);
         $this->api('POST', '/api/suppliers', $s, 'ops')->assertOk();
-        // any authenticated user may read master data
-        $this->api('GET', '/api/master', [], 'sales')->assertOk();
+        // master data pages are admin-only; sales still get the lead form lists
+        $this->api('GET', '/api/master', [], 'sales')->assertStatus(403);
+        $this->api('GET', '/api/lead-options', [], 'sales')->assertOk();
     }
 
     public function test_users_crud(): void

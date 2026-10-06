@@ -90,7 +90,8 @@ class RbacTest extends TestCase
         }
         $this->api('POST', '/api/master', ['category' => 'x', 'value' => 'y'], 'ops')->assertStatus(403);
         $this->api('POST', '/api/master', ['category' => 'x', 'value' => 'y'], 'adm')->assertOk();
-        $this->api('GET', '/api/master', [], 'sales')->assertOk();
+        $this->api('GET', '/api/master', [], 'sales')->assertStatus(403);          // admin-only; the lead form reads /api/lead-options instead
+        $this->api('GET', '/api/lead-options', [], 'sales')->assertOk();
         $this->api('POST', '/api/allocations', ['destination' => 'Goa', 'consultant_id' => (string) $sales->id], 'ops')->assertStatus(403);
         $this->api('POST', '/api/allocations', ['destination' => 'Goa', 'consultant_id' => (string) $sales->id], 'adm')->assertOk();
         foreach (['sales', 'ops'] as $b) {

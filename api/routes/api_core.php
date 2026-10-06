@@ -51,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ---- Master data ----
+    Route::get('/lead-options', [MasterDataController::class, 'leadOptions'])->middleware('perm:leads.create,leads.edit,leads.edit_limited');
     Route::get('/master', [MasterDataController::class, 'masterIndex'])->middleware('perm:master.view,master.manage');
     Route::post('/master', [MasterDataController::class, 'masterStore'])->middleware('perm:master.manage');
     Route::delete('/master/{mid}', [MasterDataController::class, 'masterDestroy'])->middleware('perm:master.manage');

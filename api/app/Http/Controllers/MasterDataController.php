@@ -13,6 +13,19 @@ use Illuminate\Http\Request;
 
 class MasterDataController extends Controller
 {
+    // ---------- /lead-options ----------
+
+    /** Dropdown values and destination cities for the lead form. Open to anyone who can create or edit leads, so the Master Data page itself can stay admin-only. */
+    public function leadOptions()
+    {
+        $master = [];
+        foreach (Master::query()->orderBy('id')->get(['category', 'value']) as $m) {
+            $master[$m->category][] = $m->value;
+        }
+
+        return ['master' => (object) $master, 'cities' => $this->citiesIndex()->getData()];
+    }
+
     // ---------- /master ----------
     public function masterIndex(Request $request)
     {

@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
-import type { DestinationCities, DuplicateInfo, Lead, LeadCreate, MasterItem, StayCity } from "@/types";
+import type { DestinationCities, DuplicateInfo, Lead, LeadCreate, StayCity } from "@/types";
 
 interface LeadFormState extends Omit<LeadCreate, "duration_days" | "child_ages" | "lead_date" | "stay_cities"> {
   duration_days: string | number;
@@ -99,15 +99,10 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
   };
 
   useEffect(() => {
-    (async () => {
-      const [m, dc] = await Promise.all([
-        api.get<MasterItem[]>("/master"),
-        api.get<DestinationCities>("/destination-cities"),
-      ]);
-      const grouped = m.data.reduce<Record<string, string[]>>((acc, x) => { (acc[x.category] = acc[x.category] || []).push(x.value); return acc; }, {});
-      setMaster(grouped);
-      setDestCities(dc.data || {});
-    })();
+    // Dropdown values come from /lead-options (open to anyone who can create or edit leads), not from the admin-only Master Data endpoints.
+    api.get<{ master: Record<string, string[]>; cities: DestinationCities }>("/lead-options")
+      .then(({ data }) => { setMaster(data.master || {}); setDestCities(data.cities || {}); })
+      .catch((e) => toast.error(`Could not load the dropdown lists: ${formatApiError(e)}`));
   }, []);
 
   useEffect(() => {
