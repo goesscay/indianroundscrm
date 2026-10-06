@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DealDialog from "@/components/crm/DealDialog";
-import { RecordActivities, RecordNotes } from "@/components/crm/RecordPanels";
+import { RecordActivities, RecordNotes, RecordQuotes } from "@/components/crm/RecordPanels";
 import { INR, STAGES, StagePill, TRIP_STATUSES, fmtDate } from "@/components/crm/shared";
 import type { Deal, DealStage } from "@/types";
 
@@ -150,6 +150,7 @@ export default function DealDetail() {
           {can("deals.delete") && <Button variant="ghost" size="sm" className="text-destructive" onClick={remove} data-testid="deal-delete"><Trash2 size={14} /> Delete deal</Button>}
         </div>
         <div className="space-y-6">
+          <RecordQuotes filter={{ deal_id: d.id }} newHref={`/quotes/new?deal=${d.id}`} />
           <RecordActivities base={`/deals/${d.id}`} link={{ deal_id: d.id, customer_id: d.customer_id }} />
           <RecordNotes base={`/deals/${d.id}`} canWrite={canEdit} />
         </div>

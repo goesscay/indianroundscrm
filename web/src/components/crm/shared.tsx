@@ -67,3 +67,58 @@ export const fmtDate = (d: string | null | undefined) => {
   if (Number.isNaN(dt.getTime())) return "—";
   return dt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 };
+
+export const PACKAGE_CATEGORIES: { value: string; label: string }[] = [
+  { value: "domestic", label: "Domestic" },
+  { value: "international", label: "International" },
+  { value: "honeymoon", label: "Honeymoon" },
+  { value: "group", label: "Group tour" },
+  { value: "pilgrimage", label: "Pilgrimage" },
+  { value: "adventure", label: "Adventure" },
+  { value: "other", label: "Other" },
+];
+export const categoryLabel = (c: string) => PACKAGE_CATEGORIES.find((x) => x.value === c)?.label ?? c;
+
+export const LINE_KINDS: { value: string; label: string }[] = [
+  { value: "package", label: "Package" },
+  { value: "hotel", label: "Hotel" },
+  { value: "flight", label: "Flight" },
+  { value: "transfer", label: "Transfer" },
+  { value: "visa", label: "Visa" },
+  { value: "insurance", label: "Insurance" },
+  { value: "activity", label: "Activity" },
+  { value: "other", label: "Other" },
+];
+
+const QUOTE_META: Record<string, { label: string; chip: string }> = {
+  draft: { label: "Draft", chip: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700" },
+  sent: { label: "Sent", chip: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-900" },
+  accepted: { label: "Accepted", chip: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-900" },
+  rejected: { label: "Rejected", chip: "bg-red-50 text-red-800 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-900" },
+  expired: { label: "Expired", chip: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-900" },
+  superseded: { label: "Superseded", chip: "bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-neutral-900 dark:text-neutral-400 dark:border-neutral-800" },
+};
+
+export function QuotePill({ status, className }: { status: string; className?: string }) {
+  const m = QUOTE_META[status] ?? QUOTE_META.draft;
+  return <span className={cn("inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium", m.chip, className)}>{m.label}</span>;
+}
+
+/** Same maths as the server: amount = qty*unit - discount, tax = amount*rate, TCS on (taxable + tax). */
+export function calcQuote(lines: { qty: number; unit_price: number; discount: number; tax_rate: number }[], tcsRate: number) {
+  let subtotal = 0, discount = 0, tax = 0;
+  const rows = lines.map((l) => {
+    const gross = Math.round((Number(l.qty) || 0) * (Number(l.unit_price) || 0) * 100) / 100;
+    const disc = Number(l.discount) || 0;
+    const amount = Math.round((gross - disc) * 100) / 100;
+    const t = Math.round(amount * (Number(l.tax_rate) || 0)) / 100;
+    subtotal += gross; discount += disc; tax += t;
+    return { gross, amount, tax: t, total: amount + t };
+  });
+  const taxable = subtotal - discount;
+  const tcs = Math.round((taxable + tax) * (Number(tcsRate) || 0)) / 100;
+  const r = (n: number) => Math.round(n * 100) / 100;
+  return { rows, subtotal: r(subtotal), discount: r(discount), tax: r(tax), tcs: r(tcs), total: r(taxable + tax + tcs) };
+}
+
+export const INR2 = (n: number | null | undefined) => "₹" + (Number(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

@@ -4,6 +4,8 @@ use App\Http\Controllers\Crm\ActivityController;
 use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
+use App\Http\Controllers\Crm\PackageController;
+use App\Http\Controllers\Crm\QuoteController;
 use App\Http\Controllers\Crm\LeadConvertController;
 use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\LeadController;
@@ -108,4 +110,25 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/forecasts', [ForecastController::class, 'show'])->middleware('perm:forecasts.view');
     Route::get('/forecasts/deals', [ForecastController::class, 'dealsList'])->middleware('perm:forecasts.view');
     Route::put('/forecasts/targets', [ForecastController::class, 'setTarget'])->middleware('perm:forecasts.manage_targets');
+
+    // ---- Packages (catalogue)
+    Route::get('/packages/options', [PackageController::class, 'options'])->middleware('perm:packages.view,packages.manage,quotes.create');
+    Route::get('/packages', [PackageController::class, 'index'])->middleware('perm:packages.view,packages.manage,quotes.create');
+    Route::post('/packages', [PackageController::class, 'store'])->middleware('perm:packages.manage');
+    Route::get('/packages/{id}', [PackageController::class, 'show'])->middleware('perm:packages.view,packages.manage,quotes.create');
+    Route::get('/packages/{id}/price', [PackageController::class, 'price'])->middleware('perm:packages.view,packages.manage,quotes.create');
+    Route::patch('/packages/{id}', [PackageController::class, 'update'])->middleware('perm:packages.manage');
+    Route::delete('/packages/{id}', [PackageController::class, 'destroy'])->middleware('perm:packages.manage');
+
+    // ---- Quotes
+    Route::get('/quotes', [QuoteController::class, 'index'])->middleware('perm:quotes.view');
+    Route::post('/quotes', [QuoteController::class, 'store'])->middleware('perm:quotes.create');
+    Route::get('/quotes/{id}', [QuoteController::class, 'show'])->middleware('perm:quotes.view');
+    Route::patch('/quotes/{id}', [QuoteController::class, 'update'])->middleware('perm:quotes.create');
+    Route::delete('/quotes/{id}', [QuoteController::class, 'destroy'])->middleware('perm:quotes.delete,quotes.create');
+    Route::post('/quotes/{id}/revise', [QuoteController::class, 'revise'])->middleware('perm:quotes.create');
+    Route::post('/quotes/{id}/status', [QuoteController::class, 'setStatus'])->middleware('perm:quotes.send');
+    Route::get('/quotes/{id}/pdf', [QuoteController::class, 'pdf'])->middleware('perm:quotes.view');
+    Route::get('/quotes/{id}/email-preview', [QuoteController::class, 'emailPreview'])->middleware('perm:quotes.send');
+    Route::post('/quotes/{id}/send', [QuoteController::class, 'send'])->middleware('perm:quotes.send');
 });

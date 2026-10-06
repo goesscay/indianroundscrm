@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ListChecks, Plus, StickyNote, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { FileText, ListChecks, Plus, StickyNote, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -12,7 +13,8 @@ import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import ActivityDialog from "@/components/activities/ActivityDialog";
 import { DoneToggle, canEditActivity, dueClass, formatDue, typeMeta } from "@/components/activities/shared";
 import { cn } from "@/lib/utils";
-import type { Activity, CrmNote } from "@/types";
+import { INR2, QuotePill, fmtDate } from "@/components/crm/shared";
+import type { Activity, CrmNote, Quote } from "@/types";
 
 /** Notes card for a customer or a deal. `base` is "/customers/12" or "/deals/7". */
 export function RecordNotes({ base, canWrite }: { base: string; canWrite: boolean }) {
@@ -133,6 +135,47 @@ export function RecordActivities({ base, link }: { base: string; link: { custome
       </ul>
       <LoadMore lm={lm} />
       <ActivityDialog open={open} onOpenChange={setOpen} activity={editing} defaults={link} onChanged={() => void load()} />
+    </Card>
+  );
+}
+
+/** Quotes for a customer or a deal, with a New quote shortcut. `filter` is {customer_id} or {deal_id}. */
+export function RecordQuotes({ filter, newHref }: { filter: { customer_id?: string; deal_id?: string }; newHref: string }) {
+  const { can } = useCurrentUser();
+  const [items, setItems] = useState<Quote[] | null>(null);
+  const key = JSON.stringify(filter);
+
+  useEffect(() => {
+    if (!can("quotes.view")) return;
+    api.get<Quote[]>("/quotes", { params: { ...filter, limit: 50 } }).then((r) => setItems(r.data)).catch(() => setItems([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  if (!can("quotes.view")) return null;
+  return (
+    <Card className="p-5 rounded-lg" data-testid="record-quotes">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <FileText size={16} className="text-muted-foreground" />
+          <h3 className="font-display font-bold">Quotes</h3>
+          {items && <span className="text-xs text-muted-foreground">({items.length})</span>}
+        </div>
+        {can("quotes.create") && <Link href={newHref}><Button size="sm" variant="outline" data-testid="record-quote-new"><Plus size={14} /> New quote</Button></Link>}
+      </div>
+      {items && items.length === 0 && <p className="text-sm text-muted-foreground">No quotes yet.</p>}
+      <ul className="divide-y divide-border">
+        {items?.map((q) => (
+          <li key={q.id}>
+            <Link href={`/quotes/${q.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded px-2 py-2.5 hover:bg-secondary/40" data-testid={`record-quote-${q.id}`}>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{q.title}</div>
+                <div className="text-xs text-muted-foreground"><span className="font-mono">{q.quote_no}</span> · {fmtDate(q.issue_date)}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3"><span className="text-sm font-semibold">{INR2(q.total)}</span><QuotePill status={q.display_status} /></div>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }

@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import CustomerDialog from "@/components/crm/CustomerDialog";
 import DealDialog from "@/components/crm/DealDialog";
-import { RecordActivities, RecordNotes } from "@/components/crm/RecordPanels";
+import { RecordActivities, RecordNotes, RecordQuotes } from "@/components/crm/RecordPanels";
 import { INR, StagePill, customerTypeLabel, fmtDate } from "@/components/crm/shared";
 import StatusPill from "@/components/app/StatusPill";
 import type { Customer } from "@/types";
@@ -182,6 +182,7 @@ export default function CustomerDetail() {
             </Card>
           )}
 
+          <RecordQuotes filter={{ customer_id: c.id }} newHref={`/quotes/new?customer=${c.id}`} />
           <RecordActivities base={`/customers/${c.id}`} link={{ customer_id: c.id }} />
           <RecordNotes base={`/customers/${c.id}`} canWrite={canEdit} />
         </div>

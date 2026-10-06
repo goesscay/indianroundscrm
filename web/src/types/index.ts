@@ -698,3 +698,32 @@ export interface Forecast {
   owners: ForecastOwnerRow[];
   consultants: { id: string; name: string }[];
 }
+
+// ---- Packages & Quotes ----
+export type PackageCategory = "domestic" | "international" | "honeymoon" | "group" | "pilgrimage" | "adventure" | "other";
+export interface PackageSeason { id?: string; name: string; start_date: string; end_date: string; adult_price: number; child_price: number; adult_cost: number; child_cost: number }
+export interface PackageDay { day_no?: number; title: string; description?: string | null }
+export interface TravelPackage {
+  id: string; code: string; name: string; destination: string | null; category: PackageCategory;
+  nights: number; days: number; summary: string | null; inclusions: string | null; exclusions: string | null; terms: string | null;
+  adult_price: number; child_price: number; adult_cost: number; child_cost: number; gst_rate: number; active: boolean;
+  seasons?: PackageSeason[]; itinerary?: PackageDay[];
+}
+export interface PackageRates { season: string | null; adult_price: number; child_price: number; adult_cost: number; child_cost: number; gst_rate: number }
+
+export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "superseded";
+export type QuoteDisplayStatus = QuoteStatus | "expired";
+export type LineKind = "package" | "hotel" | "flight" | "transfer" | "visa" | "insurance" | "activity" | "other";
+export interface QuoteLine { kind: LineKind; description: string; qty: number; unit_price: number; discount: number; tax_rate: number; amount?: number; tax?: number; total?: number }
+export interface Quote {
+  id: string; quote_no: string; version: number; status: QuoteStatus; display_status: QuoteDisplayStatus;
+  customer: CustomerBrief | null; customer_id: string; deal: { id: string; deal_no: string; name: string } | null; deal_id: string | null;
+  package_id: string | null; title: string; issue_date: string; valid_until: string | null; destination: string | null; travel_date: string | null;
+  duration_days: number | null; adults: number; children: number; tcs_rate: number;
+  subtotal: number; discount_total: number; tax_total: number; tcs_total: number; total: number;
+  intro: string | null; inclusions: string | null; exclusions: string | null; terms: string | null; reject_reason: string | null;
+  sent_at: string | null; accepted_at: string | null; owner: { id: string; name: string } | null;
+  lines?: QuoteLine[]; itinerary?: PackageDay[];
+  emails?: { to: string; subject: string; status: string; error: string | null; with_pdf: boolean; created_at: string }[];
+  created_at: string; updated_at: string;
+}

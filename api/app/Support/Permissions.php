@@ -60,6 +60,17 @@ class Permissions
                 'edit' => ['Edit deals', 'Edit deals they can see, including stage, amounts and notes.'],
                 'delete' => ['Delete deals', 'Permanently delete deals.'],
             ]),
+            $g('packages', 'Packages', [
+                'view' => ['View packages', 'Browse the tour packages, prices and itineraries.'],
+                'manage' => ['Manage packages', 'Create, edit, deactivate and delete packages, seasonal prices and itineraries.'],
+            ]),
+            $g('quotes', 'Quotes', [
+                'view' => ['View quotes', 'Open Quotes. Sees quotes they own or created.'],
+                'view_all' => ['View all quotes', 'See every quote, whoever owns it.'],
+                'create' => ['Create quotes', 'Create and edit draft quotes, and revise sent ones.'],
+                'send' => ['Send quotes', 'E-mail quotes to customers and mark them accepted or rejected.'],
+                'delete' => ['Delete quotes', 'Delete draft quotes.'],
+            ]),
             $g('forecasts', 'Forecasts', [
                 'view' => ['View forecasts', 'Open Forecasts for the deals they own.'],
                 'view_all' => ['View team forecasts', 'See the whole team and each consultant, not just their own deals.'],
@@ -150,6 +161,7 @@ class Permissions
                 'ai.use', 'chat.use', 'activities.view', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.create', 'customers.edit',
                 'deals.view', 'deals.create', 'deals.edit', 'forecasts.view',
+                'packages.view', 'quotes.view', 'quotes.create', 'quotes.send',
             ],
             'operations' => [
                 'dashboard.view', 'leads.view_all', 'leads.create', 'leads.edit', 'leads.edit_limited', 'leads.reassign',
@@ -159,6 +171,7 @@ class Permissions
                 'activities.view', 'activities.view_all', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',
                 'deals.view', 'deals.view_all', 'deals.create', 'deals.edit', 'forecasts.view', 'forecasts.view_all',
+                'packages.view', 'packages.manage', 'quotes.view', 'quotes.view_all', 'quotes.create', 'quotes.send',
             ],
             default => [],
         };

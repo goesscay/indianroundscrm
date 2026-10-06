@@ -174,12 +174,16 @@ class GraphMailTransport implements MailTransport
         $mailbox = $this->mailbox();
         $draft = $this->call('POST', $this->userPath('/messages'), [], [
             'subject' => $mail->subject,
-            'body' => ['contentType' => 'Text', 'content' => $mail->body],
+            'body' => ['contentType' => $mail->html ? 'HTML' : 'Text', 'content' => $mail->body],
             'from' => ['emailAddress' => ['address' => $mailbox]],
             'toRecipients' => $this->recipients($mail->to),
             'ccRecipients' => $this->recipients($mail->cc),
             'bccRecipients' => $this->recipients($mail->bcc),
             'replyTo' => $this->recipients([$mailbox]),
+            ...($mail->attachments ? ['attachments' => array_map(fn ($a) => [
+                '@odata.type' => '#microsoft.graph.fileAttachment', 'name' => $a['name'], 'contentType' => $a['type'],
+                'contentBytes' => base64_encode($a['bytes']),
+            ], $mail->attachments)] : []),
         ]);
         $id = (string) $draft->json('id');
         if ($id === '') {
