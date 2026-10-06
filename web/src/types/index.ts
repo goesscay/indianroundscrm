@@ -73,6 +73,9 @@ export interface LeadCreate {
 
 export interface Lead extends Partial<LeadCreate> {
   id?: string;
+  customer_id?: string | null;
+  deal_id?: string | null;
+  converted_at?: string | null;
   lead_id: string;
   customer_name: string;
   phone: string;
@@ -464,6 +467,8 @@ export interface Activity {
   created_by: ActivityUserRef | null;
   completed_by: ActivityUserRef | null;
   lead: { lead_id: string; customer_name: string } | null;
+  customer?: { id: string; name: string } | null;
+  deal?: { id: string; name: string } | null;
   created_at: string;
 }
 
@@ -485,6 +490,8 @@ export interface ActivityInput {
   due_at?: string | null;
   assigned_to?: string | null;
   lead_id?: string | null;
+  customer_id?: string | null;
+  deal_id?: string | null;
   done?: boolean;
 }
 
@@ -569,4 +576,108 @@ export interface SupplierReplyEvent {
     preview?: string;
     received_at?: string;
   };
+}
+
+
+// ---- Customers & Deals ----
+export type CustomerType = "individual" | "family" | "corporate" | "agent";
+export type DealStage = "enquiry" | "quoted" | "negotiation" | "won" | "lost";
+export type TripStatus = "confirmed" | "docs_collected" | "travelling" | "completed";
+
+export interface CustomerContact {
+  id?: string;
+  name: string;
+  designation?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  is_primary?: boolean;
+}
+
+export interface CustomerTraveller {
+  id?: string;
+  name: string;
+  relation?: string | null;
+  gender?: string | null;
+  dob?: string | null;
+  nationality?: string | null;
+  passport_no?: string | null;
+  passport_masked?: boolean;
+  passport_expiry?: string | null;
+  preferences?: string | null;
+}
+
+export interface CustomerBrief { id: string; customer_no: string; name: string }
+
+export interface Customer extends CustomerBrief {
+  type: CustomerType;
+  status: "active" | "inactive";
+  company: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  gstin: string | null;
+  address_line: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  country: string | null;
+  source: string | null;
+  notes: string | null;
+  owner: { id: string; name: string } | null;
+  owner_id?: string | null;
+  deals_count: number;
+  open_pipeline: number;
+  won_value: number;
+  created_at: string;
+  updated_at: string;
+  contacts?: CustomerContact[];
+  travellers?: CustomerTraveller[];
+  deals?: Deal[];
+  leads?: { lead_id: string; destination: string; travel_date: string; lead_status: string; converted_at: string | null }[];
+}
+
+export interface Deal {
+  id: string;
+  deal_no: string;
+  name: string;
+  customer: CustomerBrief | null;
+  customer_id: string;
+  lead_id: string | null;
+  stage: DealStage;
+  trip_status: TripStatus | null;
+  probability: number;
+  destination: string | null;
+  travel_date: string | null;
+  duration_days: number | null;
+  adults: number;
+  children: number;
+  selling_amount: number;
+  supplier_cost: number;
+  margin: number;
+  weighted: number;
+  expected_close: string | null;
+  closed_at: string | null;
+  lost_reason: string | null;
+  notes: string | null;
+  owner: { id: string; name: string } | null;
+  overdue: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrmNote { id: string; note: string; created_by_id: string | null; created_by_name: string | null; created_at: string }
+
+export interface CrmOptions {
+  owners: { id: string; name: string }[];
+  types: string[];
+  sources: string[];
+}
+
+export interface ConvertPreview {
+  lead: { lead_id: string; customer_name: string; lead_status: string };
+  converted: boolean;
+  customer: CustomerBrief | null;
+  customer_suggestion: { name: string; phone: string; email: string; type: CustomerType; source: string | null; owner_id: string | null };
+  matches: (CustomerBrief & { phone: string | null; email: string | null; visible: boolean })[];
+  deal_suggestion: Partial<Deal> & { owner_id?: string | null };
 }

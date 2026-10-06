@@ -22,7 +22,9 @@ import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { Lead, LeadUpdate, Supplier, SupplierMailHistory, SupplierMailPreview, SupplierMailSendResult, User } from "@/types";
-import { Mail, MessageCircle, ArrowLeft, Phone, Copy, MessageSquare, UserCog } from "lucide-react";
+import { Mail, MessageCircle, ArrowLeft, Phone, Copy, MessageSquare, UserCog, ArrowRightLeft } from "lucide-react";
+import Link from "next/link";
+import ConvertLeadDialog from "@/components/crm/ConvertLeadDialog";
 
 const INR = (n: number | string | null | undefined) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
 
@@ -47,6 +49,7 @@ export default function LeadDetail() {
   const [assignTo, setAssignTo] = useState("");
   const [reassignReason, setReassignReason] = useState("");
   const [nrsqOpen, setNrsqOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
   const [nrsqForm, setNrsqForm] = useState<{ package_selected: string; selling_amount: string | number }>({ package_selected: "", selling_amount: "" });
 
   const load = async () => {
@@ -236,6 +239,12 @@ export default function LeadDetail() {
                 <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" /> Awaiting supplier reply
               </span>
             )}
+            {can("leads.convert") && !lead.deal_id && (
+              <Button onClick={() => setConvertOpen(true)} variant="outline" className="h-11" data-testid="convert-btn"
+                      title="Create the customer and the deal for this trip">
+                <ArrowRightLeft size={16} /> {lead.customer_id ? "Add deal" : "Convert"}
+              </Button>
+            )}
             <a href={whatsappLink} target="_blank" rel="noreferrer" onClick={() => track("whatsapp", lead.phone)}>
               <Button variant="outline" className="h-11" data-testid="whatsapp-btn">
                 <MessageCircle size={16} /> WhatsApp
@@ -243,6 +252,15 @@ export default function LeadDetail() {
             </a>
           </div>
       </div>
+
+      {(lead.customer_id || lead.deal_id) && (
+        <Card className="p-4 rounded-lg flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" data-testid="converted-banner">
+          <span className="inline-flex items-center gap-2 font-semibold"><ArrowRightLeft size={15} /> {lead.deal_id ? "Converted" : "Linked to a customer"}</span>
+          {lead.customer_id && <Link href={`/customers/${lead.customer_id}`} className="underline underline-offset-2 hover:no-underline" data-testid="lead-customer-link">View customer</Link>}
+          {lead.deal_id && <Link href={`/deals/${lead.deal_id}`} className="underline underline-offset-2 hover:no-underline" data-testid="lead-deal-link">View deal</Link>}
+          {lead.converted_at && <span className="text-muted-foreground">on {(lead.converted_at || "").slice(0, 10)}</span>}
+        </Card>
+      )}
 
       <Card className="p-4 rounded-lg border-l-4 border-l-[#0A0A0A]" data-testid="contact-panel">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -598,6 +616,7 @@ export default function LeadDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConvertLeadDialog leadId={leadId} open={convertOpen} onOpenChange={setConvertOpen} onConverted={() => void load()} />
     </div>
   );
 }

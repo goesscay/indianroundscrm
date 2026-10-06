@@ -47,6 +47,16 @@ class Activity extends Model
         return $this->belongsTo(Lead::class, 'lead_id', 'lead_id');
     }
 
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function deal(): BelongsTo
+    {
+        return $this->belongsTo(Deal::class);
+    }
+
     public function toApi(): array
     {
         $u = fn ($rel) => $rel ? ['id' => (string) $rel->id, 'name' => $rel->name] : null;
@@ -66,6 +76,8 @@ class Activity extends Model
             'created_by' => $u($this->creator),
             'completed_by' => $u($this->completer),
             'lead' => $this->lead ? ['lead_id' => $this->lead->lead_id, 'customer_name' => $this->lead->customer_name] : null,
+            'customer' => $this->customer ? ['id' => (string) $this->customer->id, 'name' => $this->customer->name] : null,
+            'deal' => $this->deal ? ['id' => (string) $this->deal->id, 'name' => $this->deal->name] : null,
             'created_at' => $this->created_at?->utc()->toIso8601String(),
         ];
     }

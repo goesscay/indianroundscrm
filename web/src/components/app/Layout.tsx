@@ -12,7 +12,7 @@ import { useSupplierReplies } from "@/context/SupplierRepliesContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  Calendar, ListChecks, Bell, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
+  Calendar, ListChecks, Bell, Handshake, ContactRound, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAiPanel } from "@/components/ai/AiPanelContext";
@@ -33,6 +33,8 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard", group: "Workspace", perms: ["dashboard.view"] },
   { to: "/leads", label: "Leads", icon: ClipboardList, testId: "nav-leads", group: "Sales", perms: ["leads.view_all", "leads.create", "leads.edit", "leads.edit_limited"] },
+  { to: "/customers", label: "Customers", icon: ContactRound, testId: "nav-customers", group: "Sales", perms: ["customers.view"] },
+  { to: "/deals", label: "Deals", icon: Handshake, testId: "nav-deals", group: "Sales", perms: ["deals.view"] },
   { to: "/activities", label: "Activities", icon: ListChecks, testId: "nav-activities", group: "Sales", perms: ["activities.view"] },
   { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar", group: "Sales", perms: ["calendar.view"] },
   { to: "/chat", label: "Chat", icon: MessageSquare, testId: "nav-chat", group: "Team", perms: ["chat.use"] },

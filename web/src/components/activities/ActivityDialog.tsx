@@ -22,7 +22,7 @@ interface Props {
   /** Edit this activity; omit for create mode. */
   activity?: Activity | null;
   /** Create-mode prefill. `due_local` is a datetime-local string ("YYYY-MM-DDTHH:mm"). */
-  defaults?: { due_local?: string; lead?: { lead_id: string; customer_name: string } | null };
+  defaults?: { due_local?: string; lead?: { lead_id: string; customer_name: string } | null; customer_id?: string; deal_id?: string };
   onChanged: (change: ActivityChange) => void;
 }
 
@@ -102,6 +102,8 @@ export default function ActivityDialog({ open, onOpenChange, activity, defaults,
     type, priority, title: title.trim(), details: details.trim() || null,
     due_at: fromLocalInput(due), assigned_to: assignee === NOBODY ? null : assignee,
     lead_id: lead?.lead_id ?? null,
+    ...(!activity && defaults?.customer_id ? { customer_id: defaults.customer_id } : {}),
+    ...(!activity && defaults?.deal_id ? { deal_id: defaults.deal_id } : {}),
   });
 
   const save = async (e?: FormEvent) => {

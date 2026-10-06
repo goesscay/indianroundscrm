@@ -43,6 +43,22 @@ class Permissions
                 'notes_delete_any' => ['Delete any note', 'Delete notes written by other users (authors can always delete their own).'],
                 'contact_events' => ['Contact log', 'Read and log contact events on visible leads.'],
                 'export' => ['Export leads', 'Export lead data (reserved; there is no export endpoint yet).'],
+                'convert' => ['Convert leads', 'Convert a lead into a customer and a deal.'],
+            ]),
+            $g('customers', 'Customers', [
+                'view' => ['View customers', 'Open Customers. Sees customers they own or created.'],
+                'view_all' => ['View all customers', 'See every customer, whoever owns it.'],
+                'create' => ['Create customers', 'Add customers, contacts and travellers.'],
+                'edit' => ['Edit customers', 'Edit customers they can see, their contacts, travellers and notes.'],
+                'delete' => ['Delete customers', 'Delete customers that have no deals.'],
+                'view_passports' => ['View passport numbers', 'See full traveller passport numbers (others see them masked).'],
+            ]),
+            $g('deals', 'Deals', [
+                'view' => ['View deals', 'Open Deals. Sees deals they own or created.'],
+                'view_all' => ['View all deals', 'See every deal, whoever owns it.'],
+                'create' => ['Create deals', 'Add deals and move them between stages.'],
+                'edit' => ['Edit deals', 'Edit deals they can see, including stage, amounts and notes.'],
+                'delete' => ['Delete deals', 'Permanently delete deals.'],
             ]),
             $g('calendar', 'Calendar', [
                 'view' => ['View calendar', 'See travel and follow-up dates on the calendar.'],
@@ -127,6 +143,8 @@ class Permissions
                 'dashboard.view', 'leads.create', 'leads.edit_limited', 'leads.assignable', 'leads.notes',
                 'leads.contact_events', 'calendar.view', 'rsq.request', 'suppliers.view', 'master.view',
                 'ai.use', 'chat.use', 'activities.view', 'activities.create',
+                'leads.convert', 'customers.view', 'customers.create', 'customers.edit',
+                'deals.view', 'deals.create', 'deals.edit',
             ],
             'operations' => [
                 'dashboard.view', 'leads.view_all', 'leads.create', 'leads.edit', 'leads.edit_limited', 'leads.reassign',
@@ -134,6 +152,8 @@ class Permissions
                 'supplier_mail.send', 'suppliers.view', 'suppliers.manage', 'supplier_dashboard.view',
                 'master.view', 'ai.use', 'chat.use',
                 'activities.view', 'activities.view_all', 'activities.create',
+                'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',
+                'deals.view', 'deals.view_all', 'deals.create', 'deals.edit',
             ],
             default => [],
         };

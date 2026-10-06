@@ -12,7 +12,7 @@ class Lead extends Model
 
     protected $table = 'leads';
     protected $guarded = ['id'];
-    protected $stringIds = ['staff_id'];
+    protected $stringIds = ['staff_id', 'customer_id', 'deal_id'];
     protected $hidden = ['stayCities'];
 
     protected $casts = [

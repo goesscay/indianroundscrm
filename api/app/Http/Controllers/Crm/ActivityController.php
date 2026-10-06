@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
 
 class ActivityController extends Controller
 {
-    private const WITH = ['assignee:id,name', 'creator:id,name', 'completer:id,name', 'lead:id,lead_id,customer_name'];
+    public const WITH = ['assignee:id,name', 'creator:id,name', 'completer:id,name', 'lead:id,lead_id,customer_name', 'customer:id,name', 'deal:id,name'];
 
     // ------------------------------------------------------------------ helpers
 
@@ -101,6 +101,26 @@ class ActivityController extends Controller
         return (string) $v;
     }
 
+    /** Optional link to a customer / deal the caller can see (null clears). */
+    private function resolveLinked(mixed $v, string $field, User $user): ?int
+    {
+        if ($v === null || $v === '') {
+            return null;
+        }
+        $ok = false;
+        if (is_scalar($v) && ctype_digit((string) $v)) {
+            $q = $field === 'customer_id'
+                ? CustomerController::scopeForUser(\App\Models\Customer::query(), $user)->where('customers.id', (int) $v)
+                : DealController::scopeForUser(\App\Models\Deal::query(), $user)->where('deals.id', (int) $v);
+            $ok = $q->exists();
+        }
+        if (! $ok) {
+            Fail::unprocessable([$field => $field === 'customer_id' ? 'Customer not found' : 'Deal not found']);
+        }
+
+        return (int) $v;
+    }
+
     private function validated(array $b, bool $partial): array
     {
         $req = $partial ? 'sometimes|' : '';
@@ -113,6 +133,8 @@ class ActivityController extends Controller
             'due_at' => 'nullable|string',
             'assigned_to' => 'nullable',
             'lead_id' => 'nullable',
+            'customer_id' => 'nullable',
+            'deal_id' => 'nullable',
             'done' => 'sometimes|boolean',
         ]);
     }
@@ -266,6 +288,8 @@ class ActivityController extends Controller
             'due_at' => $this->parseInstant($d['due_at'] ?? null, 'due_at'),
             'assigned_to' => $this->resolveAssignee($d['assigned_to'] ?? null, $user),
             'lead_id' => $this->resolveLead($d['lead_id'] ?? null, $user),
+            'customer_id' => $this->resolveLinked($d['customer_id'] ?? null, 'customer_id', $user),
+            'deal_id' => $this->resolveLinked($d['deal_id'] ?? null, 'deal_id', $user),
             'created_by' => $user->id,
         ]);
         if (! empty($d['done'])) {
@@ -315,6 +339,11 @@ class ActivityController extends Controller
             // an unchanged link stays valid even if the caller no longer owns the lead
             $a->lead_id = ($d['lead_id'] !== null && $d['lead_id'] === $a->lead_id)
                 ? $a->lead_id : $this->resolveLead($d['lead_id'], $user);
+        }
+        foreach (['customer_id', 'deal_id'] as $f) {
+            if (array_key_exists($f, $d)) {
+                $a->{$f} = ((string) $d[$f] !== '' && (string) $d[$f] === (string) $a->{$f}) ? $a->{$f} : $this->resolveLinked($d[$f], $f, $user);
+            }
         }
         if (array_key_exists('done', $d)) {
             if ($d['done'] && ! $wasDone) {

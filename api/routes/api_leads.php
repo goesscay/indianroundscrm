@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Crm\ActivityController;
+use App\Http\Controllers\Crm\CustomerController;
+use App\Http\Controllers\Crm\DealController;
+use App\Http\Controllers\Crm\LeadConvertController;
 use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\LeadController;
 use App\Http\Controllers\Crm\RsqController;
@@ -71,4 +74,32 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/activities/{id}', [ActivityController::class, 'update'])->middleware('perm:activities.create,activities.manage');
     Route::delete('/activities/{id}', [ActivityController::class, 'destroy'])->middleware('perm:activities.create,activities.manage');
     Route::get('/leads/{lead_id}/activities', [ActivityController::class, 'forLead'])->middleware('perm:activities.view');
+
+    // ---- Lead -> Customer + Deal conversion
+    Route::get('/leads/{lead_id}/convert-preview', [LeadConvertController::class, 'preview'])->middleware('perm:leads.convert');
+    Route::post('/leads/{lead_id}/convert', [LeadConvertController::class, 'convert'])->middleware('perm:leads.convert');
+
+    // ---- Customers (static paths before {id})
+    Route::get('/customers/options', [CustomerController::class, 'options'])->middleware('perm:customers.view,customers.create');
+    Route::get('/customers/duplicate-check', [CustomerController::class, 'duplicateCheck'])->middleware('perm:customers.create,customers.edit');
+    Route::get('/customers', [CustomerController::class, 'index'])->middleware('perm:customers.view');
+    Route::post('/customers', [CustomerController::class, 'store'])->middleware('perm:customers.create');
+    Route::get('/customers/{id}', [CustomerController::class, 'show'])->middleware('perm:customers.view');
+    Route::patch('/customers/{id}', [CustomerController::class, 'update'])->middleware('perm:customers.edit');
+    Route::delete('/customers/{id}', [CustomerController::class, 'destroy'])->middleware('perm:customers.delete');
+    Route::get('/customers/{id}/notes', [CustomerController::class, 'notes'])->middleware('perm:customers.view');
+    Route::post('/customers/{id}/notes', [CustomerController::class, 'addNote'])->middleware('perm:customers.edit');
+    Route::get('/customers/{id}/activities', [CustomerController::class, 'activities'])->middleware('perm:customers.view');
+
+    // ---- Deals
+    Route::get('/deals/options', [DealController::class, 'options'])->middleware('perm:deals.view,deals.create');
+    Route::get('/deals', [DealController::class, 'index'])->middleware('perm:deals.view');
+    Route::post('/deals', [DealController::class, 'store'])->middleware('perm:deals.create');
+    Route::get('/deals/{id}', [DealController::class, 'show'])->middleware('perm:deals.view');
+    Route::patch('/deals/{id}', [DealController::class, 'update'])->middleware('perm:deals.edit');
+    Route::delete('/deals/{id}', [DealController::class, 'destroy'])->middleware('perm:deals.delete');
+    Route::get('/deals/{id}/notes', [DealController::class, 'notes'])->middleware('perm:deals.view');
+    Route::post('/deals/{id}/notes', [DealController::class, 'addNote'])->middleware('perm:deals.edit');
+    Route::get('/deals/{id}/activities', [DealController::class, 'activities'])->middleware('perm:deals.view');
+    Route::delete('/crm-notes/{id}', [DealController::class, 'deleteNote'])->middleware('perm:customers.edit,deals.edit');
 });
