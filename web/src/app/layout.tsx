@@ -14,7 +14,6 @@ export const metadata: Metadata = {
   title: "Indian Rounds CRM",
   description: "Indian Rounds — Travel Lead Management CRM",
   manifest: "/manifest.json",
-  icons: { icon: "/logo.png", apple: "/logo.png" },
 };
 
 export const viewport: Viewport = {
