@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plane } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { Activity } from "@/types";
+import type { Activity, CalendarEvent } from "@/types";
 import { PRIORITY_DOT, dayKey, typeMeta } from "./shared";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -19,9 +20,19 @@ interface Props {
   canCreate: boolean;
   onOpen: (a: Activity) => void;
   onCreate: (dueLocal: string) => void;
+  /** Show the "Trips" layer: lead travel dates. Needs the calendar.view permission. */
+  canTrips?: boolean;
 }
 
-export default function ActivityCalendar({ filters, refreshTick, canCreate, onOpen, onCreate }: Props) {
+const TRIPS_KEY = "ir-cal-trips";
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export default function ActivityCalendar({ filters, refreshTick, canCreate, onOpen, onCreate, canTrips }: Props) {
+  const router = useRouter();
+  const [showTrips, setShowTrips] = useState(true);
+  const [trips, setTrips] = useState<CalendarEvent[]>([]);
+  useEffect(() => { try { if (localStorage.getItem(TRIPS_KEY) === "0") setShowTrips(false); } catch { /* storage blocked */ } }, []);
+  const toggleTrips = () => setShowTrips((v) => { try { localStorage.setItem(TRIPS_KEY, v ? "0" : "1"); } catch { /* ignore */ } return !v; });
   const [cursor, setCursor] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
   const [items, setItems] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +62,22 @@ export default function ActivityCalendar({ filters, refreshTick, canCreate, onOp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gridStart, weeks, key, refreshTick]);
 
+  useEffect(() => {
+    if (!canTrips || !showTrips) { setTrips([]); return; }
+    let cancelled = false;
+    const end = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + weeks * 7);
+    api.get<CalendarEvent[]>("/leads/calendar", { params: { from: ymd(gridStart), to: ymd(end) } })
+      .then((r) => { if (!cancelled) setTrips(Array.isArray(r.data) ? r.data : []); })
+      .catch(() => { if (!cancelled) setTrips([]); });
+    return () => { cancelled = true; };
+  }, [gridStart, weeks, canTrips, showTrips, refreshTick]);
+
+  const tripsByDay = useMemo(() => {
+    const g: Record<string, CalendarEvent[]> = {};
+    for (const t of trips) (g[t.date] ||= []).push(t);
+    return g;
+  }, [trips]);
+
   const byDay = useMemo(() => {
     const g: Record<string, Activity[]> = {};
     for (const a of items) {
@@ -71,6 +98,9 @@ export default function ActivityCalendar({ filters, refreshTick, canCreate, onOp
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="font-display font-bold text-lg" data-testid="cal-month" aria-live="polite">{title}</div>
         <div className="flex items-center gap-2">
+          {canTrips && (
+            <Button variant={showTrips ? "default" : "outline"} onClick={toggleTrips} aria-pressed={showTrips} data-testid="cal-trips-toggle"><Plane size={14} className="mr-1" /> Trips</Button>
+          )}
           <Button variant="outline" size="icon" onClick={() => shift(-1)} aria-label="Previous month" data-testid="cal-prev"><ChevronLeft size={16} /></Button>
           <Button variant="outline" onClick={goToday} data-testid="cal-today">Today</Button>
           <Button variant="outline" size="icon" onClick={() => shift(1)} aria-label="Next month" data-testid="cal-next"><ChevronRight size={16} /></Button>
@@ -88,10 +118,13 @@ export default function ActivityCalendar({ filters, refreshTick, canCreate, onOp
                 const k = dayKey(d);
                 const inMonth = d.getMonth() === cursor.getMonth();
                 const isToday = k === todayKey;
+                const dayTrips = tripsByDay[k] ?? [];
                 const list = byDay[k] ?? [];
+                const total = dayTrips.length + list.length;
                 const open = expanded === k;
-                const shown = open ? list : list.slice(0, MAX_CHIPS);
-                const hidden = list.length - shown.length;
+                const shownTrips = open ? dayTrips : dayTrips.slice(0, MAX_CHIPS);
+                const shown = open ? list : list.slice(0, Math.max(0, MAX_CHIPS - shownTrips.length));
+                const hidden = total - shownTrips.length - shown.length;
                 return (
                   <div
                     key={k}
@@ -114,6 +147,18 @@ export default function ActivityCalendar({ filters, refreshTick, canCreate, onOp
                       >{d.getDate()}</span>
                     </div>
                     <div className="space-y-1">
+                      {shownTrips.map((t, ti) => (
+                        <button
+                          key={`${t.lead_id}-${ti}`} type="button"
+                          onClick={(e) => { e.stopPropagation(); router.push(`/leads/${t.lead_id}`); }}
+                          title={`Trip · ${t.customer_name} · ${t.destination} (${t.lead_status})`}
+                          className="flex w-full items-center gap-1 rounded border border-transparent bg-[#0A0A0A] px-1.5 py-0.5 text-left text-[11px] leading-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-white dark:text-neutral-900"
+                          data-testid={`cal-trip-${t.lead_id}`}
+                        >
+                          <Plane size={10} className="shrink-0" aria-hidden />
+                          <span className="truncate">{t.customer_name} · {t.destination}</span>
+                        </button>
+                      ))}
                       {shown.map((a) => {
                         const m = typeMeta(a.type);
                         const Icon = m.icon;
@@ -137,7 +182,7 @@ export default function ActivityCalendar({ filters, refreshTick, canCreate, onOp
                           </button>
                         );
                       })}
-                      {(hidden > 0 || (open && list.length > MAX_CHIPS)) && (
+                      {(hidden > 0 || (open && total > MAX_CHIPS)) && (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setExpanded(open ? null : k); }}

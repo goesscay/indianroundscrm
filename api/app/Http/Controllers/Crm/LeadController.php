@@ -169,27 +169,21 @@ class LeadController extends Controller
         ])->values()];
     }
 
+    /** Trip (travel) dates of the leads the caller can see, for the Activities calendar. `month=YYYY-MM` or `from`/`to` (YYYY-MM-DD, `to` exclusive). Cancelled leads are left out. */
     public function calendar(Request $request)
     {
         $month = (string) $request->query('month', '');
-        $leads = self::scopeForUser(Lead::query(), $request->user())->limit(5000)->get();
+        $from = (string) $request->query('from', '');
+        $to = (string) $request->query('to', '');
+        $leads = self::scopeForUser(Lead::query(), $request->user())->where('lead_status', '<>', 'Cancelled')->whereNotNull('travel_date')->limit(5000)->get();
         $events = [];
         foreach ($leads as $l) {
             $d = substr((string) ($l->travel_date ?? ''), 0, 10);
-            if ($d !== '' && ($month === '' || str_starts_with($d, $month))) {
-                $events[] = ['date' => $d, 'kind' => 'travel', 'lead_id' => $l->lead_id, 'customer_name' => $l->customer_name,
-                    'destination' => $l->destination, 'lead_status' => $l->lead_status];
+            if ($d === '' || ($month !== '' && ! str_starts_with($d, $month)) || ($from !== '' && $d < $from) || ($to !== '' && $d >= $to)) {
+                continue;
             }
-        }
-        // follow-ups are Activities: show the open ones on their due date
-        $byLead = $leads->keyBy('lead_id');
-        foreach (\App\Models\Activity::whereNull('completed_at')->where('type', 'follow_up')->whereIn('lead_id', $byLead->keys())->whereNotNull('due_at')->get() as $a) {
-            $d = $a->due_at->copy()->timezone('Asia/Kolkata')->toDateString();
-            if ($month === '' || str_starts_with($d, $month)) {
-                $l = $byLead[$a->lead_id];
-                $events[] = ['date' => $d, 'kind' => 'follow-up', 'lead_id' => $l->lead_id, 'customer_name' => $l->customer_name,
-                    'destination' => $l->destination, 'lead_status' => $l->lead_status];
-            }
+            $events[] = ['date' => $d, 'kind' => 'travel', 'lead_id' => $l->lead_id, 'customer_name' => $l->customer_name,
+                'destination' => $l->destination, 'lead_status' => $l->lead_status];
         }
         usort($events, fn ($a, $b) => strcmp($a['date'], $b['date']));
         return $events;

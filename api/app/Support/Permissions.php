@@ -96,7 +96,7 @@ class Permissions
                 'manage_targets' => ['Set sales targets', 'Set and change the quarterly targets for the team and consultants.'],
             ]),
             $g('calendar', 'Calendar', [
-                'view' => ['View calendar', 'See travel and follow-up dates on the calendar.'],
+                'view' => ['View trips on the calendar', 'Show lead travel dates (Trips) on the Activities calendar.'],
             ]),
             $g('rsq', 'RSQ requests', [
                 'request' => ['Raise RSQ requests', 'Request supplier quotes for a visible lead.'],

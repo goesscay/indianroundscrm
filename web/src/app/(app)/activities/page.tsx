@@ -201,7 +201,7 @@ function ActivitiesInner() {
 
       {view === "calendar" ? (
         <ActivityCalendar
-          filters={filters} refreshTick={refreshTick} canCreate={canCreate}
+          filters={filters} refreshTick={refreshTick} canCreate={canCreate} canTrips={can("calendar.view")}
           onOpen={openEdit} onCreate={(d) => openNew(d)}
         />
       ) : (

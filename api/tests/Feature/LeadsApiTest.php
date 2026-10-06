@@ -144,12 +144,10 @@ class LeadsApiTest extends TestCase
         $this->assertSame('travel', $cal[0]['kind']);
         $this->getJson('/api/followups/upcoming')->assertStatus(404);   // follow-ups are Activities now
 
-        // an open follow-up activity shows on the calendar on its due date; a done one does not
-        $act = $this->postJson('/api/activities', ['type' => 'follow_up', 'title' => 'Call', 'lead_id' => $id, 'due_at' => '2026-12-05T10:00:00+05:30'])->assertOk()->json('id');
-        $cal = collect($this->getJson('/api/leads/calendar?month=2026-12')->assertOk()->json());
-        $this->assertSame(['2026-12-05'], $cal->where('kind', 'follow-up')->pluck('date')->all());
-        $this->patchJson("/api/activities/$act", ["done" => true])->assertOk();
-        $this->assertCount(0, collect($this->getJson('/api/leads/calendar?month=2026-12')->json())->where('kind', 'follow-up'));
+        // trip dates by month or by range (end exclusive); follow-ups are on the Activities calendar, not here
+        $this->assertCount(0, $this->getJson('/api/leads/calendar?from=2026-01-01&to=2026-12-01')->assertOk()->json());
+        $this->assertCount(1, $this->getJson('/api/leads/calendar?from=2026-12-01&to=2027-01-01')->assertOk()->json());
+        $this->assertSame(['travel'], collect($this->getJson('/api/leads/calendar')->json())->pluck('kind')->unique()->values()->all());
 
         $other = User::factory()->create(['role' => 'sales', 'consultant_code' => 'ZZ', 'name' => 'Zed']);
         $ops = User::factory()->create(['role' => 'operations']);

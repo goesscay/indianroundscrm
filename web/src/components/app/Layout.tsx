@@ -12,7 +12,7 @@ import { useSupplierReplies } from "@/context/SupplierRepliesContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  Calendar, ListChecks, Bell, Handshake, ContactRound, TrendingUp, Package, FileText, ReceiptText, Wallet, Landmark, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
+  ListChecks, Bell, Handshake, ContactRound, TrendingUp, Package, FileText, ReceiptText, Wallet, Landmark, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAiPanel } from "@/components/ai/AiPanelContext";
@@ -41,7 +41,6 @@ const NAV: NavItem[] = [
   { to: "/quotes", label: "Quotes", icon: FileText, testId: "nav-quotes", group: "Sales", perms: ["quotes.view"] },
   { to: "/invoices", label: "Invoices", icon: ReceiptText, testId: "nav-invoices", group: "Sales", perms: ["invoices.view"] },
   { to: "/receipts", label: "Receipts", icon: Wallet, testId: "nav-receipts", group: "Sales", perms: ["receipts.view"] },
-  { to: "/calendar", label: "Calendar", icon: Calendar, testId: "nav-calendar", group: "Sales", perms: ["calendar.view"] },
   { to: "/chat", label: "Chat", icon: MessageSquare, testId: "nav-chat", group: "Team", perms: ["chat.use"] },
   { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard", group: "Operations", perms: ["supplier_dashboard.view"] },
   { to: "/supplier-inbox", label: "Supplier Inbox", icon: MailOpen, testId: "nav-supplier-inbox", group: "Operations", perms: ["rsq.manage"] },
