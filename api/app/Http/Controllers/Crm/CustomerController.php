@@ -205,6 +205,10 @@ class CustomerController extends Controller
         $a['travellers'] = $c->travellers()->get()->map(fn (CustomerTraveller $t) => $t->toApi($show))->all();
         $a['deals'] = Deal::query()->where('customer_id', $c->id)->with(['owner:id,name', 'customer:id,customer_no,name'])
             ->orderByDesc('id')->get()->map(fn (Deal $d) => $d->toApi())->all();
+        $inv = \App\Models\Invoice::query()->where('customer_id', $c->id)->where('status', 'issued')->get(['total', 'credited_total', 'paid_total']);
+        $a['invoiced'] = round((float) $inv->sum(fn ($i) => $i->total - $i->credited_total), 2);
+        $a['outstanding'] = round((float) $inv->sum(fn ($i) => max(0, $i->total - $i->credited_total - $i->paid_total)), 2);
+        $a['advances'] = round((float) \App\Models\Receipt::where('customer_id', $c->id)->where('kind', 'receipt')->where('status', 'valid')->whereNull('invoice_id')->sum('amount'), 2);
         $a['leads'] = Lead::query()->where('customer_id', $c->id)->orderByDesc('id')
             ->get(['lead_id', 'destination', 'travel_date', 'lead_status', 'converted_at'])->map(fn ($l) => $l->toArray())->all();
 

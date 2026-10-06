@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Check, FileText, GitBranch, Pencil, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, FilePlus2, FileText, GitBranch, Pencil, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -60,6 +60,12 @@ export default function QuoteDetail() {
     catch (e) { toast.error(formatApiError(e)); setBusy(false); }
   };
 
+  const toInvoice = async () => {
+    setBusy(true);
+    try { const { data } = await api.post<{ id: string }>(`/quotes/${id}/invoice`, {}); toast.success("Draft invoice created from this quote"); router.push(`/invoices/${data.id}/edit`); }
+    catch (e) { toast.error(formatApiError(e)); setBusy(false); }
+  };
+
   const remove = async () => {
     if (!x || !window.confirm(`Delete draft ${x.quote_no}?`)) return;
     try { await api.delete(`/quotes/${id}`); toast.success("Quote deleted"); router.replace("/quotes"); } catch (e) { toast.error(formatApiError(e)); }
@@ -89,6 +95,7 @@ export default function QuoteDetail() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={openPdf} data-testid="quote-pdf"><FileText size={16} /> PDF</Button>
+          {!draft && x.status !== "superseded" && x.status !== "rejected" && can("invoices.create") && <Button variant="outline" disabled={busy} onClick={toInvoice} data-testid="quote-to-invoice"><FilePlus2 size={16} /> Create invoice</Button>}
           {draft && canCreate && <Button variant="outline" onClick={() => router.push(`/quotes/${x.id}/edit`)} data-testid="quote-edit"><Pencil size={16} /> Edit</Button>}
           {canSend && !["superseded", "rejected"].includes(x.status) && <Button onClick={() => setSendOpen(true)} disabled={busy} data-testid="quote-send"><Send size={16} /> {x.status === "draft" ? "Send" : "Send again"}</Button>}
           {canSend && draft && <Button variant="outline" disabled={busy} onClick={() => setStatus("sent")} data-testid="quote-mark-sent">Mark as sent</Button>}

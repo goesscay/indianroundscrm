@@ -4,7 +4,9 @@ use App\Http\Controllers\Crm\ActivityController;
 use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
+use App\Http\Controllers\Crm\InvoiceController;
 use App\Http\Controllers\Crm\PackageController;
+use App\Http\Controllers\Crm\ReceiptController;
 use App\Http\Controllers\Crm\QuoteController;
 use App\Http\Controllers\Crm\LeadConvertController;
 use App\Http\Controllers\Crm\DashboardController;
@@ -131,4 +133,29 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/quotes/{id}/pdf', [QuoteController::class, 'pdf'])->middleware('perm:quotes.view');
     Route::get('/quotes/{id}/email-preview', [QuoteController::class, 'emailPreview'])->middleware('perm:quotes.send');
     Route::post('/quotes/{id}/send', [QuoteController::class, 'send'])->middleware('perm:quotes.send');
+
+    // ---- Invoices, receipts, credit notes
+    Route::get('/invoices', [InvoiceController::class, 'index'])->middleware('perm:invoices.view');
+    Route::post('/invoices', [InvoiceController::class, 'store'])->middleware('perm:invoices.create');
+    Route::post('/quotes/{id}/invoice', [InvoiceController::class, 'fromQuote'])->middleware('perm:invoices.create');
+    Route::get('/invoices/{id}', [InvoiceController::class, 'show'])->middleware('perm:invoices.view');
+    Route::patch('/invoices/{id}', [InvoiceController::class, 'update'])->middleware('perm:invoices.create');
+    Route::delete('/invoices/{id}', [InvoiceController::class, 'destroy'])->middleware('perm:invoices.delete,invoices.create');
+    Route::post('/invoices/{id}/issue', [InvoiceController::class, 'issue'])->middleware('perm:invoices.issue');
+    Route::post('/invoices/{id}/cancel', [InvoiceController::class, 'cancel'])->middleware('perm:invoices.issue');
+    Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'pdf'])->middleware('perm:invoices.view');
+    Route::get('/invoices/{id}/email-preview', [InvoiceController::class, 'emailPreview'])->middleware('perm:invoices.issue');
+    Route::post('/invoices/{id}/send', [InvoiceController::class, 'send'])->middleware('perm:invoices.issue');
+    Route::post('/invoices/{id}/receipts', [InvoiceController::class, 'addReceipt'])->middleware('perm:receipts.record');
+    Route::post('/invoices/{id}/credit-notes', [InvoiceController::class, 'addCreditNote'])->middleware('perm:invoices.credit');
+    Route::post('/invoices/{id}/refunds', [InvoiceController::class, 'addRefund'])->middleware('perm:invoices.credit');
+
+    Route::get('/receipts', [ReceiptController::class, 'index'])->middleware('perm:receipts.view');
+    Route::get('/receipts/{id}', [ReceiptController::class, 'show'])->middleware('perm:receipts.view');
+    Route::post('/customers/{id}/advances', [ReceiptController::class, 'addAdvance'])->middleware('perm:receipts.record');
+    Route::post('/receipts/{id}/apply', [ReceiptController::class, 'apply'])->middleware('perm:receipts.record');
+    Route::post('/receipts/{id}/cancel', [ReceiptController::class, 'cancel'])->middleware('perm:receipts.cancel');
+    Route::get('/receipts/{id}/pdf', [ReceiptController::class, 'pdf'])->middleware('perm:receipts.view');
+    Route::get('/receipts/{id}/email-preview', [ReceiptController::class, 'emailPreview'])->middleware('perm:receipts.record');
+    Route::post('/receipts/{id}/send', [ReceiptController::class, 'send'])->middleware('perm:receipts.record');
 });

@@ -628,6 +628,9 @@ export interface Customer extends CustomerBrief {
   deals_count: number;
   open_pipeline: number;
   won_value: number;
+  invoiced?: number;
+  outstanding?: number;
+  advances?: number;
   created_at: string;
   updated_at: string;
   contacts?: CustomerContact[];
@@ -725,5 +728,30 @@ export interface Quote {
   sent_at: string | null; accepted_at: string | null; owner: { id: string; name: string } | null;
   lines?: QuoteLine[]; itinerary?: PackageDay[];
   emails?: { to: string; subject: string; status: string; error: string | null; with_pdf: boolean; created_at: string }[];
+  created_at: string; updated_at: string;
+}
+
+// ---- Invoices, receipts, credit notes ----
+export type InvoiceStatus = "draft" | "issued" | "cancelled";
+export type PaymentStatus = "draft" | "cancelled" | "credited" | "paid" | "overdue" | "partial" | "unpaid";
+export type PayMode = "upi" | "bank_transfer" | "card" | "cash" | "cheque" | "other";
+export interface Installment { label: string; due_date: string; amount: number; paid?: number; status?: "paid" | "partial" | "due" | "overdue" }
+export interface CreditNote { id: string; credit_note_no: string; issue_date: string; amount: number; taxable_part: number; tax_part: number; reason: string }
+export interface Receipt {
+  id: string; receipt_no: string; kind: "receipt" | "refund"; status: "valid" | "cancelled";
+  customer: CustomerBrief | null; customer_id: string; invoice: { id: string; invoice_no: string; title: string } | null; invoice_id: string | null;
+  amount: number; received_date: string; mode: PayMode; reference: string | null; deposited_to: string | null; notes: string | null;
+  cancel_reason: string | null; created_by_name?: string | null; created_at: string;
+}
+export interface Invoice {
+  id: string; invoice_no: string | null; status: InvoiceStatus; payment_status: PaymentStatus;
+  customer: CustomerBrief | null; customer_id: string; deal: { id: string; deal_no: string; name: string } | null; deal_id: string | null; quote_id: string | null;
+  title: string; issue_date: string | null; destination: string | null; travel_date: string | null; adults: number; children: number;
+  bill_name: string | null; bill_gstin: string | null; bill_address: string | null; place_of_supply: string | null; sac_code: string | null;
+  gst_mode: "cgst_sgst" | "igst" | "unspecified"; tcs_rate: number;
+  subtotal: number; discount_total: number; tax_total: number; cgst_total: number; sgst_total: number; igst_total: number; tcs_total: number; total: number;
+  paid_total: number; credited_total: number; balance: number; refundable: number; next_due: string | null;
+  notes: string | null; terms: string | null; cancel_reason: string | null; owner: { id: string; name: string } | null;
+  lines?: QuoteLine[]; installments?: Installment[]; receipts?: Receipt[]; credit_notes?: CreditNote[];
   created_at: string; updated_at: string;
 }

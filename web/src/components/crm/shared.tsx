@@ -122,3 +122,28 @@ export function calcQuote(lines: { qty: number; unit_price: number; discount: nu
 }
 
 export const INR2 = (n: number | null | undefined) => "₹" + (Number(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const PAY_MODES: { value: string; label: string }[] = [
+  { value: "upi", label: "UPI" },
+  { value: "bank_transfer", label: "Bank transfer" },
+  { value: "card", label: "Card" },
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "other", label: "Other" },
+];
+export const modeLabel = (m: string) => PAY_MODES.find((x) => x.value === m)?.label ?? m;
+
+const PAY_META: Record<string, { label: string; chip: string }> = {
+  draft: { label: "Draft", chip: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700" },
+  unpaid: { label: "Unpaid", chip: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-900" },
+  partial: { label: "Part paid", chip: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-900" },
+  paid: { label: "Paid", chip: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-900" },
+  overdue: { label: "Overdue", chip: "bg-red-50 text-red-800 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-900" },
+  credited: { label: "Credited", chip: "bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-950/50 dark:text-violet-300 dark:border-violet-900" },
+  cancelled: { label: "Cancelled", chip: "bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-neutral-900 dark:text-neutral-400 dark:border-neutral-800" },
+};
+
+export function PayPill({ status, className }: { status: string; className?: string }) {
+  const m = PAY_META[status] ?? PAY_META.draft;
+  return <span className={cn("inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium", m.chip, className)}>{m.label}</span>;
+}

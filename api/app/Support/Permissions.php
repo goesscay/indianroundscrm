@@ -71,6 +71,19 @@ class Permissions
                 'send' => ['Send quotes', 'E-mail quotes to customers and mark them accepted or rejected.'],
                 'delete' => ['Delete quotes', 'Delete draft quotes.'],
             ]),
+            $g('invoices', 'Invoices', [
+                'view' => ['View invoices', 'Open Invoices. Sees invoices they own or created.'],
+                'view_all' => ['View all invoices', 'See every invoice, whoever owns it.'],
+                'create' => ['Create invoices', 'Create and edit draft invoices, and create them from quotes.'],
+                'issue' => ['Issue and cancel invoices', 'Issue a draft (assigns the invoice number), e-mail invoices and cancel unpaid ones.'],
+                'credit' => ['Credit notes and refunds', 'Issue credit notes against invoices and record refunds to customers.'],
+                'delete' => ['Delete draft invoices', 'Delete invoices that have not been issued.'],
+            ]),
+            $g('receipts', 'Receipts', [
+                'view' => ['View receipts', 'Open Receipts and see the payments on invoices they can see.'],
+                'record' => ['Record payments', 'Record payments against invoices and customer advances, and e-mail receipts.'],
+                'cancel' => ['Cancel receipts', 'Cancel a receipt entered by mistake.'],
+            ]),
             $g('forecasts', 'Forecasts', [
                 'view' => ['View forecasts', 'Open Forecasts for the deals they own.'],
                 'view_all' => ['View team forecasts', 'See the whole team and each consultant, not just their own deals.'],
@@ -162,6 +175,7 @@ class Permissions
                 'leads.convert', 'customers.view', 'customers.create', 'customers.edit',
                 'deals.view', 'deals.create', 'deals.edit', 'forecasts.view',
                 'packages.view', 'quotes.view', 'quotes.create', 'quotes.send',
+                'invoices.view', 'invoices.create', 'receipts.view',
             ],
             'operations' => [
                 'dashboard.view', 'leads.view_all', 'leads.create', 'leads.edit', 'leads.edit_limited', 'leads.reassign',
@@ -172,6 +186,7 @@ class Permissions
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',
                 'deals.view', 'deals.view_all', 'deals.create', 'deals.edit', 'forecasts.view', 'forecasts.view_all',
                 'packages.view', 'packages.manage', 'quotes.view', 'quotes.view_all', 'quotes.create', 'quotes.send',
+                'invoices.view', 'invoices.view_all', 'invoices.create', 'invoices.issue', 'receipts.view', 'receipts.record',
             ],
             default => [],
         };

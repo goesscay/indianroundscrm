@@ -11,6 +11,10 @@ return [
         'website' => env('CRM_COMPANY_WEBSITE', 'www.indianrounds.in'),
         'gstin' => env('CRM_COMPANY_GSTIN', ''),
         'state' => env('CRM_COMPANY_STATE', ''),
+        'sac' => env('CRM_COMPANY_SAC', '998555'),   // tour operator services; confirm with your accountant
+        'bank' => env('CRM_COMPANY_BANK', ''),       // printed on invoices, e.g. "HDFC Bank, A/c 1234, IFSC HDFC0001"
     ],
+    'invoice_due_days' => (int) env('CRM_INVOICE_DUE_DAYS', 7),
+    'balance_days_before_travel' => (int) env('CRM_BALANCE_DAYS_BEFORE_TRAVEL', 15),
     'quote_valid_days' => (int) env('CRM_QUOTE_VALID_DAYS', 14),
 ];

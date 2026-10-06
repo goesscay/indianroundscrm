@@ -11,7 +11,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import CustomerDialog from "@/components/crm/CustomerDialog";
 import DealDialog from "@/components/crm/DealDialog";
-import { RecordActivities, RecordNotes, RecordQuotes } from "@/components/crm/RecordPanels";
+import { RecordActivities, RecordInvoices, RecordNotes, RecordQuotes } from "@/components/crm/RecordPanels";
+import PaymentDialog from "@/components/crm/PaymentDialog";
 import { INR, StagePill, customerTypeLabel, fmtDate } from "@/components/crm/shared";
 import StatusPill from "@/components/app/StatusPill";
 import type { Customer } from "@/types";
@@ -43,6 +44,7 @@ export default function CustomerDetail() {
   const [error, setError] = useState("");
   const [edit, setEdit] = useState(false);
   const [newDeal, setNewDeal] = useState(false);
+  const [advance, setAdvance] = useState(false);
 
   const load = useCallback(async () => {
     try { const { data } = await api.get<Customer>(`/customers/${id}`); setC(data); setError(""); }
@@ -82,15 +84,17 @@ export default function CustomerDetail() {
           {wa.length === 10 && <a href={`https://wa.me/91${wa}`} target="_blank" rel="noreferrer"><Button variant="outline"><MessageCircle size={16} /> WhatsApp</Button></a>}
           {c.email && <a href={`mailto:${c.email}`}><Button variant="outline"><Mail size={16} /> E-mail</Button></a>}
           {canEdit && <Button variant="outline" onClick={() => setEdit(true)} data-testid="customer-edit"><Pencil size={16} /> Edit</Button>}
+          {can("receipts.record") && <Button variant="outline" onClick={() => setAdvance(true)} data-testid="customer-advance">Record advance</Button>}
           {can("deals.create") && <Button onClick={() => setNewDeal(true)} data-testid="customer-new-deal"><Plus size={16} /> New deal</Button>}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Stat label="Open pipeline" value={INR(c.open_pipeline)} sub={`${(c.deals ?? []).filter((d) => d.stage !== "won" && d.stage !== "lost").length} open deals`} />
         <Stat label="Won" value={INR(c.won_value)} sub={`${(c.deals ?? []).filter((d) => d.stage === "won").length} trips booked`} />
         <Stat label="Deals" value={String(c.deals_count)} sub="all time" />
-        <Stat label="Customer since" value={fmtDate(c.created_at)} />
+        <Stat label="Invoiced" value={INR(c.invoiced)} sub="net of credit notes" />
+        <Stat label="Outstanding" value={INR(c.outstanding)} sub={c.advances ? `${INR(c.advances)} advance held` : "still to be paid"} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
@@ -183,12 +187,14 @@ export default function CustomerDetail() {
           )}
 
           <RecordQuotes filter={{ customer_id: c.id }} newHref={`/quotes/new?customer=${c.id}`} />
+          <RecordInvoices filter={{ customer_id: c.id }} newHref={`/invoices/new?customer=${c.id}`} />
           <RecordActivities base={`/customers/${c.id}`} link={{ customer_id: c.id }} />
           <RecordNotes base={`/customers/${c.id}`} canWrite={canEdit} />
         </div>
       </div>
 
       {canEdit && <CustomerDialog open={edit} onOpenChange={setEdit} customer={c} onSaved={() => void load()} />}
+      <PaymentDialog open={advance} onOpenChange={setAdvance} endpoint={`/customers/${c.id}/advances`} kind="advance" onSaved={() => void load()} />
       <DealDialog open={newDeal} onOpenChange={setNewDeal} customer={{ id: c.id, customer_no: c.customer_no, name: c.name }} onSaved={() => void load()} />
       {can("customers.delete") && (
         <div className="pt-2"><Button variant="ghost" size="sm" className="text-destructive" onClick={remove} data-testid="customer-delete"><Trash2 size={14} /> Delete customer</Button></div>
