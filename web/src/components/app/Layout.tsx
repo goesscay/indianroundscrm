@@ -12,7 +12,7 @@ import { useSupplierReplies } from "@/context/SupplierRepliesContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  Calendar, ListChecks, Bell, Handshake, ContactRound, TrendingUp, Package, FileText, ReceiptText, Wallet, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
+  Calendar, ListChecks, Bell, Handshake, ContactRound, TrendingUp, Package, FileText, ReceiptText, Wallet, Landmark, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAiPanel } from "@/components/ai/AiPanelContext";
@@ -46,6 +46,7 @@ const NAV: NavItem[] = [
   { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard", group: "Operations", perms: ["supplier_dashboard.view"] },
   { to: "/supplier-inbox", label: "Supplier Inbox", icon: MailOpen, testId: "nav-supplier-inbox", group: "Operations", perms: ["rsq.manage"] },
   { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers", group: "Operations", perms: ["suppliers.view"] },
+  { to: "/accounts", label: "Accounts", icon: Landmark, testId: "nav-accounts", group: "Finance", perms: ["finance.view"] },
   { to: "/users", label: "Users", icon: Users, testId: "nav-users", group: "Administration", perms: ["users.view"] },
   { to: "/roles", label: "Roles & Permissions", icon: ShieldCheck, testId: "nav-roles", group: "Administration", perms: ["roles.manage"] },
   { to: "/master", label: "Master Data", icon: Database, testId: "nav-master", group: "Administration", perms: ["master.view"] },

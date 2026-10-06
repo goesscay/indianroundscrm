@@ -755,3 +755,34 @@ export interface Invoice {
   lines?: QuoteLine[]; installments?: Installment[]; receipts?: Receipt[]; credit_notes?: CreditNote[];
   created_at: string; updated_at: string;
 }
+
+// ---- Accounts (finance) ----
+export type AccountType = "asset" | "liability" | "equity" | "income" | "expense";
+export interface LedgerAccount {
+  id: string; code: string; name: string; type: AccountType; type_label: string; subtype: string | null; description: string | null;
+  is_system: boolean; active: boolean; debit: number; credit: number; balance: number; used: boolean;
+}
+export interface BankAccountRow { id: string; account_id: string; account_code: string | null; name: string; kind: string; bank_name: string | null; last4: string | null; is_default: boolean; active: boolean; balance: number }
+export interface JournalSummary {
+  id: string; entry_no: string; entry_date: string; narration: string; source_type: string; source_id: string | null;
+  total: number; reversed: boolean; is_reversal: boolean; editable_by_hand: boolean; reverses_id: string | null;
+}
+export interface JournalLineRow { account_id: string; account_code: string | null; account_name: string | null; debit: number; credit: number; memo: string | null; customer_id: string | null }
+export interface JournalDetail extends JournalSummary { lines: JournalLineRow[] }
+export interface FinanceDashboard {
+  banks: { id: string | null; name: string; kind: string; balance: number }[]; bank_total: number;
+  receivable: number; payable: number; advances: number; gst_payable: number; tcs_payable: number;
+  month: { income: number; expenses: number }; year: { income: number; expenses: number; label: string };
+  months: { month: string; label: string; income: number; expenses: number }[];
+  invoices_outstanding: { count: number; total: number }; lock_date: string | null; entries: number;
+}
+export interface LedgerReport {
+  account: LedgerAccount; opening: number; closing: number; total_debit: number; total_credit: number;
+  items: { entry_id: string; entry_no: string; date: string; narration: string; source_type: string; memo: string | null; debit: number; credit: number; balance: number }[];
+  total: number; page: number; per_page: number; pages: number;
+}
+export interface TrialBalance {
+  as_of: string; total_debit: number; total_credit: number; balanced: boolean;
+  items: { id: string; code: string; name: string; type: AccountType; debit: number; credit: number; closing_debit: number; closing_credit: number }[];
+}
+export interface BankOption { id: string; name: string; kind: string; is_default: boolean }

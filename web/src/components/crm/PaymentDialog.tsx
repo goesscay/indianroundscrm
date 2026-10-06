@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { Receipt } from "@/types";
+import type { BankOption, Receipt } from "@/types";
 import { INR2, PAY_MODES } from "./shared";
 
 interface Props {
@@ -43,14 +43,21 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, sugg
   const [mode, setMode] = useState("upi");
   const [reference, setReference] = useState("");
   const [deposited, setDeposited] = useState("");
+  const [banks, setBanks] = useState<BankOption[]>([]);
+  const [bank, setBank] = useState("auto");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
-    setAmount(suggested ? String(suggested) : ""); setDate(today()); setMode("upi"); setReference(""); setDeposited(""); setNotes(""); setError(""); setSaving(false);
+    setAmount(suggested ? String(suggested) : ""); setDate(today()); setMode("upi"); setReference(""); setDeposited(""); setBank("auto"); setNotes(""); setError(""); setSaving(false);
   }, [open, suggested]);
+
+  useEffect(() => {
+    if (!open) return;
+    api.get<BankOption[]>("/finance/bank-options").then((r) => setBanks(r.data)).catch(() => setBanks([]));
+  }, [open]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -58,7 +65,7 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, sugg
     if (!(n > 0)) { setError("Enter the amount."); return; }
     setSaving(true); setError("");
     try {
-      const { data } = await api.post<{ receipt?: Receipt } & Receipt>(endpoint, { amount: n, received_date: date, mode, reference, deposited_to: deposited, notes });
+      const { data } = await api.post<{ receipt?: Receipt } & Receipt>(endpoint, { amount: n, received_date: date, mode, reference, notes, ...(banks.length ? (bank !== "auto" ? { bank_account_id: bank } : {}) : { deposited_to: deposited }) });
       const rec = (data.receipt ?? data) as Receipt;
       toast.success(`${rec.receipt_no} recorded`);
       onSaved(rec); onOpenChange(false);
@@ -91,7 +98,20 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, sugg
             </div>
           </div>
           <div><Label htmlFor="pay-ref">Reference</Label><Input id="pay-ref" className="mt-1.5 h-10" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR, cheque number, card last digits…" data-testid="payment-reference" /></div>
-          <div><Label htmlFor="pay-dep">{kind === "refund" ? "Paid from" : "Deposited to"}</Label><Input id="pay-dep" className="mt-1.5 h-10" value={deposited} onChange={(e) => setDeposited(e.target.value)} placeholder="Bank or cash account (optional)" /></div>
+          {banks.length > 0 ? (
+            <div>
+              <Label>{kind === "refund" ? "Paid from" : "Deposited to"}</Label>
+              <Select value={bank} onValueChange={setBank}>
+                <SelectTrigger className="mt-1.5 h-10" data-testid="payment-bank"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{mode === "cash" ? "Cash in hand" : `Default (${banks.find((b) => b.is_default)?.name ?? "Bank"})`}</SelectItem>
+                  {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div><Label htmlFor="pay-dep">{kind === "refund" ? "Paid from" : "Deposited to"}</Label><Input id="pay-dep" className="mt-1.5 h-10" value={deposited} onChange={(e) => setDeposited(e.target.value)} placeholder="Bank or cash account (optional)" /></div>
+          )}
           <div><Label htmlFor="pay-notes">Notes</Label><Textarea id="pay-notes" rows={2} className="mt-1.5" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
           {error && <div className="text-sm text-destructive" role="alert">{error}</div>}
           <DialogFooter>

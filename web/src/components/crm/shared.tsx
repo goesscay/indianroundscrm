@@ -147,3 +147,7 @@ export function PayPill({ status, className }: { status: string; className?: str
   const m = PAY_META[status] ?? PAY_META.draft;
   return <span className={cn("inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium", m.chip, className)}>{m.label}</span>;
 }
+
+export const SOURCE_LABEL: Record<string, string> = {
+  manual: "Manual", opening: "Opening balance", invoice: "Invoice", receipt: "Receipt", advance_apply: "Advance applied", credit_note: "Credit note", reversal: "Reversal",
+};

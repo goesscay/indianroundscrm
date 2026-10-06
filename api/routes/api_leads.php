@@ -4,7 +4,10 @@ use App\Http\Controllers\Crm\ActivityController;
 use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
+use App\Http\Controllers\Crm\AccountController;
+use App\Http\Controllers\Crm\FinanceController;
 use App\Http\Controllers\Crm\InvoiceController;
+use App\Http\Controllers\Crm\JournalController;
 use App\Http\Controllers\Crm\PackageController;
 use App\Http\Controllers\Crm\ReceiptController;
 use App\Http\Controllers\Crm\QuoteController;
@@ -158,4 +161,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/receipts/{id}/pdf', [ReceiptController::class, 'pdf'])->middleware('perm:receipts.view');
     Route::get('/receipts/{id}/email-preview', [ReceiptController::class, 'emailPreview'])->middleware('perm:receipts.record');
     Route::post('/receipts/{id}/send', [ReceiptController::class, 'send'])->middleware('perm:receipts.record');
+
+    // ---- Accounts (finance): chart, banking, journal, ledger, trial balance
+    Route::get('/finance/dashboard', [FinanceController::class, 'dashboard'])->middleware('perm:finance.view');
+    Route::get('/finance/settings', [FinanceController::class, 'settings'])->middleware('perm:finance.view');
+    Route::put('/finance/settings', [FinanceController::class, 'updateSettings'])->middleware('perm:finance.manage');
+    Route::get('/finance/trial-balance', [FinanceController::class, 'trialBalance'])->middleware('perm:finance.view');
+    Route::get('/finance/ledger/{id}', [FinanceController::class, 'ledger'])->middleware('perm:finance.view');
+
+    Route::get('/finance/accounts', [AccountController::class, 'index'])->middleware('perm:finance.view,finance.journal');
+    Route::post('/finance/accounts', [AccountController::class, 'store'])->middleware('perm:finance.manage');
+    Route::patch('/finance/accounts/{id}', [AccountController::class, 'update'])->middleware('perm:finance.manage');
+    Route::delete('/finance/accounts/{id}', [AccountController::class, 'destroy'])->middleware('perm:finance.manage');
+
+    Route::get('/finance/banks', [AccountController::class, 'banks'])->middleware('perm:finance.view');
+    Route::get('/finance/bank-options', [AccountController::class, 'bankOptions'])->middleware('perm:finance.view,receipts.record');
+    Route::post('/finance/banks', [AccountController::class, 'storeBank'])->middleware('perm:finance.manage');
+    Route::patch('/finance/banks/{id}', [AccountController::class, 'updateBank'])->middleware('perm:finance.manage');
+
+    Route::get('/finance/journal', [JournalController::class, 'index'])->middleware('perm:finance.view');
+    Route::post('/finance/journal', [JournalController::class, 'store'])->middleware('perm:finance.journal');
+    Route::get('/finance/journal/{id}', [JournalController::class, 'show'])->middleware('perm:finance.view');
+    Route::post('/finance/journal/{id}/reverse', [JournalController::class, 'reverse'])->middleware('perm:finance.journal');
 });

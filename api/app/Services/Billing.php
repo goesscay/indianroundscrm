@@ -61,12 +61,17 @@ class Billing
     public static function record(User $user, int $customerId, ?Invoice $inv, string $kind, array $d): Receipt
     {
         $date = $d['received_date'] ?? now('Asia/Kolkata')->toDateString();
+        $bank = ! empty($d['bank_account_id']) && ctype_digit((string) $d['bank_account_id']) ? \App\Models\BankAccount::where('id', (int) $d['bank_account_id'])->where('active', true)->first() : null;
+        if (! empty($d['bank_account_id']) && ! $bank) {
+            \App\Crm\Fail::unprocessable(['bank_account_id' => 'Bank account not found or inactive']);
+        }
         $r = Receipt::create([
             'receipt_no' => self::nextNumber($kind === 'refund' ? 'RFD' : 'RCT', Carbon::parse($date, 'Asia/Kolkata')), 'kind' => $kind, 'status' => 'valid',
             'customer_id' => $customerId, 'invoice_id' => $inv?->id, 'deal_id' => $inv?->deal_id,
             'amount' => round((float) $d['amount'], 2), 'received_date' => $date, 'mode' => $d['mode'] ?? 'bank_transfer',
             'reference' => ($v = trim((string) ($d['reference'] ?? ''))) !== '' ? mb_substr($v, 0, 120) : null,
-            'deposited_to' => ($v = trim((string) ($d['deposited_to'] ?? ''))) !== '' ? mb_substr($v, 0, 120) : null,
+            'bank_account_id' => $bank?->id,
+            'deposited_to' => $bank?->name ?? (($v = trim((string) ($d['deposited_to'] ?? ''))) !== '' ? mb_substr($v, 0, 120) : null),
             'notes' => ($v = trim((string) ($d['notes'] ?? ''))) !== '' ? mb_substr($v, 0, 1000) : null,
             'created_by' => $user->id,
         ]);
@@ -76,6 +81,7 @@ class Billing
                 self::dealBooked($inv, $user);
             }
         }
+        Posting::receipt($r, $inv, $user);
         ActivityLogger::log($user, $kind === 'refund' ? 'record_refund' : 'record_receipt', 'receipt', $r->id, null,
             ['receipt_no' => $r->receipt_no, 'amount' => $r->amount, 'invoice_id' => $r->invoice_id, 'customer_id' => $customerId]);
 

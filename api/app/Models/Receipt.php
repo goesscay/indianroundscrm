@@ -14,7 +14,7 @@ class Receipt extends Model
 
     protected $table = 'receipts';
     protected $guarded = ['id'];
-    protected $stringIds = ['customer_id', 'invoice_id', 'deal_id', 'created_by'];
+    protected $stringIds = ['customer_id', 'invoice_id', 'deal_id', 'created_by', 'bank_account_id'];
     protected $casts = ['amount' => 'float', 'received_date' => 'date:Y-m-d', 'cancelled_at' => 'datetime'];
 
     public function customer(): BelongsTo

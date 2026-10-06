@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\Billing;
 use App\Services\CustomerMail;
 use App\Services\DocPdf;
+use App\Services\Posting;
 use App\Support\ActivityLogger;
 use App\Support\LineMath;
 use App\Support\Paging;
@@ -435,7 +436,7 @@ class InvoiceController extends Controller
         if ($inv->lines->isEmpty() || $inv->total <= 0) {
             Fail::unprocessable(['lines' => 'Add at least one price line before issuing.']);
         }
-        DB::transaction(function () use ($inv) {
+        DB::transaction(function () use ($inv, $user) {
             $customer = Customer::findOrFail($inv->customer_id);
             $this->snapshot($inv, $customer);
             $inv->issue_date = $inv->issue_date ?: now('Asia/Kolkata')->startOfDay();
@@ -446,6 +447,7 @@ class InvoiceController extends Controller
             $inv->status = 'issued';
             $inv->issued_at = now();
             $inv->save();
+            Posting::invoiceIssued($inv->fresh(), $user); // books the sale; refused when the date is in a closed period
         });
         ActivityLogger::log($user, 'issue_invoice', 'invoice', $inv->id, null, $this->snap($inv->fresh()));
 
@@ -464,10 +466,13 @@ class InvoiceController extends Controller
             Fail::http(409, 'This invoice has payments or credit notes. Issue a credit note for the full amount instead.');
         }
         $before = $this->snap($inv);
-        $inv->status = 'cancelled';
-        $inv->cancelled_at = now();
-        $inv->cancel_reason = trim($d['reason']);
-        $inv->save();
+        DB::transaction(function () use ($inv, $d, $user) {
+            $inv->status = 'cancelled';
+            $inv->cancelled_at = now();
+            $inv->cancel_reason = trim($d['reason']);
+            $inv->save();
+            Posting::invoiceCancelled($inv, $user);
+        });
         ActivityLogger::log($user, 'cancel_invoice', 'invoice', $inv->id, $before, $this->snap($inv));
 
         return self::find($id, $user)->toApi(true);
@@ -538,6 +543,7 @@ class InvoiceController extends Controller
             'amount' => 'required|numeric|min:0.01|max:100000000',
             'received_date' => 'nullable|string', 'mode' => ($needsMode ? 'nullable|' : 'nullable|').'in:'.implode(',', Receipt::MODES),
             'reference' => 'nullable|string|max:120', 'deposited_to' => 'nullable|string|max:120', 'notes' => 'nullable|string|max:1000',
+            'bank_account_id' => 'nullable',
         ]);
     }
 
@@ -578,6 +584,7 @@ class InvoiceController extends Controller
                 'issue_date' => $date, 'amount' => $amount, 'tax_part' => $tax, 'taxable_part' => round($amount - $tax, 2), 'reason' => trim($d['reason']), 'created_by' => $user->id,
             ]);
             Billing::settle($inv);
+            Posting::creditNote($cn, $inv->fresh(), $user);
             ActivityLogger::log($user, 'issue_credit_note', 'invoice', $inv->id, null, ['credit_note_no' => $cn->credit_note_no, 'amount' => $amount]);
         });
 

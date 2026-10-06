@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Billing;
 use App\Services\CustomerMail;
 use App\Services\DocPdf;
+use App\Services\Posting;
 use App\Support\ActivityLogger;
 use App\Support\Paging;
 use Illuminate\Http\Request;
@@ -130,7 +131,7 @@ class ReceiptController extends Controller
         $d = Fail::validate(Fail::body($request), [
             'amount' => 'required|numeric|min:0.01|max:100000000', 'received_date' => 'nullable|string',
             'mode' => 'nullable|in:'.implode(',', Receipt::MODES), 'reference' => 'nullable|string|max:120',
-            'deposited_to' => 'nullable|string|max:120', 'notes' => 'nullable|string|max:1000',
+            'deposited_to' => 'nullable|string|max:120', 'notes' => 'nullable|string|max:1000', 'bank_account_id' => 'nullable',
         ]);
         $d['received_date'] = $this->date($d['received_date'] ?? null) ?? $this->today();
         if ($d['received_date'] > $this->today()) {
@@ -163,6 +164,7 @@ class ReceiptController extends Controller
             $r->save();
             Billing::settle($inv);
             Billing::dealBooked($inv, $user);
+            Posting::advanceApplied($r, $inv, $user);
             ActivityLogger::log($user, 'apply_advance', 'receipt', $r->id, null, ['receipt_no' => $r->receipt_no, 'invoice_id' => $inv->id]);
         });
 
@@ -185,6 +187,7 @@ class ReceiptController extends Controller
             if ($r->invoice_id && ($inv = Invoice::find($r->invoice_id))) {
                 Billing::settle($inv);
             }
+            Posting::receiptCancelled($r, $user);
             ActivityLogger::log($user, 'cancel_receipt', 'receipt', $r->id, ['status' => 'valid'], ['status' => 'cancelled', 'receipt_no' => $r->receipt_no, 'amount' => $r->amount]);
         });
 

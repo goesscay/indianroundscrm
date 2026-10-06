@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -21,7 +21,8 @@ function InvoiceList() {
   const options = useCrmOptions();
   const [q, setQ] = useState("");
   const [applied, setApplied] = useState("");
-  const [status, setStatus] = useState("all");
+  const sp = useSearchParams();
+  const [status, setStatus] = useState(["draft", "unpaid", "overdue", "paid", "cancelled"].includes(sp.get("status") ?? "") ? sp.get("status")! : "all");
   const [owner, setOwner] = useState("all");
   const [outstanding, setOutstanding] = useState<number | null>(null);
 
