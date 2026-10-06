@@ -17,6 +17,7 @@ use App\Services\Billing;
 use App\Services\CustomerMail;
 use App\Services\DocPdf;
 use App\Services\Posting;
+use App\Services\Reminders;
 use App\Support\ActivityLogger;
 use App\Support\LineMath;
 use App\Support\Paging;
@@ -318,7 +319,15 @@ class InvoiceController extends Controller
 
     public function show(Request $request, string $id)
     {
-        return self::find($id, $request->user())->toApi(true);
+        $inv = self::find($id, $request->user());
+        $a = $inv->toApi(true);
+        $a['overdue_days'] = Reminders::daysOverdue($inv);
+        $a['reminders'] = DB::table('invoice_emails')->leftJoin('users', 'users.id', '=', 'invoice_emails.sent_by')
+            ->where('doc_type', 'invoice')->where('doc_id', $inv->id)->where('kind', 'reminder')->orderByDesc('invoice_emails.id')
+            ->get(['invoice_emails.created_at', 'invoice_emails.to_list', 'invoice_emails.status', 'invoice_emails.trigger', 'users.name as sent_by'])
+            ->map(fn ($r) => (array) $r)->all();
+
+        return $a;
     }
 
     public function store(Request $request)
@@ -495,6 +504,11 @@ class InvoiceController extends Controller
     public function emailPreview(Request $request, string $id)
     {
         $inv = self::find($id, $request->user());
+        if ($request->boolean('reminder')) {
+            Reminders::assertRemindable($inv);
+
+            return ['to' => array_values(array_filter([$inv->customer->email])), 'filename' => DocPdf::filename((string) $inv->invoice_no)] + Reminders::compose($inv);
+        }
         $co = config('crm.company.name');
         $due = collect($inv->scheduleStatus())->first(fn ($s) => $s['status'] !== 'paid')['due_date'] ?? null;
 
@@ -517,8 +531,19 @@ class InvoiceController extends Controller
         }
         $d = Fail::validate(Fail::body($request), [
             'to' => 'required|array|min:1|max:10', 'to.*' => 'required|email|max:200', 'cc' => 'nullable|array|max:10', 'cc.*' => 'email|max:200',
-            'subject' => 'required|string|max:300', 'message' => 'required|string|max:10000', 'attach_pdf' => 'sometimes|boolean',
+            'subject' => 'required|string|max:300', 'message' => 'required|string|max:10000', 'attach_pdf' => 'sometimes|boolean', 'reminder' => 'sometimes|boolean',
         ]);
+        if (! empty($d['reminder'])) {
+            Reminders::assertRemindable($inv);
+            $res = Reminders::send($inv, $d['to'], $d['cc'] ?? [], $d['subject'], $d['message'], ! array_key_exists('attach_pdf', $d) || $d['attach_pdf'], $user->id, 'manual');
+            $failed = ($res['status'] ?? '') === 'failed';
+            ActivityLogger::log($user, $failed ? 'invoice_reminder_failed' : 'invoice_reminder_sent', 'invoice', $inv->id, null, ['to' => $d['to'], 'status' => $res['status']]);
+            if ($failed) {
+                Fail::http(502, 'The e-mail could not be sent: '.($res['error'] ?? 'unknown error'));
+            }
+
+            return ['status' => $res['status'], 'note' => $res['note'] ?? null];
+        }
         $pdf = (! array_key_exists('attach_pdf', $d) || $d['attach_pdf'])
             ? ['name' => DocPdf::filename($inv->invoice_no), 'type' => 'application/pdf', 'bytes' => DocPdf::render('pdf.invoice', $this->pdfData($inv))] : null;
         $rows = $inv->lines->map(fn ($l) => [$l->description, $l->amount + $l->tax])->all();

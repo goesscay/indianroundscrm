@@ -15,8 +15,8 @@ interface Preview { to: string[]; subject: string; message: string; filename: st
 const split = (s: string) => s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
 
 /** E-mail an invoice or a receipt. `basePath` is "/invoices/12" or "/receipts/5". */
-export default function SendDocDialog({ basePath, title, open, onOpenChange, onSent }: {
-  basePath: string; title: string; open: boolean; onOpenChange: (o: boolean) => void; onSent?: () => void;
+export default function SendDocDialog({ basePath, title, open, onOpenChange, onSent, reminder }: {
+  reminder?: boolean; basePath: string; title: string; open: boolean; onOpenChange: (o: boolean) => void; onSent?: () => void;
 }) {
   const [pre, setPre] = useState<Preview | null>(null);
   const [to, setTo] = useState("");
@@ -30,10 +30,10 @@ export default function SendDocDialog({ basePath, title, open, onOpenChange, onS
   useEffect(() => {
     if (!open) return;
     setPre(null); setError(""); setSending(false);
-    api.get<Preview>(`${basePath}/email-preview`).then(({ data }) => {
+    api.get<Preview>(`${basePath}/email-preview${reminder ? "?reminder=1" : ""}`).then(({ data }) => {
       setPre(data); setTo(data.to.join(", ")); setCc(""); setSubject(data.subject); setMessage(data.message); setPdf(true);
     }).catch((e) => setError(formatApiError(e)));
-  }, [open, basePath]);
+  }, [open, basePath, reminder]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -41,9 +41,9 @@ export default function SendDocDialog({ basePath, title, open, onOpenChange, onS
     if (toList.length === 0) { setError("Enter at least one e-mail address."); return; }
     setSending(true); setError("");
     try {
-      const { data } = await api.post<{ status: string; note?: string | null }>(`${basePath}/send`, { to: toList, cc: split(cc), subject: subject.trim(), message, attach_pdf: pdf });
+      const { data } = await api.post<{ status: string; note?: string | null }>(`${basePath}/send`, { to: toList, cc: split(cc), subject: subject.trim(), message, attach_pdf: pdf, ...(reminder ? { reminder: true } : {}) });
       if (data.status === "simulated_sent") toast.warning(data.note || "Mail is in log mode — nothing was really sent.");
-      else toast.success(`${title} e-mailed`);
+      else toast.success(reminder ? "Reminder e-mailed" : `${title} e-mailed`);
       onSent?.(); onOpenChange(false);
     } catch (err) { setError(formatApiError(err)); }
     finally { setSending(false); }
@@ -53,8 +53,8 @@ export default function SendDocDialog({ basePath, title, open, onOpenChange, onS
     <Dialog open={open} onOpenChange={(o) => !sending && onOpenChange(o)}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" data-testid="send-doc-dialog">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl font-black">E-mail {title.toLowerCase()}</DialogTitle>
-          <DialogDescription>Sent from the enquiry mailbox with the PDF attached.</DialogDescription>
+          <DialogTitle className="font-display text-2xl font-black">{reminder ? "Payment reminder" : `E-mail ${title.toLowerCase()}`}</DialogTitle>
+          <DialogDescription>{reminder ? "A polite overdue notice with the invoice attached. Edit the wording if you like." : "Sent from the enquiry mailbox with the PDF attached."}</DialogDescription>
         </DialogHeader>
         {!pre && !error && <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 size={16} className="animate-spin" /> Preparing…</div>}
         {pre && (

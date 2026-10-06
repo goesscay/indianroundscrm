@@ -751,6 +751,8 @@ export interface Invoice {
   gst_mode: "cgst_sgst" | "igst" | "unspecified"; tcs_rate: number;
   subtotal: number; discount_total: number; tax_total: number; cgst_total: number; sgst_total: number; igst_total: number; tcs_total: number; total: number;
   paid_total: number; credited_total: number; balance: number; refundable: number; next_due: string | null;
+  reminder_count?: number; last_reminder_at?: string | null; overdue_days?: number;
+  reminders?: { created_at: string; to_list: string; status: string; trigger: "manual" | "auto"; sent_by: string | null }[];
   notes: string | null; terms: string | null; cancel_reason: string | null; owner: { id: string; name: string } | null;
   lines?: QuoteLine[]; installments?: Installment[]; receipts?: Receipt[]; credit_notes?: CreditNote[];
   created_at: string; updated_at: string;

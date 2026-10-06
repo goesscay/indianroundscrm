@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Banknote, FilePlus2, FileText, Pencil, Send, Trash2, Undo2, XCircle } from "lucide-react";
+import { ArrowLeft, Banknote, BellRing, FilePlus2, FileText, Pencil, Send, Trash2, Undo2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -34,6 +34,7 @@ export default function InvoiceDetail() {
   const [pay, setPay] = useState<"receipt" | "refund" | null>(null);
   const [credit, setCredit] = useState(false);
   const [send, setSend] = useState(false);
+  const [remind, setRemind] = useState(false);
 
   const load = useCallback(async () => {
     try { const { data } = await api.get<Invoice>(`/invoices/${id}`); setX(data); setError(""); }
@@ -99,12 +100,14 @@ export default function InvoiceDetail() {
           {draft && can("invoices.create") && <Button variant="outline" onClick={() => router.push(`/invoices/${x.id}/edit`)} data-testid="invoice-edit"><Pencil size={16} /> Edit</Button>}
           {draft && can("invoices.issue") && <Button onClick={issue} disabled={busy} data-testid="invoice-issue"><FilePlus2 size={16} /> Issue invoice</Button>}
           {issued && can("invoices.issue") && <Button variant="outline" onClick={() => setSend(true)} data-testid="invoice-send"><Send size={16} /> E-mail</Button>}
+          {issued && x.balance > 0 && can("invoices.issue") && <Button variant="outline" onClick={() => setRemind(true)} data-testid="invoice-remind"><BellRing size={16} /> Send reminder</Button>}
           {issued && x.balance > 0 && can("receipts.record") && <Button onClick={() => setPay("receipt")} data-testid="record-payment"><Banknote size={16} /> Record payment</Button>}
         </div>
       </div>
 
       {x.status === "cancelled" && <Card className="rounded-lg p-4 text-sm">Cancelled{x.cancel_reason ? `: ${x.cancel_reason}` : ""}. The number {x.invoice_no} stays on record.</Card>}
-      {x.payment_status === "overdue" && <Card className="rounded-lg border-red-300 p-4 text-sm text-red-800 dark:border-red-900 dark:text-red-300" data-testid="invoice-overdue">A payment is overdue: {INR2(x.balance)} is still owed.</Card>}
+      {x.payment_status === "overdue" && <Card className="rounded-lg border-red-300 p-4 text-sm text-red-800 dark:border-red-900 dark:text-red-300" data-testid="invoice-overdue">A payment is overdue{x.overdue_days ? ` by ${x.overdue_days} day${x.overdue_days === 1 ? "" : "s"}` : ""}: {INR2(x.balance)} is still owed.{" "}
+        {x.reminders && x.reminders.length > 0 ? `Reminded ${x.reminders.length}× — last on ${fmtDate(x.reminders[0].created_at)} (${x.reminders[0].trigger === "auto" ? "automatic" : `by ${x.reminders[0].sent_by ?? "a colleague"}`}).` : "No reminder has been sent yet."}</Card>}
       {x.refundable > 0 && (
         <Card className="flex flex-wrap items-center justify-between gap-3 rounded-lg border-amber-300 p-4 text-sm dark:border-amber-900" data-testid="invoice-refundable">
           <span>The customer has paid {INR2(x.refundable)} more than is now owed. Refund it to settle the invoice.</span>
@@ -234,6 +237,7 @@ export default function InvoiceDetail() {
                      kind={pay === "refund" ? "refund" : "receipt"} suggested={pay === "refund" ? x.refundable : x.balance} max={pay === "refund" ? x.refundable : x.balance} onSaved={() => void load()} />
       <CreditNoteDialog invoiceId={x.id} open={credit} onOpenChange={setCredit} room={creditRoom} onSaved={(inv) => setX(inv)} />
       <SendDocDialog basePath={`/invoices/${x.id}`} title="Invoice" open={send} onOpenChange={setSend} />
+      <SendDocDialog reminder basePath={`/invoices/${x.id}`} title="Reminder" open={remind} onOpenChange={setRemind} onSent={load} />
     </div>
   );
 }
