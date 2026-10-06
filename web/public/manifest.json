@@ -1,13 +1,24 @@
 {
+  "id": "/",
+  "name": "Indian Rounds CRM",
   "short_name": "IR CRM",
-  "name": "Indian Rounds — Travel CRM",
-  "start_url": "/",
+  "description": "Indian Rounds — travel leads, sales, suppliers and accounts",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#F8FAFC",
-  "theme_color": "#106EBE",
-  "orientation": "portrait-primary",
-  "description": "Enterprise Travel Lead Management CRM",
+  "orientation": "any",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0A0A0A",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "/logo.png", "sizes": "any", "type": "image/png" }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Leads", "url": "/leads", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "New lead", "url": "/leads/new", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Activities", "url": "/activities", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

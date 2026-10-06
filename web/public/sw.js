@@ -1,36 +1,39 @@
-/* Simple PWA service worker for Indian Rounds CRM - caches static assets for offline access */
-const CACHE = "ir-crm-v2";
-const APP_SHELL = ["/manifest.json", "/logo.png"];
+/* Indian Rounds CRM service worker.
+   - Never touches API/auth calls or authenticated pages (data stays live and private).
+   - Static build assets and icons are cached; page navigations go to the network and show /offline.html if it is unreachable. */
+const CACHE = "ir-crm-v3";
+const PRECACHE = ["/offline.html", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
+  if (req.method !== "GET") return;
   const url = new URL(req.url);
-  // Never cache API / auth calls (need fresh data) or Next.js build output
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/sanctum/") || url.pathname.startsWith("/_next/")) return;
-  if (req.method !== "GET" || req.mode === "navigate") return;
+  if (url.origin !== location.origin) return;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/sanctum/") || url.pathname.startsWith("/broadcasting/")) return;
 
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req).then((res) => {
-        if (res && res.status === 200 && res.type === "basic") {
-          const clone = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, clone));
-        }
+  if (req.mode === "navigate") {
+    event.respondWith(fetch(req).catch(() => caches.match("/offline.html")));
+    return;
+  }
+
+  // Hashed build output never changes for a given URL, so cache-first is safe; icons and images likewise.
+  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || /\.(png|jpg|svg|ico|woff2?)$/.test(url.pathname)) {
+    event.respondWith(
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res && res.status === 200 && res.type === "basic") { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
         return res;
-      }).catch(() => cached);
-      return cached || network;
-    })
-  );
+      }))
+    );
+  }
 });
