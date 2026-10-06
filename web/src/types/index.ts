@@ -770,6 +770,7 @@ export interface JournalSummary {
 export interface JournalLineRow { account_id: string; account_code: string | null; account_name: string | null; debit: number; credit: number; memo: string | null; customer_id: string | null }
 export interface JournalDetail extends JournalSummary { lines: JournalLineRow[] }
 export interface FinanceDashboard {
+  bills_outstanding?: { count: number; total: number };
   banks: { id: string | null; name: string; kind: string; balance: number }[]; bank_total: number;
   receivable: number; payable: number; advances: number; gst_payable: number; tcs_payable: number;
   month: { income: number; expenses: number }; year: { income: number; expenses: number; label: string };
@@ -786,3 +787,38 @@ export interface TrialBalance {
   items: { id: string; code: string; name: string; type: AccountType; debit: number; credit: number; closing_debit: number; closing_credit: number }[];
 }
 export interface BankOption { id: string; name: string; kind: string; is_default: boolean }
+
+// ---- Accounts part B: payables, money in/out, reports ----
+export type BillStatus = "open" | "partial" | "paid" | "overdue" | "cancelled";
+export interface SupplierPaymentRow {
+  id: string; payment_no: string; status: "valid" | "cancelled"; supplier: { id: string; name: string } | null; supplier_id: string;
+  bill: { id: string; bill_no: string; supplier_ref: string | null } | null; bill_id: string | null;
+  amount: number; paid_date: string; mode: PayMode; reference: string | null; notes: string | null; cancel_reason: string | null;
+}
+export interface SupplierBill {
+  id: string; bill_no: string; supplier_ref: string | null; supplier: { id: string; name: string } | null; supplier_id: string;
+  deal: { id: string; deal_no: string; name: string } | null; deal_id: string | null; bill_date: string; due_date: string | null;
+  total: number; paid_total: number; balance: number; payment_status: BillStatus; status: "open" | "cancelled"; notes: string | null; cancel_reason: string | null;
+  lines?: { description: string; amount: number; account_id: string; account: string | null; deal_id: string | null }[];
+  payments?: SupplierPaymentRow[];
+}
+export interface MoneyEntryRow {
+  id: string; entry_no: string; kind: "expense" | "income"; status: "valid" | "cancelled"; entry_date: string; amount: number; mode: PayMode;
+  account: { id: string; code: string; name: string } | null; payee: string | null; reference: string | null; notes: string | null; cancel_reason: string | null;
+}
+export interface ReportRow { id?: string; code: string; name: string; amount: number }
+export interface ProfitLoss { from: string; to: string; income: ReportRow[]; cost_of_sales: ReportRow[]; expenses: ReportRow[]; total_income: number; total_cost_of_sales: number; gross_profit: number; total_expenses: number; net_profit: number }
+export interface BalanceSheet { as_of: string; assets: ReportRow[]; liabilities: ReportRow[]; equity: ReportRow[]; profit_to_date: number; total_assets: number; total_liabilities: number; total_equity: number; balanced: boolean }
+export interface AgeRow { balance: number; current: number; d1_30: number; d31_60: number; d61_90: number; d90p: number }
+export interface ReceivablesAgeing { as_of: string; items: (AgeRow & { customer_id: string; customer: string | null; invoice_id: string; invoice_no: string | null; title: string; next_due: string | null })[]; totals: AgeRow }
+export interface PayablesAgeing { as_of: string; items: (AgeRow & { supplier_id: string; supplier: string | null; bill_id: string; bill_no: string; supplier_ref: string | null; due_date: string })[]; totals: AgeRow }
+export interface GstSummary { from: string; to: string; note: string; items: { month: string; taxable: number; cgst: number; sgst: number; igst: number; gst_other: number; gst_total: number; tcs: number }[]; totals: { taxable: number; cgst: number; sgst: number; igst: number; gst_other: number; gst_total: number; tcs: number } }
+export interface PartyStatement {
+  type: "customer" | "supplier"; party: { id: string; name: string }; opening: number; closing: number; total_debit: number; total_credit: number; position: string;
+  items: { entry_id: string; entry_no: string; date: string; narration: string; source_type: string; memo: string | null; debit: number; credit: number; balance: number }[];
+  total: number; page: number; per_page: number; pages: number;
+}
+export interface DealBooks {
+  revenue: { code: string; name: string; amount: number }[]; costs: { code: string; name: string; amount: number }[];
+  total_revenue: number; total_costs: number; profit: number; margin_pct: number | null; bills: SupplierBill[];
+}

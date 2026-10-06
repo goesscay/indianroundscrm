@@ -139,6 +139,10 @@ class MasterDataController extends Controller
     public function suppliersDestroy(Request $request, string $sid)
     {
         $id = Ids::parse($sid);
+        if (\Illuminate\Support\Facades\DB::table('supplier_bills')->where('supplier_id', $id)->exists()
+            || \Illuminate\Support\Facades\DB::table('supplier_payments')->where('supplier_id', $id)->exists()) {
+            \App\Crm\Fail::http(409, 'This supplier has bills or payments in the books and cannot be deleted.');
+        }
         Supplier::where('id', $id)->delete();
         ActivityLogger::log($request->user(), 'delete_supplier', 'supplier', $id);
 

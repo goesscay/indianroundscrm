@@ -103,7 +103,7 @@ export default function AccountsDashboard() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="accounts-position">
         <Kpi label="Customers owe you" value={INR2(d.receivable)} sub={`${d.invoices_outstanding.count} open invoice${d.invoices_outstanding.count === 1 ? "" : "s"}`} href="/invoices?status=unpaid" />
-        <Kpi label="You owe suppliers" value={INR2(d.payable)} sub="Supplier bills arrive in the next release" />
+        <Kpi label="You owe suppliers" value={INR2(d.payable)} sub={d.bills_outstanding ? `${d.bills_outstanding.count} open bill${d.bills_outstanding.count === 1 ? "" : "s"}` : undefined} href="/accounts/bills?status=unpaid" />
         <Kpi label="Advances held" value={INR2(d.advances)} sub="Received, not yet on an invoice" href="/receipts" />
         <Kpi label="GST and TCS to pay" value={INR2(d.gst_payable + d.tcs_payable)} sub={`GST ${INR2(d.gst_payable)} · TCS ${INR2(d.tcs_payable)}`} />
       </div>

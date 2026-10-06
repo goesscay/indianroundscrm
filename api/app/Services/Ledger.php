@@ -59,7 +59,7 @@ class Ledger
     }
 
     /**
-     * @param  list<array{account_id:int,debit?:float,credit?:float,memo?:?string,customer_id?:?int,deal_id?:?int}>  $lines
+     * @param  list<array{account_id:int,debit?:float,credit?:float,memo?:?string,customer_id?:?int,deal_id?:?int,supplier_id?:?int}>  $lines
      */
     public static function post(string $date, string $narration, array $lines, string $sourceType = 'manual', ?int $sourceId = null, ?User $user = null, ?int $reverses = null): JournalEntry
     {
@@ -90,7 +90,7 @@ class Ledger
             foreach ($lines as $l) {
                 JournalLine::create([
                     'entry_id' => $e->id, 'account_id' => (int) $l['account_id'], 'debit' => round((float) ($l['debit'] ?? 0), 2), 'credit' => round((float) ($l['credit'] ?? 0), 2),
-                    'memo' => isset($l['memo']) ? mb_substr((string) $l['memo'], 0, 250) : null, 'customer_id' => $l['customer_id'] ?? null, 'deal_id' => $l['deal_id'] ?? null,
+                    'memo' => isset($l['memo']) ? mb_substr((string) $l['memo'], 0, 250) : null, 'customer_id' => $l['customer_id'] ?? null, 'deal_id' => $l['deal_id'] ?? null, 'supplier_id' => $l['supplier_id'] ?? null,
                 ]);
             }
 
@@ -105,7 +105,7 @@ class Ledger
             Fail::http(409, 'This entry has already been reversed (or is itself a reversal).');
         }
         $date ??= now('Asia/Kolkata')->toDateString();
-        $lines = $e->lines()->get()->map(fn ($l) => ['account_id' => $l->account_id, 'debit' => $l->credit, 'credit' => $l->debit, 'memo' => $l->memo, 'customer_id' => $l->customer_id, 'deal_id' => $l->deal_id])->all();
+        $lines = $e->lines()->get()->map(fn ($l) => ['account_id' => $l->account_id, 'debit' => $l->credit, 'credit' => $l->debit, 'memo' => $l->memo, 'customer_id' => $l->customer_id, 'deal_id' => $l->deal_id, 'supplier_id' => $l->supplier_id])->all();
 
         return DB::transaction(function () use ($e, $user, $date, $lines, $narration) {
             $r = self::post($date, $narration ?? 'Reversal of '.$e->entry_no.' — '.$e->narration, $lines, 'reversal', $e->id, $user, $e->id);

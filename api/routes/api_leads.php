@@ -9,6 +9,8 @@ use App\Http\Controllers\Crm\FinanceController;
 use App\Http\Controllers\Crm\InvoiceController;
 use App\Http\Controllers\Crm\JournalController;
 use App\Http\Controllers\Crm\PackageController;
+use App\Http\Controllers\Crm\PayablesController;
+use App\Http\Controllers\Crm\ReportsController;
 use App\Http\Controllers\Crm\ReceiptController;
 use App\Http\Controllers\Crm\QuoteController;
 use App\Http\Controllers\Crm\LeadConvertController;
@@ -183,4 +185,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/finance/journal', [JournalController::class, 'store'])->middleware('perm:finance.journal');
     Route::get('/finance/journal/{id}', [JournalController::class, 'show'])->middleware('perm:finance.view');
     Route::post('/finance/journal/{id}/reverse', [JournalController::class, 'reverse'])->middleware('perm:finance.journal');
+
+    // ---- Accounts (part B): supplier bills and payments, other money in/out, reports, statements
+    Route::get('/finance/bills', [PayablesController::class, 'bills'])->middleware('perm:finance.view');
+    Route::post('/finance/bills', [PayablesController::class, 'storeBill'])->middleware('perm:finance.payables');
+    Route::get('/finance/bills/{id}', [PayablesController::class, 'showBill'])->middleware('perm:finance.view');
+    Route::post('/finance/bills/{id}/cancel', [PayablesController::class, 'cancelBill'])->middleware('perm:finance.payables');
+    Route::post('/finance/bills/{id}/payments', [PayablesController::class, 'payBill'])->middleware('perm:finance.payables');
+    Route::get('/finance/supplier-payments', [PayablesController::class, 'payments'])->middleware('perm:finance.view');
+    Route::get('/finance/supplier-payments/{id}', [PayablesController::class, 'showPayment'])->middleware('perm:finance.view');
+    Route::post('/finance/supplier-payments/{id}/apply', [PayablesController::class, 'applyAdvance'])->middleware('perm:finance.payables');
+    Route::post('/finance/supplier-payments/{id}/cancel', [PayablesController::class, 'cancelPayment'])->middleware('perm:finance.payables');
+    Route::post('/finance/suppliers/{id}/advances', [PayablesController::class, 'advance'])->middleware('perm:finance.payables');
+    Route::get('/finance/money', [PayablesController::class, 'money'])->middleware('perm:finance.view');
+    Route::post('/finance/money', [PayablesController::class, 'storeMoney'])->middleware('perm:finance.payables');
+    Route::post('/finance/money/{id}/cancel', [PayablesController::class, 'cancelMoney'])->middleware('perm:finance.payables');
+
+    Route::get('/finance/reports/profit-loss', [ReportsController::class, 'profitLoss'])->middleware('perm:finance.view');
+    Route::get('/finance/reports/balance-sheet', [ReportsController::class, 'balanceSheet'])->middleware('perm:finance.view');
+    Route::get('/finance/reports/receivables-ageing', [ReportsController::class, 'receivablesAgeing'])->middleware('perm:finance.view');
+    Route::get('/finance/reports/payables-ageing', [ReportsController::class, 'payablesAgeing'])->middleware('perm:finance.view');
+    Route::get('/finance/reports/gst-summary', [ReportsController::class, 'gstSummary'])->middleware('perm:finance.view');
+    Route::get('/finance/party-ledger', [ReportsController::class, 'partyLedger'])->middleware('perm:finance.view');
+    Route::get('/deals/{id}/books', [ReportsController::class, 'dealBooks'])->middleware('perm:finance.view');
 });

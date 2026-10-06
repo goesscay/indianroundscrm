@@ -87,6 +87,7 @@ class Permissions
             $g('finance', 'Accounts (finance)', [
                 'view' => ['View accounts', 'Open the Accounts module: dashboard, banking, chart of accounts, journal, ledger and trial balance.'],
                 'journal' => ['Post journal entries', 'Create manual journal entries and reverse them.'],
+                'payables' => ['Record supplier bills and expenses', 'Enter supplier bills, pay suppliers, and record other money in and money out.'],
                 'manage' => ['Manage the books', 'Add and edit ledger and bank accounts and close the books up to a date.'],
             ]),
             $g('forecasts', 'Forecasts', [
@@ -195,7 +196,7 @@ class Permissions
             ],
             'accountant' => [
                 'dashboard.view', 'chat.use', 'activities.view', 'activities.create',
-                'finance.view', 'finance.journal', 'finance.manage',
+                'finance.view', 'finance.journal', 'finance.manage', 'finance.payables',
                 'invoices.view', 'invoices.view_all', 'invoices.create', 'invoices.issue', 'invoices.credit', 'invoices.delete',
                 'receipts.view', 'receipts.record', 'receipts.cancel',
                 'customers.view', 'customers.view_all', 'deals.view', 'deals.view_all', 'quotes.view', 'quotes.view_all', 'packages.view',

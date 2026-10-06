@@ -8,11 +8,15 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/accounts", label: "Dashboard", exact: true },
+  { href: "/accounts/bills", label: "Supplier bills" },
+  { href: "/accounts/money", label: "Money in and out" },
   { href: "/accounts/banking", label: "Banking" },
-  { href: "/accounts/chart", label: "Chart of accounts" },
   { href: "/accounts/journal", label: "Journal" },
   { href: "/accounts/ledger", label: "Ledger" },
+  { href: "/accounts/statements", label: "Statements" },
+  { href: "/accounts/reports", label: "Reports" },
   { href: "/accounts/trial-balance", label: "Trial balance" },
+  { href: "/accounts/chart", label: "Chart of accounts" },
 ];
 
 export default function AccountsLayout({ children }: { children: ReactNode }) {

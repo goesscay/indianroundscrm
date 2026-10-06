@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, ListChecks, Plus, ReceiptText, StickyNote, Trash2 } from "lucide-react";
+import { FileText, Landmark, ListChecks, Plus, ReceiptText, StickyNote, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -14,7 +14,7 @@ import ActivityDialog from "@/components/activities/ActivityDialog";
 import { DoneToggle, canEditActivity, dueClass, formatDue, typeMeta } from "@/components/activities/shared";
 import { cn } from "@/lib/utils";
 import { INR2, PayPill, QuotePill, fmtDate } from "@/components/crm/shared";
-import type { Activity, CrmNote, Invoice, Quote } from "@/types";
+import type { Activity, CrmNote, DealBooks, Invoice, Quote } from "@/types";
 
 /** Notes card for a customer or a deal. `base` is "/customers/12" or "/deals/7". */
 export function RecordNotes({ base, canWrite }: { base: string; canWrite: boolean }) {
@@ -217,6 +217,42 @@ export function RecordInvoices({ filter, newHref }: { filter: { customer_id?: st
           </li>
         ))}
       </ul>
+    </Card>
+  );
+}
+
+/** What the books say about one trip: revenue, costs and profit, with its supplier bills. Needs finance access. */
+export function DealBooksCard({ dealId, onChanged }: { dealId: string; onChanged?: () => void }) {
+  const { can } = useCurrentUser();
+  const [d, setD] = useState<DealBooks | null>(null);
+
+  useEffect(() => {
+    if (!can("finance.view")) return;
+    api.get<DealBooks>(`/deals/${dealId}/books`).then((r) => { setD(r.data); onChanged?.(); }).catch(() => setD(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dealId]);
+
+  if (!can("finance.view") || !d) return null;
+  return (
+    <Card className="p-5 rounded-lg" data-testid="deal-books">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2"><Landmark size={16} className="text-muted-foreground" /><h3 className="font-display font-bold">Books for this trip</h3></div>
+        {can("finance.payables") && <Link href={`/accounts/bills?new=1&deal=${dealId}`}><Button size="sm" variant="outline" data-testid="deal-add-bill"><Plus size={14} /> Add supplier bill</Button></Link>}
+      </div>
+      <dl className="space-y-1.5 text-sm">
+        <div className="flex justify-between"><dt className="text-muted-foreground">Revenue (excl. GST)</dt><dd className="font-medium" data-testid="books-revenue">{INR2(d.total_revenue)}</dd></div>
+        <div className="flex justify-between"><dt className="text-muted-foreground">Costs booked</dt><dd className="font-medium" data-testid="books-costs">{INR2(d.total_costs)}</dd></div>
+        <div className="flex justify-between border-t border-border pt-2 font-bold"><dt>Profit</dt><dd data-testid="books-profit">{INR2(d.profit)}{d.margin_pct != null ? <span className="ml-2 text-xs font-normal text-muted-foreground">{d.margin_pct}%</span> : null}</dd></div>
+      </dl>
+      {d.bills.length > 0 && (
+        <ul className="mt-3 divide-y divide-border border-t border-border">
+          {d.bills.map((b) => (
+            <li key={b.id}><Link href={`/accounts/bills/${b.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded px-2 py-2 text-sm hover:bg-secondary/40">
+              <span className="min-w-0 truncate">{b.supplier?.name} <span className="font-mono text-xs text-muted-foreground">{b.bill_no}</span></span>
+              <span className="flex shrink-0 items-center gap-2"><span className="font-semibold">{INR2(b.total)}</span><PayPill status={b.payment_status === "open" ? "unpaid" : b.payment_status} /></span></Link></li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

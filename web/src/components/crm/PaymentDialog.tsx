@@ -18,7 +18,9 @@ interface Props {
   onOpenChange: (o: boolean) => void;
   /** POST target: /invoices/{id}/receipts, /invoices/{id}/refunds or /customers/{id}/advances */
   endpoint: string;
-  kind: "receipt" | "refund" | "advance";
+  kind: "receipt" | "refund" | "advance" | "supplier" | "supplier_advance";
+  /** Name of the date field the endpoint expects. */
+  dateField?: "received_date" | "paid_date";
   /** Suggested amount (invoice balance / refundable amount). */
   suggested?: number;
   /** Largest amount the server will accept, shown as a hint. */
@@ -35,9 +37,11 @@ const COPY = {
   receipt: { title: "Record payment", desc: "Money received from the customer against this invoice.", btn: "Record payment" },
   advance: { title: "Record advance", desc: "Money received before an invoice exists. You can apply it to an invoice later.", btn: "Record advance" },
   refund: { title: "Record refund", desc: "Money paid back to the customer after a credit note.", btn: "Record refund" },
+  supplier: { title: "Pay supplier", desc: "A payment to the supplier against this bill.", btn: "Record payment" },
+  supplier_advance: { title: "Advance to supplier", desc: "Money paid before a bill exists. Apply it to a bill later.", btn: "Record advance" },
 } as const;
 
-export default function PaymentDialog({ open, onOpenChange, endpoint, kind, suggested, max, onSaved }: Props) {
+export default function PaymentDialog({ open, onOpenChange, endpoint, kind, dateField = "received_date", suggested, max, onSaved }: Props) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
   const [mode, setMode] = useState("upi");
@@ -65,9 +69,9 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, sugg
     if (!(n > 0)) { setError("Enter the amount."); return; }
     setSaving(true); setError("");
     try {
-      const { data } = await api.post<{ receipt?: Receipt } & Receipt>(endpoint, { amount: n, received_date: date, mode, reference, notes, ...(banks.length ? (bank !== "auto" ? { bank_account_id: bank } : {}) : { deposited_to: deposited }) });
-      const rec = (data.receipt ?? data) as Receipt;
-      toast.success(`${rec.receipt_no} recorded`);
+      const { data } = await api.post<{ receipt?: Receipt; payment?: Receipt } & Receipt>(endpoint, { amount: n, [dateField]: date, mode, reference, notes, ...(banks.length ? (bank !== "auto" ? { bank_account_id: bank } : {}) : { deposited_to: deposited }) });
+      const rec = (data.receipt ?? data.payment ?? data) as Receipt;
+      toast.success(`${rec.receipt_no ?? (rec as unknown as { payment_no: string }).payment_no} recorded`);
       onSaved(rec); onOpenChange(false);
     } catch (err) { setError(formatApiError(err)); }
     finally { setSaving(false); }
@@ -85,7 +89,7 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, sugg
           <div>
             <Label htmlFor="pay-amt">Amount (₹) *</Label>
             <Input id="pay-amt" type="number" min={0} step="0.01" className="mt-1.5 h-10" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus data-testid="payment-amount" />
-            {max != null && <p className="mt-1 text-xs text-muted-foreground">{kind === "refund" ? "Can refund up to" : "Balance"} {INR2(max)}</p>}
+            {max != null && <p className="mt-1 text-xs text-muted-foreground">{kind === "refund" ? "Can refund up to" : kind === "supplier" ? "Owed on this bill" : "Balance"} {INR2(max)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label htmlFor="pay-date">Date</Label><Input id="pay-date" type="date" max={today()} className="mt-1.5 h-10" value={date} onChange={(e) => setDate(e.target.value)} /></div>
@@ -100,7 +104,7 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, sugg
           <div><Label htmlFor="pay-ref">Reference</Label><Input id="pay-ref" className="mt-1.5 h-10" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR, cheque number, card last digits…" data-testid="payment-reference" /></div>
           {banks.length > 0 ? (
             <div>
-              <Label>{kind === "refund" ? "Paid from" : "Deposited to"}</Label>
+              <Label>{kind === "refund" || kind === "supplier" || kind === "supplier_advance" ? "Paid from" : "Deposited to"}</Label>
               <Select value={bank} onValueChange={setBank}>
                 <SelectTrigger className="mt-1.5 h-10" data-testid="payment-bank"><SelectValue /></SelectTrigger>
                 <SelectContent>

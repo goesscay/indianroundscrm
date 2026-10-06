@@ -85,6 +85,8 @@ class FinanceController extends Controller
         $out = Invoice::where('status', 'issued')->get(['total', 'credited_total', 'paid_total']);
         $owed = $out->map(fn ($i) => max(0, $i->total - $i->credited_total - $i->paid_total));
 
+        $bills = \App\Models\SupplierBill::where('status', 'open')->get(['total', 'paid_total'])->map(fn ($b) => max(0, $b->total - $b->paid_total))->filter(fn ($v) => $v > 0.005);
+
         return [
             'banks' => $banks, 'bank_total' => round((float) $banks->sum('balance'), 2),
             'receivable' => $dn('1100'), 'payable' => $cn('2000'), 'advances' => $cn('2100'),
@@ -92,6 +94,7 @@ class FinanceController extends Controller
             'month' => ['income' => $this->net('income', $monthStart, null), 'expenses' => $this->net('expense', $monthStart, null)],
             'year' => ['income' => $this->net('income', $fyStart, null), 'expenses' => $this->net('expense', $fyStart, null), 'label' => sprintf('FY %d–%02d', $fy, ($fy + 1) % 100)],
             'months' => $months,
+            'bills_outstanding' => ['count' => $bills->count(), 'total' => round((float) $bills->sum(), 2)],
             'invoices_outstanding' => ['count' => $owed->filter(fn ($v) => $v > 0.005)->count(), 'total' => round((float) $owed->sum(), 2)],
             'lock_date' => Ledger::lockDate(),
             'entries' => (int) DB::table('journal_entries')->count(),

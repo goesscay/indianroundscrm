@@ -84,6 +84,7 @@ export default function CustomerDetail() {
           {wa.length === 10 && <a href={`https://wa.me/91${wa}`} target="_blank" rel="noreferrer"><Button variant="outline"><MessageCircle size={16} /> WhatsApp</Button></a>}
           {c.email && <a href={`mailto:${c.email}`}><Button variant="outline"><Mail size={16} /> E-mail</Button></a>}
           {canEdit && <Button variant="outline" onClick={() => setEdit(true)} data-testid="customer-edit"><Pencil size={16} /> Edit</Button>}
+          {can("finance.view") && <Link href={`/accounts/statements?type=customer&id=${c.id}`}><Button variant="outline" data-testid="customer-statement">Statement</Button></Link>}
           {can("receipts.record") && <Button variant="outline" onClick={() => setAdvance(true)} data-testid="customer-advance">Record advance</Button>}
           {can("deals.create") && <Button onClick={() => setNewDeal(true)} data-testid="customer-new-deal"><Plus size={16} /> New deal</Button>}
         </div>

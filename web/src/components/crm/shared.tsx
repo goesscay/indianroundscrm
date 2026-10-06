@@ -150,4 +150,5 @@ export function PayPill({ status, className }: { status: string; className?: str
 
 export const SOURCE_LABEL: Record<string, string> = {
   manual: "Manual", opening: "Opening balance", invoice: "Invoice", receipt: "Receipt", advance_apply: "Advance applied", credit_note: "Credit note", reversal: "Reversal",
+  bill: "Supplier bill", supplier_payment: "Supplier payment", supplier_adv_apply: "Supplier advance applied", money_entry: "Money in / out",
 };
