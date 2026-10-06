@@ -41,7 +41,6 @@ const NAV: NavItem[] = [
   { to: "/quotes", label: "Quotes", icon: FileText, testId: "nav-quotes", group: "Sales", perms: ["quotes.view"] },
   { to: "/invoices", label: "Invoices", icon: ReceiptText, testId: "nav-invoices", group: "Sales", perms: ["invoices.view"] },
   { to: "/receipts", label: "Receipts", icon: Wallet, testId: "nav-receipts", group: "Sales", perms: ["receipts.view"] },
-  { to: "/chat", label: "Chat", icon: MessageSquare, testId: "nav-chat", group: "Team", perms: ["chat.use"] },
   { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard", group: "Operations", perms: ["supplier_dashboard.view"] },
   { to: "/supplier-inbox", label: "Supplier Inbox", icon: MailOpen, testId: "nav-supplier-inbox", group: "Operations", perms: ["rsq.manage"] },
   { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers", group: "Operations", perms: ["suppliers.view"] },
@@ -174,16 +173,6 @@ export default function Layout({ children }: { children: ReactNode }) {
       >
         <it.icon size={16} className={active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"} />
         {!rail && <span className="flex-1">{it.label}</span>}
-        {it.testId === "nav-chat" && chatUnread > 0 &&
-          (rail ? (
-            <span data-testid="chat-unread-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-sidebar">
-    {chatUnread > 9 ? "9+" : chatUnread}
-            </span>
-          ) : (
-            <span data-testid="chat-unread-badge" className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center", active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground")}>
-    {chatUnread > 99 ? "99+" : chatUnread}
-            </span>
-          ))}
         {it.testId === "nav-supplier-inbox" && (inboxUnread > 0 || inboxUnmatched > 0) &&
           (rail ? (
             <span data-testid="inbox-nav-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-sidebar">
@@ -414,6 +403,17 @@ export default function Layout({ children }: { children: ReactNode }) {
         <header className="hidden md:flex sticky top-0 z-30 h-14 items-center justify-between gap-4 px-6 bg-sidebar border-b border-border" data-testid="app-header">
           <h2 className="font-display text-[15px] tracking-tight text-foreground truncate">{pageTitle}</h2>
           <div className="flex items-center gap-1.5">
+            {can("chat.use") && (
+              <Link href="/chat" aria-label={`Chat${chatUnread > 0 ? `, ${chatUnread} unread` : ""}`} title="Chat" data-testid="chat-link"
+                    className="relative mr-1 inline-flex h-8 w-8 items-center justify-center rounded border border-border text-foreground hover:bg-accent">
+                <MessageSquare size={15} />
+                {chatUnread > 0 && (
+                  <span data-testid="chat-unread-badge" className="absolute -right-1 -top-1 flex h-[15px] min-w-[15px] items-center justify-center rounded-sm bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                    {chatUnread > 99 ? "99+" : chatUnread}
+                  </span>
+                )}
+              </Link>
+            )}
             {aiAllowed && (
               <button onClick={openAi} data-testid="ai-open-btn" title="Rounds AI (Ctrl+J)"
                       className="flex items-center gap-1.5 h-8 px-2.5 mr-1 rounded border border-border text-[13px] font-medium text-foreground hover:bg-accent">
