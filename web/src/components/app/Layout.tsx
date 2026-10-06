@@ -55,6 +55,7 @@ const NAV: NavItem[] = [
 ];
 
 const COLLAPSE_KEY = "ir-sidebar-collapsed";
+const GROUPS_KEY = "ir-nav-groups";
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout, can } = useCurrentUser();
@@ -82,6 +83,29 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => setOpen(false), [pathname]);
+
+  // Collapsible module groups (expanded desktop sidebar and mobile drawer); remembered per browser.
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(GROUPS_KEY) || "{}");
+      if (v && typeof v === "object") setClosed(v);
+    } catch {
+      /* storage unavailable or corrupt */
+    }
+  }, []);
+  const saveClosed = (next: Record<string, boolean>) => {
+    setClosed(next);
+    try { localStorage.setItem(GROUPS_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+  };
+  const toggleGroup = (name: string) => saveClosed({ ...closed, [name]: !closed[name] });
+  const setAllGroups = (shut: boolean) => saveClosed(Object.fromEntries(collapsibleGroups.map((g) => [g, shut])));
+  // Opening a page inside a folded group unfolds it.
+  useEffect(() => {
+    const g = items.find((it) => isActive(it.to))?.group;
+    if (g && closed[g]) saveClosed({ ...closed, [g]: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -128,69 +152,92 @@ export default function Layout({ children }: { children: ReactNode }) {
   const initials = (user.name || user.email || "?")
     .split(/[\s@]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
-  // `rail` = icon-only desktop mode. The mobile drawer always renders expanded.
-  const renderNav = (rail: boolean) => {
-    let lastGroup = "";
+  const groups: { name: string; items: NavItem[] }[] = [];
+  for (const it of items) {
+    const g = groups[groups.length - 1];
+    if (g && g.name === it.group) g.items.push(it); else groups.push({ name: it.group, items: [it] });
+  }
+  const collapsibleGroups = groups.filter((g) => g.items.length > 1).map((g) => g.name);
+  const allClosed = collapsibleGroups.length > 0 && collapsibleGroups.every((g) => closed[g]);
+
+  const renderItem = (it: NavItem, rail: boolean) => {
+    const active = isActive(it.to);
     return (
-      <nav className="flex-1 overflow-y-auto sidebar-scroll px-2 py-2">
-        {items.map((it) => {
-          const active = isActive(it.to);
-          const showGroup = it.group !== lastGroup;
-          lastGroup = it.group;
-          return (
-            <div key={it.to}>
-              {showGroup &&
-                (rail ? (
-                  <div className="mx-2 my-2 border-t border-sidebar-border first:hidden" />
-                ) : (
-                  <div className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    {it.group}
-                  </div>
-                ))}
-              <Link
-                href={it.to}
-                title={rail ? it.label : undefined}
-                data-testid={it.testId}
-                className={cn(
-                  "group relative flex items-center rounded text-[13px] font-medium transition-colors",
-                  rail ? "justify-center h-9 w-9 mx-auto my-0.5" : "gap-2.5 px-3 py-2",
-                  active ? "bg-primary text-primary-foreground shadow-sm" : "text-sidebar-foreground/70 hover:bg-accent hover:text-foreground"
-                )}
-              >
-                <it.icon size={16} className={active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"} />
-                {!rail && <span className="flex-1">{it.label}</span>}
-                {it.testId === "nav-chat" && chatUnread > 0 &&
-                  (rail ? (
-                    <span data-testid="chat-unread-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-sidebar">
-                      {chatUnread > 9 ? "9+" : chatUnread}
-                    </span>
-                  ) : (
-                    <span data-testid="chat-unread-badge" className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center", active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground")}>
-                      {chatUnread > 99 ? "99+" : chatUnread}
-                    </span>
-                  ))}
-                {it.testId === "nav-supplier-inbox" && (inboxUnread > 0 || inboxUnmatched > 0) &&
-                  (rail ? (
-                    <span data-testid="inbox-nav-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-sidebar">
-                      {(inboxUnread || inboxUnmatched) > 9 ? "9+" : inboxUnread || inboxUnmatched}
-                    </span>
-                  ) : (
-                    <span
-                      data-testid="inbox-nav-badge"
-                      title={inboxUnread > 0 ? `${inboxUnread} unread` : `${inboxUnmatched} unmatched`}
-                      className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center",
-                        inboxUnread > 0 ? (active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground") : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300")}
-                    >
-                      {(inboxUnread || inboxUnmatched) > 99 ? "99+" : inboxUnread || inboxUnmatched}
-                    </span>
-                  ))}
-              </Link>
-            </div>
-          );
-        })}
-      </nav>
+      <Link
+        href={it.to}
+        title={rail ? it.label : undefined}
+        data-testid={it.testId}
+        className={cn(
+          "group relative flex items-center rounded text-[13px] font-medium transition-colors",
+          rail ? "justify-center h-9 w-9 mx-auto my-0.5" : "gap-2.5 px-3 py-2",
+          active ? "bg-primary text-primary-foreground shadow-sm" : "text-sidebar-foreground/70 hover:bg-accent hover:text-foreground"
+        )}
+      >
+        <it.icon size={16} className={active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"} />
+        {!rail && <span className="flex-1">{it.label}</span>}
+        {it.testId === "nav-chat" && chatUnread > 0 &&
+          (rail ? (
+            <span data-testid="chat-unread-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-sidebar">
+    {chatUnread > 9 ? "9+" : chatUnread}
+            </span>
+          ) : (
+            <span data-testid="chat-unread-badge" className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center", active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground")}>
+    {chatUnread > 99 ? "99+" : chatUnread}
+            </span>
+          ))}
+        {it.testId === "nav-supplier-inbox" && (inboxUnread > 0 || inboxUnmatched > 0) &&
+          (rail ? (
+            <span data-testid="inbox-nav-dot" className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-sm bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-sidebar">
+    {(inboxUnread || inboxUnmatched) > 9 ? "9+" : inboxUnread || inboxUnmatched}
+            </span>
+          ) : (
+            <span
+    data-testid="inbox-nav-badge"
+    title={inboxUnread > 0 ? `${inboxUnread} unread` : `${inboxUnmatched} unmatched`}
+    className={cn("min-w-[18px] h-[18px] px-1 rounded-sm text-[10px] font-bold flex items-center justify-center",
+      inboxUnread > 0 ? (active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground") : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300")}
+            >
+    {(inboxUnread || inboxUnmatched) > 99 ? "99+" : inboxUnread || inboxUnmatched}
+            </span>
+          ))}
+      </Link>
     );
   };
+
+  // `rail` = icon-only desktop mode (always fully shown). The mobile drawer renders expanded with collapsible groups.
+  const renderNav = (rail: boolean) => (
+    <nav className="flex-1 overflow-y-auto sidebar-scroll px-2 py-2" data-testid="sidebar-nav">
+      {!rail && collapsibleGroups.length > 0 && (
+        <div className="flex justify-end px-1 pt-1">
+          <button type="button" onClick={() => setAllGroups(!allClosed)} data-testid="nav-toggle-all"
+                  className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:bg-accent hover:text-foreground">
+            {allClosed ? "Expand all" : "Collapse all"}
+          </button>
+        </div>
+      )}
+      {groups.map((g, gi) => {
+        const canFold = !rail && g.items.length > 1;
+        const isClosed = canFold && !!closed[g.name];
+        const hasActive = g.items.some((it) => isActive(it.to));
+        return (
+          <div key={g.name} data-testid={`nav-group-${g.name.toLowerCase()}`}>
+            {rail ? (
+              gi > 0 && <div className="mx-2 my-2 border-t border-sidebar-border" />
+            ) : canFold ? (
+              <button type="button" onClick={() => toggleGroup(g.name)} aria-expanded={!isClosed} data-testid={`nav-group-toggle-${g.name.toLowerCase()}`}
+                      className="flex w-full items-center justify-between rounded px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
+                <span className="flex items-center gap-2">{g.name}{isClosed && hasActive && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-label="Contains the current page" />}</span>
+                <ChevronDown size={12} className={cn("transition-transform", isClosed && "-rotate-90")} />
+              </button>
+            ) : (
+              <div className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{g.name}</div>
+            )}
+            {!isClosed && g.items.map((it) => <div key={it.to}>{renderItem(it, rail)}</div>)}
+          </div>
+        );
+      })}
+    </nav>
+  );
 
   const bell = (
     <Popover>

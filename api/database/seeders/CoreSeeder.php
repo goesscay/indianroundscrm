@@ -102,7 +102,7 @@ class CoreSeeder extends Seeder
         }
     }
 
-    private function seedMaster(): void
+    public function seedMaster(): void
     {
         foreach (self::DEFAULT_MASTER as $category => $values) {
             foreach ($values as $v) {
