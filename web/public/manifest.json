@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Indian Rounds CRM",
-  "short_name": "IR CRM",
+  "name": "Indian Rounds ERP",
+  "short_name": "IR ERP",
   "description": "Indian Rounds — travel leads, sales, suppliers and accounts",
   "start_url": "/?source=pwa",
   "scope": "/",

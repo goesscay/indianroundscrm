@@ -38,7 +38,7 @@ export default function ForgotPassword() {
               <div className="label-caps">Security</div>
               <h1 className="font-display text-3xl tracking-tight mt-1">Reset your password</h1>
               <p className="text-sm text-muted-foreground mt-2">
-                Enter the email associated with your Indian Rounds CRM account. We&apos;ll email you a secure link to set a new password.
+                Enter the email associated with your Indian Rounds ERP account. We&apos;ll email you a secure link to set a new password.
               </p>
               <form onSubmit={submit} className="mt-6 space-y-4">
                 <div>

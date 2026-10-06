@@ -146,7 +146,7 @@ function ActivitiesInner() {
           <div className="label-caps">Sales</div>
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Activities</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-xl">
-            Tasks, calls and meetings across your CRM: what&apos;s overdue, what&apos;s today and what&apos;s coming up.
+            Tasks, calls and meetings across your ERP: what&apos;s overdue, what&apos;s today and what&apos;s coming up.
           </p>
         </div>
         {canCreate && (

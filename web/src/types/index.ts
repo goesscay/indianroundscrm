@@ -1,4 +1,4 @@
-// TypeScript models mirroring the Pydantic models / JSON shapes of the CRM API contract (backend/server.py).
+// TypeScript models mirroring the Pydantic models / JSON shapes of the API contract (backend/server.py).
 
 /** Role slug. The three built-in roles are "admin" | "sales" | "operations"; admins can create more. */
 export type Role = string;

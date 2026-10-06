@@ -52,10 +52,10 @@ export default function Login() {
         </div>
 
         <div className="relative z-10 text-foreground">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-5">Indian Rounds · Travel CRM</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-5">Indian Rounds · Travel ERP</div>
           <h1 className="font-display text-5xl xl:text-6xl tracking-tight leading-[1.05]">
             Every enquiry.<br />Every itinerary.<br />
-            <span className="font-serif italic font-normal text-muted-foreground">One CRM.</span>
+            <span className="font-serif italic font-normal text-muted-foreground">One ERP.</span>
           </h1>
           <p className="mt-6 max-w-md text-muted-foreground text-[15px] leading-relaxed">
             Capture leads, dispatch supplier RFQs in one click, and track bookings from first

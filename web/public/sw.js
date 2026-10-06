@@ -1,7 +1,7 @@
-/* Indian Rounds CRM service worker.
+/* Indian Rounds ERP service worker.
    - Never touches API/auth calls or authenticated pages (data stays live and private).
    - Static build assets and icons are cached; page navigations go to the network and show /offline.html if it is unreachable. */
-const CACHE = "ir-crm-v3";
+const CACHE = "ir-erp-v4";
 const PRECACHE = ["/offline.html", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {

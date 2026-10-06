@@ -12,11 +12,11 @@ const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tig
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: "italic", variable: "--font-serif-italic", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Indian Rounds CRM",
-  description: "Indian Rounds — Travel Lead Management CRM",
+  title: "Indian Rounds ERP",
+  description: "Indian Rounds — Travel Leads, Sales & Accounts ERP",
   manifest: "/manifest.json",
-  applicationName: "Indian Rounds CRM",
-  appleWebApp: { capable: true, title: "IR CRM", statusBarStyle: "default" },
+  applicationName: "Indian Rounds ERP",
+  appleWebApp: { capable: true, title: "IR ERP", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

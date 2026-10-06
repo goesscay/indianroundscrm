@@ -6,7 +6,7 @@ use DateTimeInterface;
 use Illuminate\Support\Carbon;
 
 /**
- * Serialization shared by the CRM models: ISO-8601 timestamps and string ids,
+ * Serialization shared by the models: ISO-8601 timestamps and string ids,
  * matching the JSON shapes of the original FastAPI app.
  * Models may declare `protected $stringIds = [...]` for integer FKs exposed as strings.
  */

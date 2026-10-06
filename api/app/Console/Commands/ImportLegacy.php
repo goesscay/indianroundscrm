@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
- * Imports the JSON export of the legacy (FastAPI/MongoDB) CRM into the relational schema.
+ * Imports the JSON export of the legacy (FastAPI/MongoDB) system into the relational schema.
  *
  *   php artisan crm:import-legacy /path/to/export-dir [--dry-run] [--credentials-out=/root/file.txt]
  *

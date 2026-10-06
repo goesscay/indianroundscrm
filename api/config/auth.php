@@ -15,7 +15,7 @@ return [
     |
     */
 
-    // Inactivity timeout (minutes) for CRM sessions; 0 disables.
+    // Inactivity timeout (minutes) for ERP sessions; 0 disables.
     'idle_timeout_minutes' => (int) env('IDLE_TIMEOUT_MINUTES', 60),
     // Failed-login lockout
     'lockout_max_attempts' => (int) env('LOCKOUT_MAX_ATTEMPTS', 5),

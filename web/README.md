@@ -1,4 +1,4 @@
-# Indian Rounds Travel CRM — Next.js frontend
+# Indian Rounds Travel ERP — Next.js frontend
 
 Next.js (App Router) + TypeScript (strict) + Tailwind CSS v4 port of the original CRA/craco React frontend.
 It talks to the Laravel API (Sanctum SPA cookie authentication) through same-origin `/api/*` calls.

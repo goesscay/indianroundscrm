@@ -83,7 +83,7 @@ function ActivityLog() {
         <div>
           <div className="label-caps">Audit trail</div>
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Activity Log</h1>
-          <p className="text-sm text-muted-foreground mt-2">{total.toLocaleString("en-IN")} record{total !== 1 ? "s" : ""} · every action across the CRM is logged</p>
+          <p className="text-sm text-muted-foreground mt-2">{total.toLocaleString("en-IN")} record{total !== 1 ? "s" : ""} · every action across the ERP is logged</p>
         </div>
         <div className="flex gap-2">
           {activeFilters > 0 && (

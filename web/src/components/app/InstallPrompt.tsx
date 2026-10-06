@@ -37,7 +37,7 @@ export default function InstallPrompt() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/icons/icon-192.png" alt="" className="h-9 w-9 rounded" />
       <div className="text-sm">
-        <div className="font-semibold">Install Indian Rounds CRM</div>
+        <div className="font-semibold">Install Indian Rounds ERP</div>
         <div className="text-xs text-muted-foreground">{ios && !evt ? "Tap Share, then Add to Home Screen." : "Opens in its own window, like an app."}</div>
       </div>
       {evt && <Button size="sm" onClick={install} data-testid="install-btn"><Download size={14} className="mr-1" />Install</Button>}

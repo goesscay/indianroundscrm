@@ -1,6 +1,6 @@
-# Indian Rounds Travel CRM
+# Indian Rounds Travel ERP
 
-Lead, supplier-quote (RSQ) and sales-team CRM for a travel agency.
+Lead, supplier-quote (RSQ) and sales-team ERP for a travel agency.
 
 | Layer | Stack |
 | --- | --- |

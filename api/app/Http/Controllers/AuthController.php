@@ -205,7 +205,7 @@ class AuthController extends Controller
         // Same Microsoft 365 transport as supplier mail (never throws; failures come back as status 'failed').
         $result = \App\Crm\MailSender::send(
             [$email],
-            'Password Reset — Indian Rounds CRM',
+            'Password Reset — Indian Rounds ERP',
             $this->resetEmailText($user->name, $link)
         );
         if (($result['status'] ?? '') === 'failed') {
@@ -296,7 +296,7 @@ class AuthController extends Controller
         return implode("\n", [
             'Hi '.($name ?: 'there').',',
             '',
-            'We received a request to reset the password for your Indian Rounds CRM account.',
+            'We received a request to reset the password for your Indian Rounds ERP account.',
             '',
             'Click the link below to set a new password. This link is valid for 1 hour and can only be used once.',
             '',
@@ -307,7 +307,7 @@ class AuthController extends Controller
             'For security, we recommend never sharing this link with anyone.',
             '',
             'Regards,',
-            'Indian Rounds — CRM Security Team',
+            'Indian Rounds — ERP Security Team',
         ]);
     }
 }
