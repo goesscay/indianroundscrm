@@ -64,9 +64,11 @@ class UserController extends Controller
             'consultant_code' => ['sometimes', 'nullable', 'string'],
             'active' => ['sometimes', 'nullable', 'boolean'],
             'password' => ['sometimes', 'nullable', 'string'],
+            'email' => ['sometimes', 'nullable', 'email', 'max:190'],
+            'mobile' => ['sometimes', 'nullable', 'string', 'max:40'],
         ]);
         $updates = array_filter(
-            $request->only(['name', 'role', 'staff_code', 'consultant_code', 'active', 'password']),
+            $request->only(['name', 'role', 'staff_code', 'consultant_code', 'active', 'password', 'email', 'mobile']),
             fn ($v) => $v !== null
         );
         if (isset($updates['role']) && ! Permissions::roleExists($updates['role'])) {
@@ -81,6 +83,13 @@ class UserController extends Controller
         $user = User::find($id);
         if (! $user) {
             abort(404, 'User not found');
+        }
+
+        if (isset($updates['email'])) {
+            $updates['email'] = strtolower(trim($updates['email']));
+            if (User::where('email', $updates['email'])->where('id', '!=', $user->id)->exists()) {
+                abort(400, 'Email already exists');
+            }
         }
 
         $oldRole = $user->role;

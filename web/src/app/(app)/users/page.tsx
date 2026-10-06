@@ -13,7 +13,7 @@ import { Pagination, usePagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { DestinationAllocation, MasterItem, RoleDef, User, UserCreate } from "@/types";
-import { Trash2, KeyRound, Unlock as UnlockIcon, Shield, LogOut, UserPlus } from "lucide-react";
+import { Trash2, KeyRound, Unlock as UnlockIcon, Shield, LogOut, UserPlus, Pencil } from "lucide-react";
 
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
@@ -34,6 +34,9 @@ export default function Users() {
   const [f, setF] = useState<UserCreate>(EMPTY_USER);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
+  const [ef, setEf] = useState({ name: "", email: "", mobile: "", role: "sales", staff_code: "", consultant_code: "", password: "" });
+  const [esaving, setEsaving] = useState(false);
   const [allocations, setAllocations] = useState<DestinationAllocation[]>([]);
   const [allocForm, setAllocForm] = useState({ destination: "", consultant_id: "" });
   const [destinations, setDestinations] = useState<string[]>([]);
@@ -50,6 +53,29 @@ export default function Users() {
     catch (e) { toast.error(formatApiError(e)); }
   };
   useEffect(() => { load(); }, []);
+
+  const openEdit = (u: User) => {
+    setEf({ name: u.name || "", email: u.email || "", mobile: (u.mobile as string) || "", role: u.role, staff_code: u.staff_code || "", consultant_code: u.consultant_code || "", password: "" });
+    setEditing(u);
+  };
+
+  const saveEdit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    if (!ef.name.trim() || !ef.email.trim()) { toast.error("Name and e-mail are required"); return; }
+    setEsaving(true);
+    try {
+      const isSelf = editing.id === user.id;
+      const body: Record<string, unknown> = { name: ef.name.trim(), email: ef.email.trim(), mobile: ef.mobile.trim(), staff_code: ef.staff_code.trim(), consultant_code: ef.consultant_code.trim() };
+      if (!isSelf && ef.role !== editing.role) body.role = ef.role;
+      if (ef.password) body.password = ef.password;
+      await api.patch(`/users/${editing.id}`, body);
+      toast.success(ef.password ? "User updated. Their other sessions were signed out." : "User updated");
+      setEditing(null);
+      load();
+    } catch (err) { toast.error(formatApiError(err)); }
+    finally { setEsaving(false); }
+  };
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
@@ -172,6 +198,46 @@ export default function Users() {
         </Dialog>
       )}
 
+      {canManage && (
+        <Dialog open={!!editing} onOpenChange={(o) => { if (!o && !esaving) setEditing(null); }}>
+          <DialogContent className="sm:max-w-lg" data-testid="edit-user-dialog">
+            <DialogHeader>
+              <DialogTitle className="font-display">Edit user</DialogTitle>
+              <DialogDescription>{editing?.id === user.id ? "You are editing your own account. Your role cannot be changed here." : "Change this team member's details, role or password."}</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={saveEdit} className="space-y-4" data-testid="edit-user-form">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div><Label className="label-caps">Full name</Label><Input className="mt-1.5" value={ef.name} onChange={(e) => setEf({ ...ef, name: e.target.value })} required autoFocus data-testid="eu-name" /></div>
+                <div><Label className="label-caps">Email</Label><Input type="email" className="mt-1.5" value={ef.email} onChange={(e) => setEf({ ...ef, email: e.target.value })} required data-testid="eu-email" /></div>
+                <div><Label className="label-caps">Mobile</Label><Input className="mt-1.5" value={ef.mobile} onChange={(e) => setEf({ ...ef, mobile: e.target.value })} inputMode="tel" data-testid="eu-mobile" /></div>
+                <div>
+                  <Label className="label-caps">Role</Label>
+                  <Select value={ef.role} onValueChange={(v) => setEf({ ...ef, role: v })} disabled={editing?.id === user.id}>
+                    <SelectTrigger className="mt-1.5" data-testid="eu-role"><SelectValue /></SelectTrigger>
+                    <SelectContent>{roles.map((r) => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div><Label className="label-caps">Staff code</Label><Input className="mt-1.5" value={ef.staff_code} onChange={(e) => setEf({ ...ef, staff_code: e.target.value })} data-testid="eu-code" /></div>
+                <div>
+                  <Label className="label-caps">Consultant code</Label>
+                  <Input className="mt-1.5" maxLength={2} value={ef.consultant_code} onChange={(e) => setEf({ ...ef, consultant_code: e.target.value.toUpperCase() })} data-testid="eu-consultant" />
+                  <div className="text-[10px] text-muted-foreground mt-1">2 letters · used in new Lead IDs</div>
+                </div>
+                <div className="sm:col-span-2">
+                  <Label className="label-caps">New password</Label>
+                  <Input type="password" className="mt-1.5" autoComplete="new-password" value={ef.password} onChange={(e) => setEf({ ...ef, password: e.target.value })} placeholder="Leave empty to keep the current password" data-testid="eu-password" />
+                  <div className="text-[10px] text-muted-foreground mt-1">Setting a password signs the user out everywhere. Min 8 characters with upper, lower, number and a special character.</div>
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={esaving} data-testid="eu-cancel">Cancel</Button>
+                <Button type="submit" disabled={esaving} data-testid="eu-save">{esaving ? "Saving…" : "Save changes"}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
       <Card className="rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center gap-3 flex-wrap">
           <Label className="label-caps">Filter by role</Label>
@@ -222,6 +288,9 @@ export default function Users() {
                     <TableCell className="text-xs text-muted-foreground">{(u.last_login_at || "").slice(0, 16).replace("T", " ") || "—"}</TableCell>
                     <TableCell>
                       {canManage && <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(u)} title="Edit user" data-testid={`u-edit-${u.id}`}>
+                          <Pencil size={14} />
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => forceReset(u)} title="Force password reset on next login" data-testid={`u-forcereset-${u.id}`}>
                           <KeyRound size={14} />
                         </Button>
@@ -251,7 +320,7 @@ export default function Users() {
         <Pagination {...pg.paginationProps} />
         <div className="px-4 py-3 border-t border-border bg-secondary/30 flex items-center gap-2 text-xs text-muted-foreground">
           <Shield size={12} />
-          Key: <KeyRound size={11} className="ml-1" /> Force reset · <UnlockIcon size={11} /> Unlock · <LogOut size={11} /> Kick sessions · <Trash2 size={11} /> Delete
+          Key: <Pencil size={11} className="ml-1" /> Edit · <KeyRound size={11} /> Force reset · <UnlockIcon size={11} /> Unlock · <LogOut size={11} /> Kick sessions · <Trash2 size={11} /> Delete
         </div>
       </Card>
 
