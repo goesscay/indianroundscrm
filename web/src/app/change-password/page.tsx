@@ -57,7 +57,7 @@ function ChangePassword() {
   };
 
   return (
-    <div className={isForced ? "min-h-screen flex items-center justify-center bg-secondary/30 p-4" : ""} data-testid="change-password-page">
+    <div className={isForced ? "min-h-[100dvh] flex items-center justify-center bg-secondary/30 p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""} data-testid="change-password-page">
       <div className={isForced ? "w-full max-w-md" : "max-w-2xl mx-auto space-y-6"}>
         {isForced && (
           <div className="text-center mb-6">

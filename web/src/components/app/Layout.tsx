@@ -337,7 +337,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-[100dvh] bg-background flex overflow-x-clip">
       {/* Sidebar (desktop): expanded = wordmark + toggle, collapsed = R mark + toggle */}
       <aside
         className={cn(
@@ -369,7 +369,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 bg-sidebar text-foreground border-b border-sidebar-border h-12 px-3 flex items-center justify-between">
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 bg-sidebar text-foreground border-b border-sidebar-border h-[calc(3rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] flex items-center justify-between">
         <button onClick={() => setOpen(true)} className="p-1.5 -ml-1 rounded hover:bg-accent" aria-label="Open menu" data-testid="mobile-menu-btn">
           <Menu size={20} />
         </button>
@@ -397,7 +397,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       {open && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <aside className="relative w-64 max-w-[80%] h-full flex flex-col bg-sidebar text-sidebar-foreground shadow-2xl border-r border-sidebar-border">
+          <aside className="relative w-64 max-w-[80%] h-full pt-[env(safe-area-inset-top)] flex flex-col bg-sidebar text-sidebar-foreground shadow-2xl border-r border-sidebar-border">
             <div className="flex items-center justify-between pl-4 pr-2 h-14 border-b border-sidebar-border">
               <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left dark:hidden" />
             <img src="/logo-word.png" alt="Indian Rounds" className="h-8 w-auto max-w-[130px] object-contain object-left hidden dark:block" />
@@ -427,7 +427,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             {renderUserMenu(menuOpenD, setMenuOpenD)}
           </div>
         </header>
-        <main className="flex-1 min-w-0 pt-12 md:pt-0">
+        <main className="flex-1 min-w-0 pt-[calc(3rem+env(safe-area-inset-top))] md:pt-0">
           <div className="p-3 sm:p-4 md:p-6 max-w-[1440px] mx-auto">{children}</div>
         </main>
       </div>

@@ -16,12 +16,13 @@ export const metadata: Metadata = {
   description: "Indian Rounds — Travel Lead Management CRM",
   manifest: "/manifest.json",
   applicationName: "Indian Rounds CRM",
-  appleWebApp: { capable: true, title: "IR CRM", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "IR CRM", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0A0A0A",
-  viewportFit: "cover",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

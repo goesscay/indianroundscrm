@@ -36,7 +36,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-background">
+    <div className="min-h-[100dvh] grid grid-cols-1 lg:grid-cols-2 bg-background">
       {/* Left brand panel */}
       <div className="relative hidden lg:flex flex-col justify-between p-12 overflow-hidden bg-card border-r border-border"
            data-testid="login-brand-panel">
@@ -67,24 +67,25 @@ export default function Login() {
       </div>
 
       {/* Right form */}
-      <div className="flex items-center justify-center px-6 py-10 sm:px-10">
+      <div className="flex min-h-[100dvh] items-center justify-center px-5 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-10 lg:min-h-0">
         <div className="w-full max-w-[22rem]">
-          <div className="lg:hidden mb-8 inline-block">
-            <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-7 w-auto dark:hidden" />
-          <img src="/logo-word.png" alt="Indian Rounds" className="h-7 w-auto hidden dark:block" />
+          <div className="lg:hidden mb-6 flex flex-col items-center text-center">
+            <img src="/icons/icon-192.png" alt="" className="mb-3 h-16 w-16 rounded-2xl shadow-sm" />
+            <img src="/logo-word-dark.png" alt="Indian Rounds" className="h-8 w-auto dark:hidden" />
+            <img src="/logo-word.png" alt="Indian Rounds" className="hidden h-8 w-auto dark:block" />
           </div>
 
-          <h2 className="font-display text-[28px] tracking-tight">Sign in</h2>
-          <p className="text-muted-foreground text-sm mt-1.5">Welcome back. Sign in to your Indian Rounds workspace.</p>
+          <h2 className="font-display text-2xl tracking-tight text-center lg:text-left lg:text-[28px]">Sign in</h2>
+          <p className="text-muted-foreground text-sm mt-1.5 text-center lg:text-left">Welcome back. Sign in to your Indian Rounds workspace.</p>
 
-          <form onSubmit={submit} className="mt-8 space-y-4" data-testid="login-form">
+          <form onSubmit={submit} className="mt-6 space-y-4 lg:mt-8" data-testid="login-form">
             <div>
               <Label htmlFor="email" className="text-[13px] font-medium">Email</Label>
               <Input
                 id="email" type="email" required autoComplete="username"
                 value={email} onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@indianrounds.com"
-                className="mt-1.5 h-10"
+                className="mt-1.5 h-11"
                 data-testid="login-email"
               />
             </div>
@@ -98,14 +99,14 @@ export default function Login() {
               <Input
                 id="password" type="password" required autoComplete="current-password"
                 value={password} onChange={(e) => setPassword(e.target.value)}
-                className="mt-1.5 h-10"
+                className="mt-1.5 h-11"
                 data-testid="login-password"
               />
             </div>
             {err && <div className="text-sm text-destructive font-medium" data-testid="login-error">{err}</div>}
             <Button
               type="submit" disabled={loading}
-              className="w-full h-10 text-sm font-semibold"
+              className="w-full h-11 text-sm font-semibold"
               data-testid="login-submit"
             >
               {loading ? "Signing in…" : "Sign in"}

@@ -56,7 +56,12 @@
   }
 }
 
-html { font-size: 14px; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; }
+
+/* Phones zoom the page when a field under 16px is focused, which shoves the layout sideways. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
+}
 
 body {
   margin: 0;
