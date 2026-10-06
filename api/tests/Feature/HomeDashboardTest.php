@@ -93,23 +93,21 @@ class HomeDashboardTest extends TestCase
         $this->api('GET', '/api/dashboard/overview', [], 'n')->assertStatus(403);                        // no dashboard.view
     }
 
-    public function test_follow_up_dates_of_open_leads_appear_in_the_focus_list(): void
+    public function test_focus_list_shows_activities_not_the_old_lead_follow_up_date(): void
     {
         $u = User::factory()->create(['role' => 'sales']);
         $this->loginAs($u, 's');
-        $mk = fn (string $id, string $fu, string $status = 'Follow-up') => Lead::create([
-            'lead_id' => $id, 'customer_name' => "Cust $id", 'phone' => '9'.random_int(100000000, 999999999), 'destination' => 'Goa', 'staff_id' => $u->id,
-            'staff_name' => $u->name, 'lead_status' => $status, 'follow_up_date' => $fu, 'lead_date' => '2026-10-01',
-        ]);
-        $mk('IR1', '2026-10-14T10:00:00+05:30');
-        $mk('IR2', '2026-10-15T18:00:00+05:30');
-        $mk('IR3', '2026-10-20T10:00:00+05:30');
-        $mk('IR4', '2026-10-10T10:00:00+05:30', 'Booked');
-
+        // an old lead-level follow-up date no longer feeds the dashboard (it could not be marked done)
+        Lead::create(['lead_id' => 'IR1', 'customer_name' => 'Cust IR1', 'phone' => '9'.random_int(100000000, 999999999), 'destination' => 'Goa', 'staff_id' => $u->id,
+            'staff_name' => $u->name, 'lead_status' => 'Follow-up', 'follow_up_date' => '2026-10-14T10:00:00+05:30', 'lead_date' => '2026-10-01']);
         $r = $this->api('GET', '/api/dashboard/overview', [], 's')->assertOk();
-        $this->assertSame(['IR1', 'IR2'], array_column($r->json('focus.items'), 'id'));
+        $this->assertSame([], $r->json('focus.items'));
+        $this->assertEquals(0, collect($r->json('kpis'))->firstWhere('key', 'followups')['value']);
+
+        $this->api('POST', '/api/activities', ['type' => 'follow_up', 'title' => 'Call Cust IR1', 'lead_id' => 'IR1', 'due_at' => '2026-10-14T10:00:00+05:30', 'assigned_to' => (string) $u->id], 's')->assertOk();
+        $r = $this->api('GET', '/api/dashboard/overview', [], 's')->assertOk();
+        $this->assertSame(['Call Cust IR1'], array_column($r->json('focus.items'), 'title'));
         $this->assertTrue($r->json('focus.items.0.overdue'));
-        $this->assertFalse($r->json('focus.items.1.overdue'));
-        $this->assertEquals(2, collect($r->json('kpis'))->firstWhere('key', 'followups')['value']);
+        $this->assertEquals(1, collect($r->json('kpis'))->firstWhere('key', 'followups')['value']);
     }
 }

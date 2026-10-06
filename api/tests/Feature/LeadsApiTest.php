@@ -142,9 +142,14 @@ class LeadsApiTest extends TestCase
         $this->assertCount(1, $this->getJson('/api/leads?status=New%20Lead&destination=Bali')->json());
         $cal = $this->getJson('/api/leads/calendar?month=2026-12')->assertOk()->json();
         $this->assertSame('travel', $cal[0]['kind']);
-        $fu = $this->getJson('/api/followups/upcoming')->assertOk()->json();
-        $this->assertCount(1, $fu);
-        $this->assertFalse($fu[0]['overdue']);
+        $this->getJson('/api/followups/upcoming')->assertStatus(404);   // follow-ups are Activities now
+
+        // an open follow-up activity shows on the calendar on its due date; a done one does not
+        $act = $this->postJson('/api/activities', ['type' => 'follow_up', 'title' => 'Call', 'lead_id' => $id, 'due_at' => '2026-12-05T10:00:00+05:30'])->assertOk()->json('id');
+        $cal = collect($this->getJson('/api/leads/calendar?month=2026-12')->assertOk()->json());
+        $this->assertSame(['2026-12-05'], $cal->where('kind', 'follow-up')->pluck('date')->all());
+        $this->patchJson("/api/activities/$act", ["done" => true])->assertOk();
+        $this->assertCount(0, collect($this->getJson('/api/leads/calendar?month=2026-12')->json())->where('kind', 'follow-up'));
 
         $other = User::factory()->create(['role' => 'sales', 'consultant_code' => 'ZZ', 'name' => 'Zed']);
         $ops = User::factory()->create(['role' => 'operations']);

@@ -67,7 +67,6 @@ class DashboardController extends Controller
             'quote_pending' => $leads->filter(fn ($l) => $l->mail_status === 'Sent' && ! $l->quote_received)->count(),
             'revenue' => $booked->sum(fn ($l) => (float) $l->selling_amount),
             'profit' => $booked->sum($profitOf),
-            'followups_today' => $leads->filter(fn ($l) => str_starts_with((string) $l->follow_up_date, $today))->count(),
             'pending_payments' => $booked->filter(fn ($l) => $l->payment_status !== 'Paid')->count(),
             'status_counts' => (object) $statusCounts,
             'monthly' => $monthlyList,
@@ -142,17 +141,6 @@ class DashboardController extends Controller
                     ];
                 }
             }
-        }
-
-        $fups = LeadController::scopeForUser(Lead::query(), $user)
-            ->where('follow_up_date', 'LIKE', $today.'%')->limit(20)->get();
-        foreach ($fups as $l) {
-            $alerts[] = [
-                'kind' => 'followup_due', 'icon' => "\u{1F7E0}",
-                'title' => "Follow-up today: {$l->customer_name}",
-                'detail' => "Lead {$l->lead_id} · {$l->destination}",
-                'lead_id' => $l->lead_id, 'timestamp' => $l->follow_up_date,
-            ];
         }
 
         // unread supplier replies / bounces (only rows persisted for this user: lead owner + rsq.manage holders)

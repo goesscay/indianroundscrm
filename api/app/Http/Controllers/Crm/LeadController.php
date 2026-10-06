@@ -175,15 +175,20 @@ class LeadController extends Controller
         $leads = self::scopeForUser(Lead::query(), $request->user())->limit(5000)->get();
         $events = [];
         foreach ($leads as $l) {
-            foreach ([['travel', 'travel_date'], ['follow-up', 'follow_up_date']] as [$kind, $field]) {
-                $d = substr((string) ($l->{$field} ?? ''), 0, 10);
-                if ($d !== '' && ($month === '' || str_starts_with($d, $month))) {
-                    $events[] = [
-                        'date' => $d, 'kind' => $kind, 'lead_id' => $l->lead_id,
-                        'customer_name' => $l->customer_name, 'destination' => $l->destination,
-                        'lead_status' => $l->lead_status,
-                    ];
-                }
+            $d = substr((string) ($l->travel_date ?? ''), 0, 10);
+            if ($d !== '' && ($month === '' || str_starts_with($d, $month))) {
+                $events[] = ['date' => $d, 'kind' => 'travel', 'lead_id' => $l->lead_id, 'customer_name' => $l->customer_name,
+                    'destination' => $l->destination, 'lead_status' => $l->lead_status];
+            }
+        }
+        // follow-ups are Activities: show the open ones on their due date
+        $byLead = $leads->keyBy('lead_id');
+        foreach (\App\Models\Activity::whereNull('completed_at')->where('type', 'follow_up')->whereIn('lead_id', $byLead->keys())->whereNotNull('due_at')->get() as $a) {
+            $d = $a->due_at->copy()->timezone('Asia/Kolkata')->toDateString();
+            if ($month === '' || str_starts_with($d, $month)) {
+                $l = $byLead[$a->lead_id];
+                $events[] = ['date' => $d, 'kind' => 'follow-up', 'lead_id' => $l->lead_id, 'customer_name' => $l->customer_name,
+                    'destination' => $l->destination, 'lead_status' => $l->lead_status];
             }
         }
         usort($events, fn ($a, $b) => strcmp($a['date'], $b['date']));
@@ -597,38 +602,5 @@ class LeadController extends Controller
         $lead = $this->findLead($leadId);
         $this->assertCanSee($lead, $request->user());
         return ContactEvent::where('lead_id', $leadId)->orderByDesc('timestamp')->orderByDesc('id')->limit(500)->get()->values();
-    }
-
-    // --------------------------------------------------------------- follow-ups
-
-    public function upcomingFollowups(Request $request)
-    {
-        $hours = (int) $request->query('hours', 72);
-        $now = Carbon::now('UTC');
-        $horizon = $hours * 3600;
-        $leads = self::scopeForUser(Lead::query(), $request->user())
-            ->whereNotNull('follow_up_date')->where('follow_up_date', '<>', '')->limit(2000)->get();
-        $result = [];
-        foreach ($leads as $l) {
-            $fu = $l->follow_up_date;
-            try {
-                $dt = str_contains($fu, 'T')
-                    ? Carbon::parse($fu, 'UTC')
-                    : Carbon::parse(substr($fu, 0, 10).'T09:00:00+00:00');
-                $secs = $dt->getTimestamp() - $now->getTimestamp();
-            } catch (\Throwable) {
-                continue;
-            }
-            if ($secs > $horizon && $secs > 0) {
-                continue;
-            }
-            $result[] = [
-                'lead_id' => $l->lead_id, 'customer_name' => $l->customer_name, 'phone' => $l->phone,
-                'destination' => $l->destination, 'lead_status' => $l->lead_status,
-                'follow_up_at' => $dt->utc()->toIso8601String(), 'seconds_left' => $secs, 'overdue' => $secs < 0,
-            ];
-        }
-        usort($result, fn ($a, $b) => $a['seconds_left'] <=> $b['seconds_left']);
-        return $result;
     }
 }

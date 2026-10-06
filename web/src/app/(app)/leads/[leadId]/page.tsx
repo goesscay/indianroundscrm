@@ -17,7 +17,6 @@ import SupplierTracker from "@/components/app/SupplierTracker";
 import SupplierReplies, { useLeadReplies } from "@/components/app/SupplierReplies";
 import LeadNotes from "@/components/app/LeadNotes";
 import { Combobox } from "@/components/ui/combobox";
-import FollowupCountdown from "@/components/app/FollowupCountdown";
 import LeadActivities from "@/components/activities/LeadActivities";
 import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
@@ -338,26 +337,7 @@ export default function LeadDetail() {
                 <SelectContent>{LEAD_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="label-caps">Booking</Label>
-              <Select value={lead.booking_status || "none"} onValueChange={(v) => update({ booking_status: v === "none" ? "" : v })}>
-                <SelectTrigger className="mt-1 h-9" data-testid="update-booking"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">—</SelectItem>
-                  <SelectItem value="In Progress">In Progress</SelectItem>
-                  <SelectItem value="Booked">Booked</SelectItem>
-                  <SelectItem value="Cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="label-caps">Follow-up</Label>
-              <Input type="datetime-local" defaultValue={(lead.follow_up_date || "").slice(0, 16)}
-                     onBlur={(e) => e.target.value && update({ follow_up_date: new Date(e.target.value).toISOString() })}
-                     className="mt-1 h-9 px-2 text-xs" data-testid="update-followup" />
-            </div>
           </div>
-          {lead.follow_up_date && <div className="mt-1"><FollowupCountdown iso={lead.follow_up_date} /></div>}
 
           <div className="mt-3 border-t border-border pt-3">
             <div className="mb-2 inline-flex rounded border border-border p-0.5 text-sm" role="tablist" aria-label="Activities and notes">

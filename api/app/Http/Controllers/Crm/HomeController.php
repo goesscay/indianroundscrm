@@ -62,7 +62,7 @@ class HomeController extends Controller
                 'sub' => '₹'.number_format($sent->sum('total')).' offered', 'href' => '/quotes?status=sent'];
         }
 
-        // ------------------------------------------------------------------ today's focus: tasks and lead follow-ups
+        // ------------------------------------------------------------------ today's focus: tasks and follow-ups (Activities)
         $focus = [];
         $tasksDue = 0;
         if ($can('activities.view')) {
@@ -80,24 +80,8 @@ class HomeController extends Controller
                     'href' => $a->lead ? '/leads/'.$a->lead->lead_id : ($a->deal_id ? '/deals/'.$a->deal_id : ($a->customer_id ? '/customers/'.$a->customer_id : '/activities'))];
             }
         }
-        $followDue = 0;
         if ($leadsOn) {
-            $leads = LeadController::scopeForUser(Lead::query(), $user)->whereNotNull('follow_up_date')->where('follow_up_date', '!=', '')->whereNotIn('lead_status', self::CLOSED_LEADS)
-                ->orderBy('follow_up_date')->limit(200)->get(['lead_id', 'customer_name', 'destination', 'follow_up_date', 'lead_status', 'phone']);
-            foreach ($leads as $l) {
-                try {
-                    $due = Carbon::parse($l->follow_up_date)->timezone(self::TZ);
-                } catch (\Throwable) {
-                    continue;
-                }
-                if ($due->gt($today->copy()->endOfDay())) {
-                    continue;
-                }
-                $followDue++;
-                $focus[] = ['kind' => 'followup', 'id' => $l->lead_id, 'type' => 'follow_up', 'title' => 'Follow up with '.$l->customer_name, 'sub' => trim($l->destination.' · '.$l->lead_status, ' ·'),
-                    'due_at' => $due->toIso8601String(), 'overdue' => $due->lt($now), 'href' => '/leads/'.$l->lead_id, 'phone' => $l->phone];
-            }
-            $out['kpis'][] = ['key' => 'followups', 'label' => 'Follow-ups due', 'value' => $followDue + $tasksDue, 'format' => 'number',
+            $out['kpis'][] = ['key' => 'followups', 'label' => 'Follow-ups due', 'value' => $tasksDue, 'format' => 'number',
                 'sub' => collect($focus)->where('overdue', true)->count().' overdue', 'tone' => collect($focus)->where('overdue', true)->count() ? 'warn' : null, 'href' => '/activities'];
             $week = LeadController::scopeForUser(Lead::query(), $user)->where('created_at', '>=', $today->copy()->subDays(6)->utc())->count();
             $out['kpis'][] = ['key' => 'leads', 'label' => 'New leads · 7 days', 'value' => $week, 'format' => 'number',

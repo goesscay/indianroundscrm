@@ -199,7 +199,7 @@ class AuthTest extends TestCase
         $msg = $fake->sent[0];
         $body = $msg->body;
         $this->assertSame([$u->email], $msg->to);
-        $this->assertSame('Password Reset — Indian Rounds CRM', $msg->subject);
+        $this->assertSame('Password Reset — Indian Rounds ERP', $msg->subject);
         $this->assertMatchesRegularExpression('#http://localhost:3000/reset-password/([A-Za-z0-9]+)#', $body);
         preg_match('#/reset-password/([A-Za-z0-9]+)#', $body, $m);
         $token = $m[1];

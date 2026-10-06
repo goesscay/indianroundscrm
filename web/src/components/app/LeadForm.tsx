@@ -606,7 +606,6 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
               <div><span className="label-caps">Sales Consultant:</span> {blockDialog.existing.staff_name}</div>
               <div><span className="label-caps">Destination:</span> {blockDialog.existing.destination}</div>
               <div><span className="label-caps">Status:</span> {blockDialog.existing.lead_status}</div>
-              <div><span className="label-caps">Last Follow-up:</span> {(blockDialog.existing.follow_up_date || "—").slice(0,10)}</div>
             </div>
           )}
           <DialogFooter>

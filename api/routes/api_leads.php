@@ -41,7 +41,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/notes/{nid}', [LeadController::class, 'deleteNote'])->middleware('perm:leads.notes');
     Route::get('/leads/{lead_id}/contact-events', [LeadController::class, 'contacts'])->middleware('perm:leads.contact_events');
     Route::post('/leads/{lead_id}/contact-events', [LeadController::class, 'logContact'])->middleware('perm:leads.contact_events');
-    Route::get('/followups/upcoming', [LeadController::class, 'upcomingFollowups']);
 
     // ---- RSQ requests
     Route::middleware('perm:rsq.request,rsq.manage')->post('/rsq-requests', [RsqController::class, 'create']);
