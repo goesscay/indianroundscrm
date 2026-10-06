@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Columns3, Download, List as ListIcon, Search, X } from "lucide-react";
 import { toast } from "sonner";
@@ -152,7 +152,8 @@ function DealsPage() {
   const [q, setQ] = useState("");
   const [applied, setApplied] = useState("");
   const [owner, setOwner] = useState("all");
-  const [close, setClose] = useState("all");
+  const sp = useSearchParams();
+  const [close, setClose] = useState(["overdue", "this_month", "next_month"].includes(sp.get("close") ?? "") ? sp.get("close")! : "all");
   const [tick, setTick] = useState(0);
   const [dlg, setDlg] = useState<{ open: boolean; stage: DealStage }>({ open: false, stage: "enquiry" });
   const [exportErr, setExportErr] = useState("");

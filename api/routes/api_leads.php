@@ -3,6 +3,7 @@
 use App\Http\Controllers\Crm\ActivityController;
 use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\DealController;
+use App\Http\Controllers\Crm\ForecastController;
 use App\Http\Controllers\Crm\LeadConvertController;
 use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\LeadController;
@@ -102,4 +103,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/deals/{id}/notes', [DealController::class, 'addNote'])->middleware('perm:deals.edit');
     Route::get('/deals/{id}/activities', [DealController::class, 'activities'])->middleware('perm:deals.view');
     Route::delete('/crm-notes/{id}', [DealController::class, 'deleteNote'])->middleware('perm:customers.edit,deals.edit');
+
+    // ---- Forecasts (financial-year quarters)
+    Route::get('/forecasts', [ForecastController::class, 'show'])->middleware('perm:forecasts.view');
+    Route::get('/forecasts/deals', [ForecastController::class, 'dealsList'])->middleware('perm:forecasts.view');
+    Route::put('/forecasts/targets', [ForecastController::class, 'setTarget'])->middleware('perm:forecasts.manage_targets');
 });

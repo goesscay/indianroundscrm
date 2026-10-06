@@ -681,3 +681,20 @@ export interface ConvertPreview {
   matches: (CustomerBrief & { phone: string | null; email: string | null; visible: boolean })[];
   deal_suggestion: Partial<Deal> & { owner_id?: string | null };
 }
+
+// ---- Forecasts ----
+export interface ForecastQuarter {
+  quarter: number; label: string; months: string; start: string; end: string; current: boolean;
+  target: number; margin_target: number | null;
+  won: number; won_count: number; won_margin: number;
+  open: number; open_count: number; weighted: number; overdue_count: number; overdue_value: number;
+}
+export interface ForecastOwnerRow { id: string | null; name: string; won: number; won_count: number; open: number; open_count: number; weighted: number; target: number }
+export interface Forecast {
+  fy: number; label: string; fys: number[]; owner: string; can_view_all: boolean; can_set_targets: boolean;
+  quarters: ForecastQuarter[];
+  totals: { target: number; won: number; won_count: number; won_margin: number; pct: number | null; open: number; weighted: number; open_count: number; overdue_count: number; overdue_value: number };
+  undated: { count: number; value: number; weighted: number };
+  owners: ForecastOwnerRow[];
+  consultants: { id: string; name: string }[];
+}

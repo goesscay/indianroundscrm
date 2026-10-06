@@ -60,6 +60,11 @@ class Permissions
                 'edit' => ['Edit deals', 'Edit deals they can see, including stage, amounts and notes.'],
                 'delete' => ['Delete deals', 'Permanently delete deals.'],
             ]),
+            $g('forecasts', 'Forecasts', [
+                'view' => ['View forecasts', 'Open Forecasts for the deals they own.'],
+                'view_all' => ['View team forecasts', 'See the whole team and each consultant, not just their own deals.'],
+                'manage_targets' => ['Set sales targets', 'Set and change the quarterly targets for the team and consultants.'],
+            ]),
             $g('calendar', 'Calendar', [
                 'view' => ['View calendar', 'See travel and follow-up dates on the calendar.'],
             ]),
@@ -144,7 +149,7 @@ class Permissions
                 'leads.contact_events', 'calendar.view', 'rsq.request', 'suppliers.view', 'master.view',
                 'ai.use', 'chat.use', 'activities.view', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.create', 'customers.edit',
-                'deals.view', 'deals.create', 'deals.edit',
+                'deals.view', 'deals.create', 'deals.edit', 'forecasts.view',
             ],
             'operations' => [
                 'dashboard.view', 'leads.view_all', 'leads.create', 'leads.edit', 'leads.edit_limited', 'leads.reassign',
@@ -153,7 +158,7 @@ class Permissions
                 'master.view', 'ai.use', 'chat.use',
                 'activities.view', 'activities.view_all', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',
-                'deals.view', 'deals.view_all', 'deals.create', 'deals.edit',
+                'deals.view', 'deals.view_all', 'deals.create', 'deals.edit', 'forecasts.view', 'forecasts.view_all',
             ],
             default => [],
         };
