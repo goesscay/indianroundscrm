@@ -23,7 +23,11 @@ class MasterDataController extends Controller
             $master[$m->category][] = $m->value;
         }
 
-        return ['master' => (object) $master, 'cities' => $this->citiesIndex()->getData()];
+        $owners = User::query()->where('active', true)->where('account_status', 'active')->orderBy('name')->get()
+            ->filter(fn (User $u) => $u->hasPermission('leads.assignable'))
+            ->map(fn (User $u) => ['id' => (string) $u->id, 'name' => $u->name, 'code' => $u->consultant_code ?: ($u->staff_code ?: '')])->values();
+
+        return ['master' => (object) $master, 'cities' => $this->citiesIndex()->getData(), 'owners' => $owners];
     }
 
     // ---------- /master ----------

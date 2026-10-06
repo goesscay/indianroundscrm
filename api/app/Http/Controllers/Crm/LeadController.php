@@ -277,6 +277,7 @@ class LeadController extends Controller
             'stay_cities.*.nights' => 'nullable|integer',
             'passport_available' => 'nullable|boolean',
             'passport_reason' => 'nullable|string',
+            'owner_id' => 'nullable',
         ]);
 
         // phone validator (Indian mobile)
@@ -340,12 +341,7 @@ class LeadController extends Controller
                 'created_by' => $user->email, 'timestamp' => now()]);
         }
 
-        // Auto-allocate to destination consultant if mapping exists
-        $owner = $user;
-        $alloc = Allocation::where('destination', $d['destination'])->first();
-        if ($alloc && ($consultant = User::find($alloc->consultant_id))) {
-            $owner = $consultant;
-        }
+        $owner = $this->resolveOwner($d['owner_id'] ?? null, $d['destination'], $user);
         $code = strtoupper(substr($owner->consultant_code ?: ($owner->staff_code ?: 'XX'), 0, 2));
 
         $cities = $this->cleanCities($d['stay_cities'] ?? []);
@@ -397,6 +393,33 @@ class LeadController extends Controller
         ActivityLogger::log($user, 'create_lead', 'lead', $lead->lead_id, null,
             ['customer' => $lead->customer_name, 'destination' => $lead->destination]);
         return $lead->fresh('stayCities')->toApi();
+    }
+
+    /**
+     * Who owns a new lead. An explicit owner must be an active consultant; only users who may reassign leads (Operations, Admin)
+     * can pick someone else. Without one: a sales consultant owns what they create (so it appears in their list). "auto", or Operations / Admin,
+     * get the destination's allocated consultant, else themselves.
+     */
+    private function resolveOwner(mixed $ownerId, string $destination, User $user): User
+    {
+        if ($ownerId !== null && $ownerId !== '' && $ownerId !== 'auto') {
+            $owner = ctype_digit((string) $ownerId) ? User::find((int) $ownerId) : null;
+            if (! $owner || ! $owner->active || $owner->account_status !== 'active' || ! $owner->hasPermission('leads.assignable')) {
+                Fail::unprocessable(['owner_id' => 'Choose an active sales consultant as the lead owner']);
+            }
+            if ((int) $owner->id !== (int) $user->id && ! $user->hasPermission('leads.reassign')) {
+                Fail::forbidden('You can only create leads in your own name');
+            }
+
+            return $owner;
+        }
+        if ($ownerId !== 'auto' && ! $user->hasPermission('leads.reassign') && $user->hasPermission('leads.assignable')) {
+            return $user;
+        }
+        $alloc = Allocation::where('destination', $destination)->first();
+        $consultant = $alloc ? User::find($alloc->consultant_id) : null;
+
+        return $consultant ?: $user;
     }
 
     public function show(Request $request, string $leadId)

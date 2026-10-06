@@ -18,6 +18,7 @@ import { useCurrentUser } from "@/context/AuthContext";
 import type { DestinationCities, DuplicateInfo, Lead, LeadCreate, StayCity } from "@/types";
 
 interface LeadFormState extends Omit<LeadCreate, "duration_days" | "child_ages" | "lead_date" | "stay_cities"> {
+  owner_id: string; // lead owner: the consultant whose list the lead appears in
   duration_days: string | number;
   child_ages_arr: string[];
   stay_cities: StayCity[];
@@ -57,6 +58,7 @@ const EMPTY: LeadFormState = {
   stay_cities: [],   // [{city, nights}]
   passport_available: null,  // true / false / null
   passport_reason: "",
+  owner_id: "",
 };
 
 // Format ISO date + N days later
@@ -89,6 +91,11 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
   const [loaded, setLoaded] = useState(!leadId);
   const [loadError, setLoadError] = useState("");
   const [leadNo, setLeadNo] = useState(leadId ?? "");
+  const [owners, setOwners] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [ownerName, setOwnerName] = useState(""); // edit mode: current owner, read-only here (use Reassign on the lead page)
+  const canPickOwner = can("leads.reassign");
+  // default owner: the logged-in sales person. Operations / Admin leave it on Auto (the destination's allocated consultant) unless they pick
+  const defaultOwner = !canPickOwner && owners.some((o) => o.id === user.id) ? user.id : "";
 
   const cleanPhone = (raw: string) => (raw || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "");
   const validPhone = (raw: string) => {
@@ -100,8 +107,8 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
 
   useEffect(() => {
     // Dropdown values come from /lead-options (open to anyone who can create or edit leads), not from the admin-only Master Data endpoints.
-    api.get<{ master: Record<string, string[]>; cities: DestinationCities }>("/lead-options")
-      .then(({ data }) => { setMaster(data.master || {}); setDestCities(data.cities || {}); })
+    api.get<{ master: Record<string, string[]>; cities: DestinationCities; owners?: { id: string; name: string; code: string }[] }>("/lead-options")
+      .then(({ data }) => { setMaster(data.master || {}); setDestCities(data.cities || {}); setOwners(data.owners || []); })
       .catch((e) => toast.error(`Could not load the dropdown lists: ${formatApiError(e)}`));
   }, []);
 
@@ -118,8 +125,9 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
         package_type: l.package_type || "", budget: l.budget || "", adults: l.adults ?? 1, children: l.children ?? 0, child_ages_arr: ages,
         rooms: l.rooms ?? 1, room_type: l.room_type || "", departure_from: l.departure_from || "", special_requests: l.special_requests || "",
         lead_source: l.lead_source || "", stay_cities: (l.stay_cities || []).map((c) => ({ city: c.city, nights: c.nights ?? null })),
-        passport_available: l.passport_available ?? null, passport_reason: l.passport_reason || "",
+        passport_available: l.passport_available ?? null, passport_reason: l.passport_reason || "", owner_id: l.staff_id ? String(l.staff_id) : "",
       });
+      setOwnerName(l.staff_name || "");
       setOtherReason(!!l.passport_reason && !PASSPORT_REASONS.includes(l.passport_reason));
       setLoaded(true);
     }).catch((e) => { if (!off) setLoadError(formatApiError(e)); });
@@ -149,6 +157,9 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
     }, 500);
     return () => clearTimeout(t);
   }, [f.phone, f.email, leadId]);
+
+  // once the consultants are known, the owner defaults to the logged-in person (create mode)
+  useEffect(() => { if (!editing && defaultOwner) setF((p) => (p.owner_id ? p : { ...p, owner_id: defaultOwner })); }, [editing, defaultOwner]);
 
   const set = (k: keyof LeadFormState) => (v: string | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setF((p) => ({ ...p, [k]: typeof v === "string" ? v : v.target.value }));
@@ -253,7 +264,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
       const passportReason = f.passport_available === false
         ? (f.passport_reason || "").trim()
         : "";
-      const { child_ages_arr: ageList, ...rest } = f;
+      const { child_ages_arr: ageList, owner_id: ownerId, ...rest } = f;
       const payload = {
         ...rest,
         phone: cleanPhone(f.phone),
@@ -266,6 +277,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
                                   .map(sc => ({ city: sc.city.trim(), nights: sc.nights || null })),
         passport_available: f.passport_available,
         passport_reason: passportReason,
+        ...(!editing && ownerId ? { owner_id: ownerId } : {}),
       };
       if (editing) {
         await api.patch<Lead>(`/leads/${leadId}`, payload);
@@ -277,7 +289,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
       const { data } = await api.post<Lead>(url, payload);
       if (addAnother.current) {
         toast.success(`Lead ${data.lead_id} saved. Add the next one.`);
-        setF(EMPTY); setAgeErrors({}); setPhoneErr(""); setOtherReason(false);
+        setF({ ...EMPTY, owner_id: f.owner_id }); setAgeErrors({}); setPhoneErr(""); setOtherReason(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
@@ -325,6 +337,13 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
         <Card className="p-4 rounded-lg">
           <h3 className="font-display text-base font-bold mb-3">Customer</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-2.5">
+            <F label="Lead Owner" testId="f-owner-wrap">
+              {editing ? <Input value={ownerName || "—"} disabled data-testid="f-owner" />
+                : canPickOwner
+                  ? <Combobox options={owners.map((o) => ({ value: o.id, label: o.code ? `${o.name} · ${o.code}` : o.name }))} value={f.owner_id}
+                              onChange={set("owner_id")} placeholder="Auto: by destination" searchPlaceholder="Search consultant…" clearLabel="Auto: by destination" clearValue="auto" testId="f-owner" />
+                  : <Input value={user.name} disabled data-testid="f-owner" />}
+            </F>
             <F label="Customer Name" required><Input value={f.customer_name} onChange={set("customer_name")} data-testid="f-customer-name" /></F>
             <F label="Mobile Number" required>
               <Input
