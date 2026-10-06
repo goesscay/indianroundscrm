@@ -680,10 +680,11 @@ class SupplierMailTest extends TestCase
         $this->assertSame('response_received', RsqRequest::where('lead_id', $lead->lead_id)->value('status'));
         $this->assertSame('response_received', $lead->fresh()->rsq_status);
 
-        // unread rows: owner + rsq.manage holders (ops, admin) - nobody else, nobody inactive
+        // unread rows: rsq.manage holders (ops, admin) only: not the sales owner, nobody else, nobody inactive
         $r1 = SupplierReply::where('graph_message_id', 'R1')->first();
         $users = DB::table('supplier_reply_reads')->where('reply_id', $r1->id)->pluck('user_id')->sort()->values()->all();
-        $this->assertSame(collect([$owner->id, $ops->id, $admin->id])->map(fn ($i) => (int) $i)->sort()->values()->all(), array_map('intval', $users));
+        $this->assertSame(collect([$ops->id, $admin->id])->map(fn ($i) => (int) $i)->sort()->values()->all(), array_map('intval', $users));
+        $this->assertNotContains($owner->id, $users);
         $this->assertNotContains($bystander->id, $users);
         $this->assertNotContains($inactiveOps->id, $users);
 
@@ -694,7 +695,7 @@ class SupplierMailTest extends TestCase
             }
             $names = array_map(fn ($c) => $c->name, $e->broadcastOn());
             sort($names);
-            $want = array_map(fn ($id) => 'private-notifications.user.'.$id, collect([$owner->id, $ops->id, $admin->id])->sort()->values()->all());
+            $want = array_map(fn ($id) => 'private-notifications.user.'.$id, collect([$ops->id, $admin->id])->sort()->values()->all());
             sort($want);
             $this->assertSame($want, $names);
             $this->assertSame('supplier.reply', $e->broadcastAs());
@@ -709,15 +710,16 @@ class SupplierMailTest extends TestCase
         $this->assertCount(2, $acts); // one per reply
         $a = Activity::whereKey(SupplierReply::where('graph_message_id', 'R1')->value('activity_id'))->first();
         $this->assertSame('email', $a->type);
-        $this->assertSame('Review reply from Sunrise Travels — '.$lead->lead_id, $a->title);
+        $this->assertSame('Review supplier reply — '.$lead->lead_id, $a->title);       // no supplier name: the sales owner can see activities on their lead
+        $this->assertNull($a->details);
         $this->assertSame('medium', $a->priority);
-        $this->assertSame((string) $owner->id, (string) $a->assigned_to);
+        $this->assertNull($a->assigned_to);                                              // the owner is sales, so it is not theirs to work
         $this->assertNull($a->created_by);
         $this->assertSame($lead->lead_id, $a->lead_id);
         $this->assertNotNull($a->due_at);
 
-        // owner bell shows it, bystander does not
-        $this->as($owner);
+        // Operations' bell shows it with the supplier name; the sales owner and a bystander get nothing
+        $this->as($ops);
         $al = collect($this->getJson('/api/notifications')->assertOk()->json())->where('kind', 'supplier_reply')->values();
         $this->assertCount(2, $al);
         $this->assertSame('Reply from Sunrise Travels', $al[0]['title']);
@@ -725,8 +727,10 @@ class SupplierMailTest extends TestCase
         $this->assertSame($lead->lead_id, $al[0]['lead_id']);
         $this->assertArrayHasKey('icon', $al[0]);
         $this->assertArrayHasKey('reply_id', $al[0]);
-        $this->as($bystander);
-        $this->assertCount(0, collect($this->getJson('/api/notifications')->json())->where('kind', 'supplier_reply'));
+        foreach ([$owner, $bystander] as $u) {
+            $this->as($u);
+            $this->assertCount(0, collect($this->getJson('/api/notifications')->json())->where('kind', 'supplier_reply'));
+        }
     }
 
     public function test_reply_never_downgrades_a_further_tracker_state_and_inactive_owner_gets_unassigned_activity(): void
@@ -766,7 +770,7 @@ class SupplierMailTest extends TestCase
 
     public function test_bounce_flags_tracker_and_alerts_owner(): void
     {
-        [$owner, , $lead, , $tr] = $this->world();
+        [$owner, $ops, $lead, , $tr] = $this->world();
         Event::fake([SupplierReplyReceived::class]);
         $f = $this->useFake();
         $f->inbox = [$this->msg(['id' => 'B1', 'from' => 'MicrosoftExchange329e71ec88ae4615bbc36ab6ce41109e@x.onmicrosoft.com',
@@ -781,9 +785,11 @@ class SupplierMailTest extends TestCase
         $this->assertSame('Email Sent', $tr->status);
         $this->assertSame(0, Activity::count());
         Event::assertDispatched(SupplierReplyReceived::class, fn ($e) => $e->reply['kind'] === 'supplier_bounce');
-        $this->as($owner);
+        $this->as($ops);
         $al = collect($this->getJson('/api/notifications')->json())->firstWhere('kind', 'supplier_bounce');
         $this->assertSame('Delivery failed: Sunrise Travels', $al['title']);
+        $this->as($owner);                                                       // sales: no supplier details
+        $this->assertNull(collect($this->getJson('/api/notifications')->json())->firstWhere('kind', 'supplier_bounce'));
 
         // bounce with no lead found at all -> unmatched
         $f->inbox = [$this->msg(['id' => 'B2', 'from' => 'mailer-daemon@x.com', 'subject' => 'Undeliverable: something else'])];
@@ -850,24 +856,26 @@ class SupplierMailTest extends TestCase
         $this->poll();
         $reply = SupplierReply::first();
 
-        // owner (sales: rsq.request) sees their lead's replies; another sales user gets 403; nothing for unknown lead
+        // sales (even the lead's owner) cannot see supplier replies at all
         $this->as($owner);
+        $this->getJson("/api/leads/{$lead->lead_id}/supplier-replies")->assertStatus(403);
+        $this->as($ops);
         $list = $this->getJson("/api/leads/{$lead->lead_id}/supplier-replies")->assertOk();
         $list->assertJsonCount(1);
         $this->assertSame(['id', 'lead_id', 'customer_name', 'supplier', 'from_email', 'from_name', 'subject', 'body_text', 'preview', 'received_at', 'status', 'matched_by', 'read', 'attachments'], array_keys($list->json(0)));
         $list->assertJsonPath('0.read', false)->assertJsonPath('0.status', 'matched')->assertJsonPath('0.matched_by', 'subject')
             ->assertJsonPath('0.supplier.name', 'Sunrise Travels')->assertJsonPath('0.id', (string) $reply->id);
         $this->getJson('/api/leads/NOPE/supplier-replies')->assertStatus(404);
+        $this->getJson("/api/leads/{$otherLead->lead_id}/supplier-replies")->assertOk()->assertJsonCount(0);
         $this->as($other);
         $this->getJson("/api/leads/{$lead->lead_id}/supplier-replies")->assertStatus(403);
-        $this->getJson("/api/leads/{$otherLead->lead_id}/supplier-replies")->assertOk()->assertJsonCount(0);
         // sales cannot use the inbox
         $this->getJson('/api/supplier-replies')->assertStatus(403);
         $this->postJson("/api/supplier-replies/{$reply->id}/link", ['lead_id' => $lead->lead_id])->assertStatus(403);
         $this->postJson("/api/supplier-replies/{$reply->id}/ignore")->assertStatus(403);
-        // ... nor read someone else's reply
+        // ... nor mark a reply read
         $this->postJson("/api/supplier-replies/{$reply->id}/read")->assertStatus(403);
-        // a user without rsq.request/manage cannot read lead replies at all
+        // a user without rsq.manage cannot read lead replies at all
         $noPerm = User::factory()->create(['role' => 'accounts']);
         $this->as($noPerm);
         $this->getJson("/api/leads/{$lead->lead_id}/supplier-replies")->assertStatus(403);
@@ -887,12 +895,9 @@ class SupplierMailTest extends TestCase
         // read / read-all only touch the caller's own rows
         $this->postJson("/api/supplier-replies/{$reply->id}/read")->assertOk()->assertJson(['ok' => true]);
         $this->getJson('/api/supplier-replies')->assertJsonPath('counts.unread', 0)->assertJsonPath('items.0.read', true);
-        $this->as($owner);
-        $this->getJson("/api/leads/{$lead->lead_id}/supplier-replies")->assertJsonPath('0.read', false); // owner's own unread unaffected
-        $this->postJson('/api/supplier-replies/read-all?lead_id=IRNOPE')->assertOk();
-        $this->getJson("/api/leads/{$lead->lead_id}/supplier-replies")->assertJsonPath('0.read', false);
-        $this->postJson('/api/supplier-replies/read-all?lead_id='.$lead->lead_id)->assertOk()->assertJson(['ok' => true]);
         $this->getJson("/api/leads/{$lead->lead_id}/supplier-replies")->assertJsonPath('0.read', true);
+        $this->postJson('/api/supplier-replies/read-all?lead_id=IRNOPE')->assertOk();
+        $this->postJson('/api/supplier-replies/read-all?lead_id='.$lead->lead_id)->assertOk()->assertJson(['ok' => true]);
         $this->assertCount(0, collect($this->getJson('/api/notifications')->json())->where('kind', 'supplier_reply'));
     }
 
@@ -921,7 +926,9 @@ class SupplierMailTest extends TestCase
         $this->poll();
         $orphan = SupplierReply::where('graph_message_id', 'D2')->first()->attachments->first();
 
-        $this->as($owner);
+        $this->as($owner);                                                   // sales owner: no access to supplier files
+        $this->get("/api/supplier-replies/attachments/{$good->id}/download")->assertStatus(403);
+        $this->as($ops);
         $res = $this->get("/api/supplier-replies/attachments/{$good->id}/download")->assertOk();
         $this->assertSame('nosniff', $res->headers->get('X-Content-Type-Options'));
         $this->assertStringContainsString('attachment', $res->headers->get('Content-Disposition'));
@@ -929,7 +936,6 @@ class SupplierMailTest extends TestCase
         $this->assertSame('application/pdf', $res->headers->get('Content-Type'));
         $this->assertSame('%PDF-1.4', $res->streamedContent());
         $this->get("/api/supplier-replies/attachments/{$bad->id}/download")->assertStatus(404);      // skipped
-        $this->get("/api/supplier-replies/attachments/{$orphan->id}/download")->assertStatus(403);  // unmatched: managers only
         $this->get('/api/supplier-replies/attachments/99999/download')->assertStatus(404);
         $this->as($other);
         $this->get("/api/supplier-replies/attachments/{$good->id}/download")->assertStatus(403);

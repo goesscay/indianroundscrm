@@ -14,12 +14,13 @@ import { cn } from "@/lib/utils";
 import type { SupplierReply } from "@/types";
 
 /** Fetches a lead's replies; refreshes on realtime events and when replies change elsewhere. */
-export function useLeadReplies(leadId: string) {
+export function useLeadReplies(leadId: string, enabled = true) {
   const { version, bump } = useSupplierReplies();
   const [replies, setReplies] = useState<SupplierReply[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
+    if (!enabled) { setLoaded(true); return; }
     try {
       const { data } = await api.get<SupplierReply[]>(`/leads/${leadId}/supplier-replies`);
       setReplies(Array.isArray(data) ? data : []);
@@ -28,7 +29,7 @@ export function useLeadReplies(leadId: string) {
     } finally {
       setLoaded(true);
     }
-  }, [leadId]);
+  }, [leadId, enabled]);
 
   useEffect(() => { void load(); }, [load, version]);
 

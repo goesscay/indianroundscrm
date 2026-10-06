@@ -77,7 +77,7 @@ class RbacTest extends TestCase
         $this->api('GET', '/api/rsq-requests', [], 'ops')->assertOk();
         $this->api('GET', '/api/lead-suppliers/dashboard/summary', [], 'sales')->assertStatus(403);
         $this->api('GET', '/api/lead-suppliers/dashboard/summary', [], 'ops')->assertOk();
-        $this->api('GET', '/api/suppliers', [], 'sales')->assertOk();
+        $this->api('GET', '/api/suppliers', [], 'sales')->assertStatus(403);        // supplier details: Admin and Operations only
         $s = ['name' => 'S', 'email' => 's@x.com'];
         $this->api('POST', '/api/suppliers', $s, 'sales')->assertStatus(403);
         $this->api('POST', '/api/suppliers', $s, 'ops')->assertOk();

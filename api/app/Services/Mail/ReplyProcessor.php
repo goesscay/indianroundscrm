@@ -92,7 +92,8 @@ class ReplyProcessor
     }
 
     /**
-     * Lead owner (if active) + every active user holding rsq.manage.
+     * Every active user holding rsq.manage (Operations, Admin), plus the lead owner when the owner is one of them.
+     * A sales owner is not told: supplier names and mail ids are not for sales.
      *
      * @return list<int>
      */
@@ -101,7 +102,7 @@ class ReplyProcessor
         $ids = [];
         if ($lead && $lead->staff_id) {
             $owner = User::find($lead->staff_id);
-            if ($owner && $this->isActive($owner)) {
+            if ($owner && $this->isActive($owner) && $owner->hasPermission('rsq.manage')) {
                 $ids[] = (int) $owner->id;
             }
         }
@@ -139,12 +140,13 @@ class ReplyProcessor
             return;
         }
         $owner = $lead->staff_id ? User::find($lead->staff_id) : null;
-        $title = mb_substr('Review reply from '.$this->supplierName($reply, $tracker).' — '.$lead->lead_id, 0, 200);
+        // activities on a lead are visible to its sales owner, so no supplier name or subject goes in here
+        $title = mb_substr('Review supplier reply — '.$lead->lead_id, 0, 200);
         $activity = Activity::create([
             'type' => 'email', 'title' => $title,
-            'details' => 'Subject: '.mb_substr((string) $reply->subject, 0, 200),
+            'details' => null,
             'priority' => 'medium', 'due_at' => now(),
-            'assigned_to' => $owner && $this->isActive($owner) ? $owner->id : null,
+            'assigned_to' => $owner && $this->isActive($owner) && $owner->hasPermission('rsq.manage') ? $owner->id : null,
             'created_by' => null, 'lead_id' => $lead->lead_id,
         ]);
         SupplierReply::whereKey($reply->id)->update(['activity_id' => $activity->id]);

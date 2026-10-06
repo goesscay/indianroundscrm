@@ -176,7 +176,7 @@ class Permissions
             'admin' => self::keys(),
             'sales' => [
                 'dashboard.view', 'leads.create', 'leads.edit_limited', 'leads.assignable', 'leads.notes',
-                'leads.contact_events', 'calendar.view', 'rsq.request', 'suppliers.view',
+                'leads.contact_events', 'calendar.view', 'rsq.request',
                 'ai.use', 'chat.use', 'activities.view', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.create', 'customers.edit',
                 'deals.view', 'deals.create', 'deals.edit', 'forecasts.view',

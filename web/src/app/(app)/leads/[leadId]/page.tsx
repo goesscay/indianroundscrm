@@ -22,7 +22,7 @@ import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { Lead, LeadUpdate, Supplier, SupplierMailHistory, SupplierMailPreview, SupplierMailSendResult, User } from "@/types";
-import { Mail, MessageCircle, ArrowLeft, Phone, Copy, MessageSquare, UserCog, ArrowRightLeft, Pencil } from "lucide-react";
+import { Mail, MessageCircle, ArrowLeft, Phone, Copy, UserCog, ArrowRightLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 import ConvertLeadDialog from "@/components/crm/ConvertLeadDialog";
 
@@ -33,7 +33,9 @@ export default function LeadDetail() {
   const router = useRouter();
   const { can } = useCurrentUser();
   const [lead, setLead] = useState<Lead | null>(null);
-  const supplierReplies = useLeadReplies(leadId);
+  // supplier names, mail ids, mail history and replies: Admin and Operations only
+  const seeSuppliers = can("suppliers.view", "rsq.manage");
+  const supplierReplies = useLeadReplies(leadId, seeSuppliers);
   const [history, setHistory] = useState<SupplierMailHistory[]>([]);
   const historyLm = useLoadMore(history, 10);
   const [mailOpen, setMailOpen] = useState(false);
@@ -59,8 +61,10 @@ export default function LeadDetail() {
     try {
       const { data } = await api.get<Lead>(`/leads/${leadId}`);
       setLead(data);
-      const h = await api.get<SupplierMailHistory[]>(`/supplier-mail/${leadId}`);
-      setHistory(h.data);
+      if (seeSuppliers) {
+        const h = await api.get<SupplierMailHistory[]>(`/supplier-mail/${leadId}`);
+        setHistory(h.data);
+      }
     } catch (e) { toast.error(formatApiError(e)); }
   };
 
@@ -291,7 +295,6 @@ export default function LeadDetail() {
           <div className="flex gap-2 flex-wrap">
             <a href={`tel:+91${cleanPhone.slice(-10)}`} onClick={() => track("call", lead.phone)}><Button size="sm" variant="outline" title="Call" data-testid="qa-call"><Phone size={14} /> Call</Button></a>
             <a href={whatsappLink} target="_blank" rel="noreferrer" onClick={() => track("whatsapp", lead.phone)}><Button size="sm" style={{ background: "#25D366", color: "white" }} title="WhatsApp" data-testid="qa-whatsapp"><MessageCircle size={14} /> WhatsApp</Button></a>
-            <a href={`sms:+91${cleanPhone.slice(-10)}`} onClick={() => track("sms", lead.phone)}><Button size="sm" variant="outline" title="SMS" data-testid="qa-sms"><MessageSquare size={14} /> SMS</Button></a>
             {lead.email && <a href={`mailto:${lead.email}?subject=Indian Rounds - ${lead.lead_id}`} onClick={() => track("email", lead.email ?? "")}><Button size="sm" variant="outline" title="Email" data-testid="qa-email"><Mail size={14} /> Email</Button></a>}
             {canReassign && <Button size="sm" variant="outline" onClick={openReassign} title="Reassign" data-testid="qa-reassign"><UserCog size={14} /> Reassign</Button>}
           </div>
@@ -413,7 +416,7 @@ export default function LeadDetail() {
           </div>
         </Card>
 
-        <Card className="p-4 rounded-lg">
+        {seeSuppliers && <Card className="p-4 rounded-lg">
           <h3 className="font-display text-base font-bold mb-3">Supplier mail history</h3>          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}
           <div className="space-y-3">
             {historyLm.visible.map((h) => (
@@ -438,10 +441,10 @@ export default function LeadDetail() {
             ))}
           </div>
           <LoadMore lm={historyLm} className="mt-3" />
-        </Card>
+        </Card>}
       </div>
 
-      {lead.quote_type === "rsq" && <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} replies={supplierReplies.replies} />}
+      {seeSuppliers && lead.quote_type === "rsq" && <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} replies={supplierReplies.replies} />}
 
       <SupplierReplies
         leadId={lead.lead_id}
@@ -449,7 +452,7 @@ export default function LeadDetail() {
         patchLocal={supplierReplies.patchLocal}
         bump={supplierReplies.bump}
         reload={supplierReplies.reload}
-        show={supplierReplies.replies.length > 0 || can("rsq.request", "rsq.manage")}
+        show={seeSuppliers && (supplierReplies.replies.length > 0 || can("rsq.request", "rsq.manage"))}
       />
 
       {!lead.quote_type && (
