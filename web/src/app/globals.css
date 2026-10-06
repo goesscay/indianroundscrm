@@ -204,3 +204,6 @@ body {
 table thead th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; }
 
 .font-serif { font-family: var(--font-serif-italic), Georgia, serif; }
+
+/* Pages with a sticky save bar: lift the chat dock so it never covers the Save buttons. */
+body:has([data-testid="lead-action-bar"]) [data-testid="chat-dock"] { bottom: 4rem; }

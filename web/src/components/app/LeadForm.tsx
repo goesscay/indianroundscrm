@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useMemo, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { api, apiErrorStatus, formatApiError } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -239,6 +239,8 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
     setF(p => ({ ...p, passport_reason: v }));
   };
 
+  const addAnother = useRef(false); // set by "Save and add another"; kept across the duplicate-warning dialog
+
   const submit = async (e: FormEvent | null, force = false) => {
     if (e) e.preventDefault();
     const pErr = validPhone(f.phone);
@@ -278,6 +280,12 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
       }
       const url = force ? "/leads?force=true" : "/leads";
       const { data } = await api.post<Lead>(url, payload);
+      if (addAnother.current) {
+        toast.success(`Lead ${data.lead_id} saved. Add the next one.`);
+        setF(EMPTY); setAgeErrors({}); setPhoneErr(""); setOtherReason(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       // If the destination was auto-allocated to a different sales consultant, sales won't see the lead in their list
       if (!can("leads.view_all") && data.staff_id && data.staff_id !== user.id) {
         toast.success(`Lead ${data.lead_id} created — assigned to ${data.staff_name || "another consultant"}`);
@@ -295,13 +303,6 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
       }
     }
     finally { setBusy(false); }
-  };
-
-  const saveDraft = () => { localStorage.setItem("ir_lead_draft", JSON.stringify(f)); toast.success("Draft saved locally"); };
-  const loadDraft = () => {
-    const d = localStorage.getItem("ir_lead_draft");
-    if (d) { setF({ ...EMPTY, ...JSON.parse(d) }); toast.success("Draft loaded"); }
-    else toast.info("No draft found");
   };
 
   const kids = useMemo(() => Number(f.children) || 0, [f.children]);
@@ -322,14 +323,6 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
           <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight mt-0.5">{editing ? `Edit Lead ${leadNo}` : "New Lead"}</h1>
           <p className="text-xs text-muted-foreground mt-1">{editing ? "Change any detail and save. The lead keeps its ID, status and history." : "Lead ID auto-generated on save (e.g. IR07001)."}</p>
         </div>
-        {editing ? (
-          <Button variant="outline" onClick={() => router.push(`/leads/${leadId}`)} data-testid="edit-cancel-top">Cancel</Button>
-        ) : (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={loadDraft} data-testid="load-draft">Load Draft</Button>
-            <Button variant="outline" onClick={saveDraft} data-testid="save-draft">Save Draft</Button>
-          </div>
-        )}
       </div>
 
       <form onSubmit={submit} className="space-y-3">
@@ -585,12 +578,16 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
           <Textarea rows={2} value={f.special_requests} onChange={set("special_requests")} placeholder="Any preferences, allergies, celebrations…" data-testid="f-special" />
         </Card>
 
-        <div className="flex justify-end gap-3 pb-10">
-          {editing
-            ? <Button type="button" variant="outline" onClick={() => router.push(`/leads/${leadId}`)} data-testid="edit-cancel">Cancel</Button>
-            : <Button type="button" variant="outline" onClick={() => { setF(EMPTY); setAgeErrors({}); }} data-testid="reset-btn">Reset</Button>}
-          <Button type="submit" disabled={busy || !!validPhone(f.phone)} className="px-8" data-testid="submit-lead">
-            {busy ? "Saving…" : editing ? "Save changes" : "Create Lead →"}
+        {/* sticky action bar: always in reach however long the form is */}
+        <div className="sticky bottom-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 mt-4 flex items-center justify-end gap-2 border-t border-border bg-background/95 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:px-4 md:px-6" data-testid="lead-action-bar">
+          <Button type="button" variant="ghost" onClick={() => router.push(editing ? `/leads/${leadId}` : "/leads")} data-testid={editing ? "edit-cancel" : "cancel-lead"}>Cancel</Button>
+          {!editing && (
+            <Button type="button" variant="outline" disabled={busy || !!validPhone(f.phone)} onClick={() => { addAnother.current = true; void submit(null); }} data-testid="save-add-another">
+              Save and add another
+            </Button>
+          )}
+          <Button type="submit" disabled={busy || !!validPhone(f.phone)} onClick={() => { addAnother.current = false; }} className="px-6" data-testid="submit-lead">
+            {busy ? "Saving…" : editing ? "Save changes" : "Save lead"}
           </Button>
         </div>
       </form>
