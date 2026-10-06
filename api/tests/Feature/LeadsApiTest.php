@@ -240,4 +240,36 @@ class LeadsApiTest extends TestCase
         $this->getJson('/api/leads')->assertStatus(401);
         $this->getJson('/api/dashboard/stats')->assertStatus(401);
     }
+
+    public function test_full_edit_of_a_lead_by_admin_and_limited_edit_by_sales(): void
+    {
+        $this->as('admin');
+        $id = $this->postJson('/api/leads', $this->leadPayload())->assertOk()->json('lead_id');
+        $other = $this->postJson('/api/leads', $this->leadPayload(['phone' => '9123456780', 'customer_name' => 'Other']))->assertOk()->json('lead_id');
+
+        $r = $this->patchJson("/api/leads/$id", [
+            'customer_name' => 'Asha R. Menon', 'phone' => '+91 98765 11111', 'email' => 'asha@example.com', 'destination' => 'Goa', 'lead_source' => 'Referral',
+            'travel_date' => '2027-01-05', 'duration_days' => 6, 'adults' => 3, 'children' => 1, 'child_ages' => '7', 'rooms' => 2,
+            'hotel_category' => '4 Star', 'special_requests' => 'Sea view',
+            'stay_cities' => [['city' => 'Calangute', 'nights' => 3], ['city' => 'Palolem', 'nights' => 2]],
+        ])->assertOk();
+        $r->assertJsonPath('customer_name', 'Asha R. Menon')->assertJsonPath('phone', '9876511111')->assertJsonPath('destination', 'Goa')
+            ->assertJsonPath('lead_source', 'Referral')->assertJsonPath('trip_end_date', '2027-01-10')->assertJsonPath('stay_summary', 'Calangute 3N + Palolem 2N');
+        $this->assertSame($id, $r->json('lead_id'));              // identity and status are untouched
+        $this->assertSame('New Lead', $r->json('lead_status'));
+
+        // another lead's mobile number cannot be taken
+        $this->patchJson("/api/leads/$id", ['phone' => '9123456780'])->assertStatus(409);
+        $this->patchJson("/api/leads/$id", ['phone' => '09876511111'])->assertOk(); // the same number written differently is fine
+        $this->assertNotNull($other);
+
+        // a consultant may edit the trip details of their own lead but not the source
+        $sales = $this->as('sales');
+        $mine = $this->postJson('/api/leads', $this->leadPayload(['phone' => '9000000001']))->assertOk()->json('lead_id');
+        $e = $this->patchJson("/api/leads/$mine", ['customer_name' => 'Edited by consultant', 'destination' => 'Kerala', 'lead_source' => 'Instagram'])->assertOk();
+        $this->assertSame('Edited by consultant', $e->json('customer_name'));
+        $this->assertSame('Kerala', $e->json('destination'));
+        $this->assertNotSame('Instagram', $e->json('lead_source'));
+        $this->assertSame((string) $sales->id, $e->json('staff_id'));
+    }
 }

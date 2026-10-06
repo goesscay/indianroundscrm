@@ -431,11 +431,20 @@ class LeadController extends Controller
             'booking_status' => 'nullable|string', 'booking_amount_received' => 'nullable|numeric',
             'follow_up_date' => 'nullable|string', 'payment_status' => 'nullable|string',
             'quote_type' => 'nullable|string', 'package_selected' => 'nullable|string',
-            'rsq_status' => 'nullable|string',
+            'rsq_status' => 'nullable|string', 'lead_source' => 'nullable|string',
         ]);
 
         // exclude_unset + drop None
         $updates = array_filter($d, fn ($v) => $v !== null);
+        if (isset($updates['phone'])) {
+            $updates['phone'] = self::normalizePhone((string) $updates['phone']);
+            if ($updates['phone'] !== self::normalizePhone((string) $lead->phone)) {
+                $other = Lead::where('phone', $updates['phone'])->where('lead_id', '!=', $lead->lead_id)->first();
+                if ($other) {
+                    Fail::http(409, "Another lead ({$other->lead_id} — {$other->customer_name}) already uses this mobile number.");
+                }
+            }
+        }
         if (! $user->hasPermission('leads.edit')) {
             $updates = array_intersect_key($updates, array_flip(self::SALES_ALLOWED));
         }

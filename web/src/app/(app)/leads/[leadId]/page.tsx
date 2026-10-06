@@ -22,7 +22,7 @@ import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { Lead, LeadUpdate, Supplier, SupplierMailHistory, SupplierMailPreview, SupplierMailSendResult, User } from "@/types";
-import { Mail, MessageCircle, ArrowLeft, Phone, Copy, MessageSquare, UserCog, ArrowRightLeft } from "lucide-react";
+import { Mail, MessageCircle, ArrowLeft, Phone, Copy, MessageSquare, UserCog, ArrowRightLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 import ConvertLeadDialog from "@/components/crm/ConvertLeadDialog";
 
@@ -238,6 +238,11 @@ export default function LeadDetail() {
               <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40 text-red-800 dark:text-red-300 text-xs font-semibold" data-testid="rsq-pending-reply">
                 <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" /> Awaiting supplier reply
               </span>
+            )}
+            {can("leads.edit", "leads.edit_limited") && (
+              <Button onClick={() => router.push(`/leads/${lead.lead_id}/edit`)} variant="outline" className="h-11" data-testid="edit-lead-btn">
+                <Pencil size={16} /> Edit
+              </Button>
             )}
             {can("leads.convert") && !lead.deal_id && (
               <Button onClick={() => setConvertOpen(true)} variant="outline" className="h-11" data-testid="convert-btn"
