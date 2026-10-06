@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -30,21 +31,14 @@ interface ExistingLeadBlock {
 const F = ({ label, required, children, testId }: { label: string; required?: boolean; children: ReactNode; testId?: string }) => (
   <div>
     <Label className="label-caps">{label}{required && <span className="text-destructive"> *</span>}</Label>
-    <div className="mt-1.5" data-testid={testId}>{children}</div>
+    <div className="mt-1" data-testid={testId}>{children}</div>
   </div>
 );
 
 function SelectMaster({ options, value, onChange, placeholder, testId }: {
   options?: string[]; value?: string; onChange: (v: string) => void; placeholder?: string; testId?: string;
 }) {
-  return (
-    <Select value={value || undefined} onValueChange={onChange}>
-      <SelectTrigger className="h-10" data-testid={testId}><SelectValue placeholder={placeholder} /></SelectTrigger>
-      <SelectContent>
-        {(options || []).map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  );
+  return <Combobox options={options || []} value={value} onChange={onChange} placeholder={placeholder} searchPlaceholder="Type to search…" testId={testId} />;
 }
 
 const PASSPORT_REASONS = [
@@ -321,12 +315,12 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
   if (!loaded) return <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>;
 
   return (
-    <div className="space-y-6" data-testid="new-lead-page">
+    <div className="space-y-4" data-testid="new-lead-page">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <div className="label-caps">{editing ? "Lead detail" : "Sales entry"}</div>
-          <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">{editing ? `Edit Lead ${leadNo}` : "New Lead"}</h1>
-          <p className="text-sm text-muted-foreground mt-2">{editing ? "Change any detail and save. The lead keeps its ID, status and history." : "Lead ID auto-generated on save (e.g. IR07001)."}</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight mt-0.5">{editing ? `Edit Lead ${leadNo}` : "New Lead"}</h1>
+          <p className="text-xs text-muted-foreground mt-1">{editing ? "Change any detail and save. The lead keeps its ID, status and history." : "Lead ID auto-generated on save (e.g. IR07001)."}</p>
         </div>
         {editing ? (
           <Button variant="outline" onClick={() => router.push(`/leads/${leadId}`)} data-testid="edit-cancel-top">Cancel</Button>
@@ -338,11 +332,11 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
         )}
       </div>
 
-      <form onSubmit={submit} className="space-y-6">
+      <form onSubmit={submit} className="space-y-3">
         {/* Customer */}
-        <Card className="p-6 rounded-lg">
-          <h3 className="font-display text-xl font-bold mb-4">Customer</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-4 rounded-lg">
+          <h3 className="font-display text-base font-bold mb-3">Customer</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-2.5">
             <F label="Customer Name" required><Input value={f.customer_name} onChange={set("customer_name")} data-testid="f-customer-name" /></F>
             <F label="Mobile Number" required>
               <Input
@@ -361,7 +355,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
             <F label="Departure From"><SelectMaster options={master.departure_city} value={f.departure_from} onChange={set("departure_from")} placeholder="City" testId="f-departure" /></F>
           </div>
           {duplicates.length > 0 && (
-            <div className="mt-4 p-4 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40" data-testid="duplicate-warning">
+            <div className="mt-3 p-3 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40" data-testid="duplicate-warning">
               <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-semibold text-sm">
                 <AlertTriangle size={16} /> Possible duplicate — {duplicates.length} existing lead(s) match this phone/email
               </div>
@@ -379,9 +373,9 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
         </Card>
 
         {/* Trip */}
-        <Card className="p-6 rounded-lg">
-          <h3 className="font-display text-xl font-bold mb-4">Trip</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-4 rounded-lg">
+          <h3 className="font-display text-base font-bold mb-3">Trip</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-2.5">
             <F label="Destination" required>
               <SelectMaster options={master.destination} value={f.destination}
                             onChange={(v) => setF(p => ({ ...p, destination: v, stay_cities: [] }))}
@@ -415,7 +409,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
 
         {/* Stay Cities */}
         {f.destination && (
-          <Card className="p-6 rounded-lg" data-testid="stay-cities-card">
+          <Card className="p-4 rounded-lg" data-testid="stay-cities-card">
             <div className="flex items-end justify-between flex-wrap gap-3 mb-1">
               <div>
                 <h3 className="font-display text-xl font-bold">Which city / area will you stay in?</h3>
@@ -501,8 +495,8 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
         )}
 
         {/* Guests */}
-        <Card className="p-6 rounded-lg">
-          <h3 className="font-display text-xl font-bold mb-4">Guests</h3>
+        <Card className="p-4 rounded-lg">
+          <h3 className="font-display text-base font-bold mb-3">Guests</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <F label="Adults"><Input type="number" min="1" value={f.adults} onChange={set("adults")} data-testid="f-adults" /></F>
             <F label="Number of Children">
@@ -542,7 +536,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
         </Card>
 
         {/* Passport */}
-        <Card className="p-6 rounded-lg" data-testid="passport-card">
+        <Card className="p-4 rounded-lg" data-testid="passport-card">
           <h3 className="font-display text-xl font-bold mb-1">Passport Available?</h3>
           <p className="text-xs text-muted-foreground mb-4">Required for international travel processing.</p>
           <div className="flex gap-3 flex-wrap">
@@ -563,7 +557,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
               <div>
                 <Label className="label-caps">Why is passport not available?</Label>
                 <Select value={reasonSelectValue} onValueChange={setReason}>
-                  <SelectTrigger className="h-10 mt-1.5" data-testid="f-passport-reason-select">
+                  <SelectTrigger className="mt-1" data-testid="f-passport-reason-select">
                     <SelectValue placeholder="Choose a reason" />
                   </SelectTrigger>
                   <SelectContent>
@@ -586,12 +580,12 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
           )}
         </Card>
 
-        <Card className="p-6 rounded-lg">
-          <h3 className="font-display text-xl font-bold mb-4">Special Requests</h3>
-          <Textarea rows={4} value={f.special_requests} onChange={set("special_requests")} placeholder="Any preferences, allergies, celebrations…" data-testid="f-special" />
+        <Card className="p-4 rounded-lg">
+          <h3 className="font-display text-base font-bold mb-3">Special Requests</h3>
+          <Textarea rows={2} value={f.special_requests} onChange={set("special_requests")} placeholder="Any preferences, allergies, celebrations…" data-testid="f-special" />
         </Card>
 
-        <div className="flex justify-end gap-3 pb-24">
+        <div className="flex justify-end gap-3 pb-10">
           {editing
             ? <Button type="button" variant="outline" onClick={() => router.push(`/leads/${leadId}`)} data-testid="edit-cancel">Cancel</Button>
             : <Button type="button" variant="outline" onClick={() => { setF(EMPTY); setAgeErrors({}); }} data-testid="reset-btn">Reset</Button>}

@@ -16,6 +16,7 @@ import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
 import SupplierTracker from "@/components/app/SupplierTracker";
 import SupplierReplies, { useLeadReplies } from "@/components/app/SupplierReplies";
 import LeadNotes from "@/components/app/LeadNotes";
+import { Combobox } from "@/components/ui/combobox";
 import FollowupCountdown from "@/components/app/FollowupCountdown";
 import LeadActivities from "@/components/activities/LeadActivities";
 import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
@@ -50,6 +51,9 @@ export default function LeadDetail() {
   const [reassignReason, setReassignReason] = useState("");
   const [nrsqOpen, setNrsqOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [wsTab, setWsTab] = useState<"activities" | "notes">("activities");
+  const [openTasks, setOpenTasks] = useState(0);
+  const [noteCount, setNoteCount] = useState(0);
   const [nrsqForm, setNrsqForm] = useState<{ package_selected: string; selling_amount: string | number }>({ package_selected: "", selling_amount: "" });
 
   const load = async () => {
@@ -193,65 +197,65 @@ export default function LeadDetail() {
   };
 
   return (
-    <div className="space-y-6" data-testid="lead-detail-page">
+    <div className="space-y-3" data-testid="lead-detail-page">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-2 -ml-3" data-testid="back-btn">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-1 -ml-3 h-8" data-testid="back-btn">
             <ArrowLeft size={16} /> Back
           </Button>
           <div className="label-caps">Lead detail</div>
           <div className="flex items-center gap-3 mt-1">
-            <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight">{lead.lead_id}</h1>
+            <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight">{lead.lead_id}</h1>
             <StatusPill status={lead.lead_status} />
           </div>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-sm text-muted-foreground mt-1">
             {lead.customer_name} · {lead.destination} · Travel {(lead.travel_date || "").slice(0, 10)}
           </p>
         </div>
           <div className="flex gap-2 flex-wrap">
             {canQuote && !lead.quote_type && (
               <>
-                <Button onClick={() => setNrsqOpen(true)} className="h-11 bg-[#E5E5E5] text-[#0A0A0A] hover:bg-[#E5E5E5] dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700" data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
+                <Button onClick={() => setNrsqOpen(true)} className="h-9 bg-[#E5E5E5] text-[#0A0A0A] hover:bg-[#E5E5E5] dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700" data-testid="nrsq-btn" title="Generate quote instantly from predefined packages — no supplier email">
                   ⚡ NRSQ
                 </Button>
-                <Button onClick={canOps ? openMail : createRsqRequest} className="h-11" data-testid="rsq-btn" title={canOps ? "Compose supplier email now" : "Request Ops team to fetch supplier quotes"}>
+                <Button onClick={canOps ? openMail : createRsqRequest} className="h-9" data-testid="rsq-btn" title={canOps ? "Compose supplier email now" : "Request Ops team to fetch supplier quotes"}>
                   <Mail size={16} /> RSQ
                 </Button>
               </>
             )}
             {canQuote && lead.quote_type === "nrsq" && (
-              <Button onClick={() => setNrsqOpen(true)} variant="outline" className="h-11" data-testid="nrsq-edit-btn">
+              <Button onClick={() => setNrsqOpen(true)} variant="outline" className="h-9" data-testid="nrsq-edit-btn">
                 ⚡ Edit NRSQ Quote
               </Button>
             )}
             {canOps && lead.quote_type === "rsq" && (
-              <Button onClick={openMail} className="h-11" data-testid="send-mail-btn">
+              <Button onClick={openMail} className="h-9" data-testid="send-mail-btn">
                 <Mail size={16} /> Supplier Mail
               </Button>
             )}
             {!canOps && lead.quote_type === "rsq" && lead.rsq_status === "new" && (
-              <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs font-semibold" data-testid="rsq-waiting-ops">
+              <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs font-semibold" data-testid="rsq-waiting-ops">
                 <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> Awaiting Ops to send mail
               </span>
             )}
             {lead.rsq_status === "pending_reply" && (
-              <span className="inline-flex items-center gap-1.5 h-11 px-3 rounded-md border border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40 text-red-800 dark:text-red-300 text-xs font-semibold" data-testid="rsq-pending-reply">
+              <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40 text-red-800 dark:text-red-300 text-xs font-semibold" data-testid="rsq-pending-reply">
                 <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" /> Awaiting supplier reply
               </span>
             )}
             {can("leads.edit", "leads.edit_limited") && (
-              <Button onClick={() => router.push(`/leads/${lead.lead_id}/edit`)} variant="outline" className="h-11" data-testid="edit-lead-btn">
+              <Button onClick={() => router.push(`/leads/${lead.lead_id}/edit`)} variant="outline" className="h-9" data-testid="edit-lead-btn">
                 <Pencil size={16} /> Edit
               </Button>
             )}
             {can("leads.convert") && !lead.deal_id && (
-              <Button onClick={() => setConvertOpen(true)} variant="outline" className="h-11" data-testid="convert-btn"
+              <Button onClick={() => setConvertOpen(true)} variant="outline" className="h-9" data-testid="convert-btn"
                       title="Create the customer and the deal for this trip">
                 <ArrowRightLeft size={16} /> {lead.customer_id ? "Add deal" : "Convert"}
               </Button>
             )}
             <a href={whatsappLink} target="_blank" rel="noreferrer" onClick={() => track("whatsapp", lead.phone)}>
-              <Button variant="outline" className="h-11" data-testid="whatsapp-btn">
+              <Button variant="outline" className="h-9" data-testid="whatsapp-btn">
                 <MessageCircle size={16} /> WhatsApp
               </Button>
             </a>
@@ -267,7 +271,7 @@ export default function LeadDetail() {
         </Card>
       )}
 
-      <Card className="p-4 rounded-lg border-l-4 border-l-[#0A0A0A]" data-testid="contact-panel">
+      <Card className="p-3 rounded-lg border-l-4 border-l-[#0A0A0A]" data-testid="contact-panel">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -295,10 +299,10 @@ export default function LeadDetail() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-6 rounded-lg lg:col-span-2">
-          <h3 className="font-display text-xl font-bold mb-4">Trip details</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <Card className="p-4 rounded-lg lg:col-span-2">
+          <h3 className="font-display text-base font-bold mb-3">Trip details</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2.5 text-sm">
             <KV label="Customer" value={lead.customer_name} />
             <KV label="Phone" value={lead.phone} />
             <KV label="Email" value={lead.email || "—"} />
@@ -325,20 +329,19 @@ export default function LeadDetail() {
           </div>
         </Card>
 
-        <Card className="p-6 rounded-lg">
-          <h3 className="font-display text-xl font-bold mb-4">Pipeline</h3>
-          <div className="space-y-4">
-            <div>
-              <Label className="label-caps">Lead Status</Label>
+        <Card className="p-4 rounded-lg lg:row-span-2" data-testid="lead-workspace">
+          <div className="grid grid-cols-2 gap-x-2.5 gap-y-2">
+            <div className="col-span-2">
+              <Label className="label-caps">Status</Label>
               <Select value={lead.lead_status} onValueChange={(v) => update({ lead_status: v })}>
-                <SelectTrigger className="mt-1.5 h-10" data-testid="update-status"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 h-9" data-testid="update-status"><SelectValue /></SelectTrigger>
                 <SelectContent>{LEAD_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="label-caps">Booking Status</Label>
+              <Label className="label-caps">Booking</Label>
               <Select value={lead.booking_status || "none"} onValueChange={(v) => update({ booking_status: v === "none" ? "" : v })}>
-                <SelectTrigger className="mt-1.5 h-10" data-testid="update-booking"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectTrigger className="mt-1 h-9" data-testid="update-booking"><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">—</SelectItem>
                   <SelectItem value="In Progress">In Progress</SelectItem>
@@ -348,18 +351,42 @@ export default function LeadDetail() {
               </Select>
             </div>
             <div>
-              <Label className="label-caps">Follow-up Date & Time</Label>
+              <Label className="label-caps">Follow-up</Label>
               <Input type="datetime-local" defaultValue={(lead.follow_up_date || "").slice(0, 16)}
                      onBlur={(e) => e.target.value && update({ follow_up_date: new Date(e.target.value).toISOString() })}
-                     className="mt-1.5" data-testid="update-followup" />
-              {lead.follow_up_date && <FollowupCountdown iso={lead.follow_up_date} />}
+                     className="mt-1 h-9 px-2 text-xs" data-testid="update-followup" />
+            </div>
+          </div>
+          {lead.follow_up_date && <div className="mt-1"><FollowupCountdown iso={lead.follow_up_date} /></div>}
+
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="mb-2 inline-flex rounded border border-border p-0.5 text-sm" role="tablist" aria-label="Activities and notes">
+              {can("activities.view") && (
+                <button type="button" role="tab" aria-selected={wsTab === "activities"} onClick={() => setWsTab("activities")} data-testid="ws-tab-activities"
+                        className={`rounded px-3 py-1 ${wsTab === "activities" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+                  Activities{openTasks > 0 ? ` (${openTasks})` : ""}
+                </button>
+              )}
+              <button type="button" role="tab" aria-selected={wsTab === "notes" || !can("activities.view")} onClick={() => setWsTab("notes")} data-testid="ws-tab-notes"
+                      className={`rounded px-3 py-1 ${wsTab === "notes" || !can("activities.view") ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+                Notes{noteCount > 0 ? ` (${noteCount})` : ""}
+              </button>
+            </div>
+            {/* both stay mounted so their counts are always current; only one is shown */}
+            {can("activities.view") && (
+              <div className={wsTab === "activities" ? "" : "hidden"}>
+                <LeadActivities embedded leadId={lead.lead_id} customerName={lead.customer_name} onCount={setOpenTasks} />
+              </div>
+            )}
+            <div className={wsTab === "notes" || !can("activities.view") ? "" : "hidden"}>
+              <LeadNotes embedded leadId={lead.lead_id} onCount={setNoteCount} />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6 rounded-lg lg:col-span-2">
-          <h3 className="font-display text-xl font-bold mb-4">Quote & Pricing {canOps ? "" : "(Ops-only)"}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <Card className="p-4 rounded-lg lg:col-span-2">
+          <h3 className="font-display text-base font-bold mb-3">Quote & Pricing {canOps ? "" : "(Ops-only)"}</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2.5">
             <div>
               <Label className="label-caps">Supplier Quote ₹</Label>
               <Input type="number" disabled={!canOps} defaultValue={lead.supplier_quote_amount || 0}
@@ -406,8 +433,8 @@ export default function LeadDetail() {
           </div>
         </Card>
 
-        <Card className="p-6 rounded-lg">
-          <h3 className="font-display text-xl font-bold mb-4">Supplier mail history</h3>          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}
+        <Card className="p-4 rounded-lg">
+          <h3 className="font-display text-base font-bold mb-3">Supplier mail history</h3>          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}
           <div className="space-y-3">
             {historyLm.visible.map((h) => (
               <div key={h.id} className="border-l-2 border-[#0A0A0A] dark:border-white/70 pl-3 py-1">
@@ -446,7 +473,7 @@ export default function LeadDetail() {
       />
 
       {!lead.quote_type && (
-        <Card className="p-6 rounded-lg lg:col-span-3 border-2 border-dashed" data-testid="quote-choice-card">
+        <Card className="p-4 rounded-lg lg:col-span-3 border-2 border-dashed" data-testid="quote-choice-card">
           <div className="text-center py-4">
             <div className="label-caps">Quotation Method</div>
             <h3 className="font-display text-xl font-bold mt-1">Choose how to generate this customer&apos;s quote</h3>
@@ -454,10 +481,10 @@ export default function LeadDetail() {
               For pre-packaged trips with fixed pricing, use <b>NRSQ</b>. For customized itineraries or live supplier pricing, use <b>RSQ</b>.
             </p>
             <div className="flex justify-center gap-3 mt-4 flex-wrap">
-              <Button onClick={() => setNrsqOpen(true)} className="h-11 px-6 bg-[#E5E5E5] text-[#0A0A0A] hover:bg-[#E5E5E5] dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700" data-testid="nrsq-cta">
+              <Button onClick={() => setNrsqOpen(true)} className="h-9 px-6 bg-[#E5E5E5] text-[#0A0A0A] hover:bg-[#E5E5E5] dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700" data-testid="nrsq-cta">
                 ⚡ NRSQ — Instant Quote
               </Button>
-              <Button onClick={canOps ? openMail : createRsqRequest} className="h-11 px-6" data-testid="rsq-cta">
+              <Button onClick={canOps ? openMail : createRsqRequest} className="h-9 px-6" data-testid="rsq-cta">
                 <Mail size={16} /> {canOps ? "RSQ — Compose Supplier Mail" : "RSQ — Request Ops Team"}
               </Button>
             </div>
@@ -466,7 +493,7 @@ export default function LeadDetail() {
       )}
 
       {lead.quote_type === "nrsq" && (
-        <Card className="p-6 rounded-lg lg:col-span-3" data-testid="nrsq-summary">
+        <Card className="p-4 rounded-lg lg:col-span-3" data-testid="nrsq-summary">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <div className="label-caps flex items-center gap-2">
@@ -487,10 +514,6 @@ export default function LeadDetail() {
           </div>
         </Card>
       )}
-
-      {can("activities.view") && <LeadActivities leadId={lead.lead_id} customerName={lead.customer_name} />}
-
-      <LeadNotes leadId={lead.lead_id} />
 
       <ContactTimeline leadId={lead.lead_id} refreshKey={timelineKey} />
 
@@ -542,14 +565,7 @@ export default function LeadDetail() {
             </div>
             <div>
               <Label className="label-caps">Assign to</Label>
-              <Select value={assignTo || undefined} onValueChange={setAssignTo}>
-                <SelectTrigger className="mt-1.5" data-testid="reassign-select"><SelectValue placeholder="Choose consultant" /></SelectTrigger>
-                <SelectContent>
-                  {consultants.map(c =>
-                    <SelectItem key={c.id} value={c.id}>{c.name} · {c.consultant_code || "??"}</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+              <Combobox className="mt-1.5" value={assignTo || undefined} onChange={setAssignTo} options={consultants.map((c) => ({ value: c.id, label: `${c.name} · ${c.consultant_code || "??"}` }))} placeholder="Choose consultant" searchPlaceholder="Search consultant…" testId="reassign-select" />
             </div>
             <div>
               <Label className="label-caps">Reason (optional)</Label>

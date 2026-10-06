@@ -11,7 +11,8 @@ import { StickyNote, Trash2 } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { LeadNote } from "@/types";
 
-export default function LeadNotes({ leadId }: { leadId: string }) {
+/** `embedded` drops the card chrome and heading so it can sit inside a tab; `onCount` reports how many notes there are. */
+export default function LeadNotes({ leadId, embedded, onCount }: { leadId: string; embedded?: boolean; onCount?: (n: number) => void }) {
   const { user, can } = useCurrentUser();
   const [notes, setNotes] = useState<LeadNote[]>([]);
   const lm = useLoadMore(notes, 10);
@@ -19,7 +20,7 @@ export default function LeadNotes({ leadId }: { leadId: string }) {
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    try { const { data } = await api.get<LeadNote[]>(`/leads/${leadId}/notes`); setNotes(data); }
+    try { const { data } = await api.get<LeadNote[]>(`/leads/${leadId}/notes`); setNotes(data); onCount?.(data.length); }
     catch (e) { toast.error(formatApiError(e)); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -42,21 +43,23 @@ export default function LeadNotes({ leadId }: { leadId: string }) {
   };
 
   return (
-    <Card className="p-6 rounded-lg lg:col-span-3" data-testid="lead-notes">
-      <div className="flex items-center gap-2 mb-4">
-        <StickyNote size={18} className="text-[#0A0A0A] dark:text-foreground" />
-        <h3 className="font-display text-xl font-bold">Notes</h3>
-        <span className="label-caps ml-auto">{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
-      </div>
-      <div className="flex gap-2 mb-4">
-        <Textarea rows={2} value={txt} onChange={(e) => setTxt(e.target.value)}
+    <Wrap embedded={embedded}>
+      {!embedded && (
+        <div className="flex items-center gap-2 mb-3">
+          <StickyNote size={16} className="text-[#0A0A0A] dark:text-foreground" />
+          <h3 className="font-display text-base font-bold">Notes</h3>
+          <span className="label-caps ml-auto">{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
+        </div>
+      )}
+      <div className="flex gap-2 mb-3">
+        <Textarea rows={2} className="min-h-0 text-sm" value={txt} onChange={(e) => setTxt(e.target.value)}
           placeholder="Add a quick note — customer said..." data-testid="note-input" />
         <Button onClick={add} disabled={busy || !txt.trim()} data-testid="note-add">Add</Button>
       </div>
-      <div className="space-y-2 max-h-80 overflow-y-auto">
+      <div className="space-y-2 max-h-72 overflow-y-auto">
         {notes.length === 0 && <div className="text-sm text-muted-foreground">No notes yet. Add one above.</div>}
         {lm.visible.map((n) => (
-          <div key={n.id} className="p-3 rounded-md border border-border bg-secondary/30 group" data-testid={`note-${n.id}`}>
+          <div key={n.id} className="p-2.5 rounded-md border border-border bg-secondary/30 group" data-testid={`note-${n.id}`}>
             <div className="flex justify-between items-start gap-2">
               <div className="text-sm whitespace-pre-wrap flex-1">{n.note}</div>
               {(can("leads.delete") || n.created_by_id === user.id) && (
@@ -72,6 +75,12 @@ export default function LeadNotes({ leadId }: { leadId: string }) {
         ))}
         <LoadMore lm={lm} />
       </div>
-    </Card>
+    </Wrap>
   );
+}
+
+function Wrap({ embedded, children }: { embedded?: boolean; children: React.ReactNode }) {
+  return embedded
+    ? <div data-testid="lead-notes">{children}</div>
+    : <Card className="p-4 rounded-lg lg:col-span-3" data-testid="lead-notes">{children}</Card>;
 }

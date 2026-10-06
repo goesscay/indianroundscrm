@@ -14,7 +14,8 @@ import ActivityDialog from "./ActivityDialog";
 import { DoneToggle, canEditActivity, dueClass, formatDue, typeMeta } from "./shared";
 
 /** Compact "Activities" card for the lead detail page. */
-export default function LeadActivities({ leadId, customerName }: { leadId: string; customerName: string }) {
+/** `embedded` drops the card chrome and heading so it can sit inside a tab; `onCount` reports the number of activities. */
+export default function LeadActivities({ leadId, customerName, embedded, onCount }: { leadId: string; customerName: string; embedded?: boolean; onCount?: (n: number) => void }) {
   const { user, can } = useCurrentUser();
   const myId = user.id ? String(user.id) : "";
   const canCreate = can("activities.create", "activities.manage");
@@ -31,10 +32,10 @@ export default function LeadActivities({ leadId, customerName }: { leadId: strin
       // Open first (soonest due first, undated last), then done (most recent first).
       const openList = data.filter((a) => !a.done).sort((x, y) => (x.due_at ?? "9999").localeCompare(y.due_at ?? "9999"));
       const doneList = data.filter((a) => a.done).sort((x, y) => (y.completed_at ?? "").localeCompare(x.completed_at ?? ""));
-      setItems([...openList, ...doneList]); setError("");
+      setItems([...openList, ...doneList]); setError(""); onCount?.(openList.length);
     } catch (e) { setError(formatApiError(e)); }
     finally { setLoaded(true); }
-  }, [leadId]);
+  }, [leadId, onCount]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -57,13 +58,14 @@ export default function LeadActivities({ leadId, customerName }: { leadId: strin
   };
 
   return (
-    <Card className="p-5 rounded-lg" data-testid="lead-activities">
-      <div className="flex items-center justify-between gap-3 mb-3">
+    <Wrap embedded={embedded}>
+      <div className={`flex items-center gap-3 mb-2 ${embedded ? "justify-between" : "justify-between"}`}>
+        {embedded ? <span className="text-xs text-muted-foreground">{loaded ? `${items.filter((a) => !a.done).length} open · ${items.length} total` : ""}</span> : (
         <div className="flex items-center gap-2">
           <ListChecks size={16} className="text-muted-foreground" />
-          <h3 className="font-display font-bold">Activities</h3>
+          <h3 className="font-display text-base font-bold">Activities</h3>
           {loaded && <span className="text-xs text-muted-foreground">({items.length})</span>}
-        </div>
+        </div>)}
         {canCreate && (
           <Button size="sm" variant="outline" onClick={() => { setEditing(null); setOpen(true); }} data-testid="lead-activity-add">
             <Plus size={14} /> Add activity
@@ -103,6 +105,12 @@ export default function LeadActivities({ leadId, customerName }: { leadId: strin
         defaults={{ lead: { lead_id: leadId, customer_name: customerName } }}
         onChanged={() => void load()}
       />
-    </Card>
+    </Wrap>
   );
+}
+
+function Wrap({ embedded, children }: { embedded?: boolean; children: React.ReactNode }) {
+  return embedded
+    ? <div data-testid="lead-activities">{children}</div>
+    : <Card className="p-4 rounded-lg" data-testid="lead-activities">{children}</Card>;
 }
