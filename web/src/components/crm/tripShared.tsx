@@ -15,6 +15,7 @@ export interface TripSummary {
   customer: { id: string; name: string } | null; owner: { id: string; name: string } | null;
   confirmed: boolean; trip_type: string | null; confirmed_at: string | null; days_left: number | null;
   payment: TripPayment; progress: TripProgress;
+  documents: { required: number; received: number; verified: number; complete: boolean; all_verified: boolean; missing: number; travellers: number };
 }
 export interface TripDetail extends TripSummary { tasks: TripTask[]; assignees: { id: string; name: string }[]; advance_percent: number }
 export interface TripTemplateItem { id?: string; category: string; title: string; due_days_before: number | null; critical: boolean }

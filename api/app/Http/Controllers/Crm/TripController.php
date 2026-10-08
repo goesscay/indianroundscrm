@@ -30,7 +30,7 @@ class TripController extends Controller
             'owner' => $deal->owner ? ['id' => (string) $deal->owner->id, 'name' => $deal->owner->name] : null,
             'confirmed' => TripPlan::confirmed($deal), 'trip_type' => $deal->trip_type, 'confirmed_at' => $deal->trip_confirmed_at?->utc()->toIso8601String(),
             'days_left' => $deal->travel_date ? (int) now('Asia/Kolkata')->startOfDay()->diffInDays($deal->travel_date->copy()->startOfDay(), false) : null,
-            'payment' => TripPlan::payment($deal), 'progress' => TripPlan::progress($deal),
+            'payment' => TripPlan::payment($deal), 'progress' => TripPlan::progress($deal), 'documents' => \App\Services\TripDocuments::summary($deal),
         ];
     }
 

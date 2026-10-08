@@ -44,7 +44,7 @@ export default function CustomerTrips({ customerId }: { customerId: string }) {
               </div>
               {r.confirmed ? (
                 <div className="mt-1.5"><ProgressBar percent={r.progress.percent} tone={r.progress.overdue > 0 ? "warn" : "default"} />
-                  <div className="mt-0.5 text-xs text-muted-foreground">Checklist {r.progress.done}/{r.progress.total}{r.progress.overdue > 0 ? ` · ${r.progress.overdue} overdue` : ""}</div></div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">Checklist {r.progress.done}/{r.progress.total}{r.progress.overdue > 0 ? ` · ${r.progress.overdue} overdue` : ""}{r.documents.travellers > 0 ? ` · Documents ${r.documents.received}/${r.documents.required}` : " · Documents: travellers not chosen"}</div></div>
               ) : <div className="mt-1 text-xs text-muted-foreground">Trip not confirmed yet</div>}
             </Link>
           </li>

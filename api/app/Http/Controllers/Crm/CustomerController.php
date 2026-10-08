@@ -143,9 +143,10 @@ class CustomerController extends Controller
 
     private function syncTravellers(Customer $c, array $rows): void
     {
+        // Rows that carry an existing id are updated in place, so trip documents that point at a traveller keep pointing at them.
         // A masked passport number (unchanged by a viewer who cannot see it) keeps the stored value.
         $existing = $c->travellers()->get()->keyBy(fn ($t) => (string) $t->id);
-        $c->travellers()->delete();
+        $keep = [];
         foreach (array_values($rows) as $i => $r) {
             $name = is_array($r) ? trim((string) ($r['name'] ?? '')) : '';
             if ($name === '') {
@@ -156,15 +157,21 @@ class CustomerController extends Controller
             if ($prev && (! empty($r['passport_masked']) || $passport === null && ! array_key_exists('passport_no', $r))) {
                 $passport = $prev->passport_no;
             }
-            $t = new CustomerTraveller([
+            $fields = [
                 'customer_id' => $c->id, 'name' => mb_substr($name, 0, 200),
                 'relation' => $this->s($r['relation'] ?? null, 60), 'gender' => $this->s($r['gender'] ?? null, 20),
                 'dob' => $this->d($r['dob'] ?? null), 'nationality' => $this->s($r['nationality'] ?? null, 80),
                 'passport_no' => $passport, 'passport_expiry' => $this->d($r['passport_expiry'] ?? null),
                 'preferences' => $this->s($r['preferences'] ?? null, 1000), 'position' => $i,
-            ]);
-            $t->save();
+            ];
+            if ($prev) {
+                $prev->fill($fields)->save();
+                $keep[] = (int) $prev->id;
+            } else {
+                $keep[] = (int) CustomerTraveller::create($fields)->id;
+            }
         }
+        $c->travellers()->whereNotIn('id', $keep)->delete();
     }
 
     private function s(mixed $v, int $max): ?string

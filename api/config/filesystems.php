@@ -30,6 +30,15 @@ return [
 
     'disks' => [
 
+        // Customer documents for trips (passports, IDs): never public, contents encrypted; storage/app/trip-documents/{deal}/{random}
+        'trip_documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app/trip-documents'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         // Supplier reply attachments (never public): storage/app/supplier-replies/{yyyy}/{mm}/{random}
         'supplier_replies' => [
             'driver' => 'local',

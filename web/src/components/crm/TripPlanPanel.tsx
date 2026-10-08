@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import TripDocumentsPanel from "./TripDocumentsPanel";
 import { INR, fmtDate } from "./shared";
 import { CATEGORIES, PaymentChip, ProgressBar, TASK_STATUS, TRIP_TYPES, daysLabel, type TripDetail, type TripTask } from "./tripShared";
 
@@ -73,6 +74,7 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
 
   const p = t.payment;
   return (
+    <>
     <Card className="rounded-lg p-5" data-testid="trip-plan">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 font-display text-lg font-bold"><Plane size={16} className="text-muted-foreground" /> Trip plan</h3>
@@ -214,5 +216,7 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
         </DialogContent>
       </Dialog>
     </Card>
+    {t.confirmed && can("trip_docs.view") && <TripDocumentsPanel dealId={dealId} onChanged={() => { void load(); onChanged?.(); }} />}
+    </>
   );
 }

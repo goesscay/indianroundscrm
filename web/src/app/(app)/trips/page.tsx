@@ -78,6 +78,9 @@ export default function TripsBoard() {
                   <ProgressBar percent={r.progress.percent} tone={r.progress.overdue > 0 ? "warn" : "default"} />
                   {r.progress.next && <div className="mt-1 truncate text-xs text-muted-foreground">Next: {r.progress.next.title}{r.progress.next.due_date ? ` · ${fmtDate(r.progress.next.due_date)}` : ""}</div>}
                 </div>
+                <div className="mt-2 text-xs text-muted-foreground" data-testid={`trip-docs-${r.deal.id}`}>
+                  {r.documents.travellers === 0 ? "Documents: travellers not chosen yet" : `Documents ${r.documents.received}/${r.documents.required} received${r.documents.verified === r.documents.required && r.documents.required > 0 ? " · all verified" : r.documents.missing > 0 ? ` · ${r.documents.missing} missing` : ""}`}
+                </div>
                 <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-xs">
                   <PaymentChip p={r.payment} />
                   <span className={cn(r.payment.balance > 0 && "font-semibold", r.payment.overdue && "text-red-600 dark:text-red-400")}>{r.payment.balance > 0 ? `${INR(r.payment.balance)} balance${r.payment.overdue ? " · overdue" : ""}` : "Settled"}</span>
