@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertTriangle, CalendarCheck, Loader2, Plane, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarCheck, CheckCircle2, Loader2, Plane, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -96,6 +96,15 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
         {p.balance > 0 && p.next_due && <div className="mt-1 text-xs text-muted-foreground">Next payment due {fmtDate(p.next_due)}{p.overdue ? " (overdue)" : ""}</div>}
       </div>
 
+      {t.confirmed && (
+        <div className={cn("mt-3 rounded-md border p-3 text-sm", t.readiness.ready ? "border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30" : "border-border")} data-testid="trip-readiness">
+          {t.readiness.ready
+            ? <div className="flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300"><CheckCircle2 size={16} /> Ready to travel</div>
+            : <><div className="font-semibold">Not ready to travel yet</div><ul className="mt-1 list-disc pl-5 text-xs text-muted-foreground">{t.readiness.blockers.map((b) => <li key={b}>{b}</li>)}</ul></>}
+          {t.costs && <div className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground" data-testid="trip-costs">Supplier cost entered {INR(t.costs.planned)} on {t.costs.items} item{t.costs.items === 1 ? "" : "s"} · Margin on trip value <span className={cn("font-semibold", t.costs.margin < 0 ? "text-red-600" : "text-foreground")}>{INR(t.costs.margin)}</span></div>}
+        </div>
+      )}
+
       {!t.confirmed ? (
         <div className="mt-3 rounded-md border border-dashed border-border p-4 text-sm" data-testid="trip-unconfirmed">
           <p className="text-muted-foreground">The checklist is created when the trip is confirmed. This happens automatically once {t.advance_percent}% of the trip is paid{canConfirm ? ", or you can confirm it now." : "."}</p>
@@ -132,6 +141,7 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                             {task.due_date && <span className={cn(task.overdue && "font-semibold text-red-600 dark:text-red-400")}>Due {fmtDate(task.due_date)}{task.overdue ? " · overdue" : ""}</span>}
                             {task.assigned_to && <span>{task.assigned_to.name}</span>}
+                            {t.can_cost && task.cost != null && <span>{INR(task.cost)}{task.supplier ? ` · ${task.supplier.name}` : ""}</span>}
                             {task.status === "in_progress" && <span className="font-medium text-amber-700 dark:text-amber-300">In progress</span>}
                             {task.status === "na" && <span>Not needed</span>}
                             {task.notes && <span className="truncate italic">“{task.notes}”</span>}
@@ -161,6 +171,22 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
                             <Label className="label-caps">Due date</Label>
                             <Input type="date" className="mt-1 h-8" defaultValue={task.due_date ?? ""} onBlur={(e) => e.target.value !== (task.due_date ?? "") && patch(task, { due_date: e.target.value || null })} />
                           </div>
+                          {t.can_cost && (
+                            <>
+                              <div>
+                                <Label className="label-caps">Supplier</Label>
+                                <Select value={task.supplier?.id ?? "none"} onValueChange={(v) => patch(task, { supplier_id: v === "none" ? null : v })}>
+                                  <SelectTrigger className="mt-1 h-8"><SelectValue placeholder="None" /></SelectTrigger>
+                                  <SelectContent><SelectItem value="none">None</SelectItem>{t.suppliers.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="label-caps">Cost ₹</Label>
+                                <Input type="number" min={0} className="mt-1 h-8" defaultValue={task.cost ?? ""} placeholder="Amount paid to the supplier"
+                                       onBlur={(e) => String(task.cost ?? "") !== e.target.value && patch(task, { cost: e.target.value === "" ? null : Number(e.target.value) })} data-testid={`trip-cost-${task.id}`} />
+                              </div>
+                            </>
+                          )}
                           <div className="sm:col-span-3">
                             <Label className="label-caps">Notes</Label>
                             <Textarea rows={2} className="mt-1 min-h-0 text-sm" defaultValue={task.notes ?? ""} placeholder="Booking reference, supplier, anything the team should know"

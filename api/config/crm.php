@@ -24,6 +24,12 @@ return [
         'max' => (int) env('CRM_REMINDER_MAX', 3),                             // reminders per invoice, manual and automatic together
     ],
     // A trip is confirmed automatically once this share of its value is paid (a manager can also confirm it by hand).
-    'trip' => ['advance_percent' => (float) env('CRM_TRIP_ADVANCE_PERCENT', 25)],
+    'trip' => [
+        'advance_percent' => (float) env('CRM_TRIP_ADVANCE_PERCENT', 25),
+        // Daily e-mail asking customers for missing documents 14, 7 and 3 days before travel. Off until CRM_AUTO_TRIP_DOC_REMINDERS=true.
+        'auto_doc_reminders' => filter_var(env('CRM_AUTO_TRIP_DOC_REMINDERS', false), FILTER_VALIDATE_BOOL),
+        'doc_reminder_days' => [14, 7, 3],
+    ],
+    'public_url' => env('CRM_PUBLIC_URL'),   // used in links sent to customers; falls back to APP_URL
     'quote_valid_days' => (int) env('CRM_QUOTE_VALID_DAYS', 14),
 ];

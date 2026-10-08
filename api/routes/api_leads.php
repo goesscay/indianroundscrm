@@ -112,6 +112,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/deals/{id}/trip/travellers', [TripDocumentController::class, 'setTravellers'])->middleware('perm:trip_docs.upload');
     Route::post('/deals/{id}/trip/travellers', [TripDocumentController::class, 'addTraveller'])->middleware('perm:trip_docs.upload');
     Route::patch('/deals/{id}/trip/travellers/{tid}', [TripDocumentController::class, 'updateTraveller'])->middleware('perm:trip_docs.manage');
+    Route::get('/deals/{id}/trip/upload-link', [TripDocumentController::class, 'linkStatus'])->middleware('perm:trip_docs.upload');
+    Route::post('/deals/{id}/trip/upload-link', [TripDocumentController::class, 'createLink'])->middleware('perm:trip_docs.upload');
+    Route::delete('/deals/{id}/trip/upload-link', [TripDocumentController::class, 'revokeLink'])->middleware('perm:trip_docs.upload');
+    Route::post('/deals/{id}/trip/upload-link/email', [TripDocumentController::class, 'emailLink'])->middleware('perm:trip_docs.upload');
     Route::get('/deals/{id}/trip/manifest', [TripDocumentController::class, 'manifest'])->middleware('perm:trip_docs.download');
     Route::post('/trip-documents/{id}/files', [TripDocumentController::class, 'upload'])->middleware('perm:trip_docs.upload');
     Route::patch('/trip-documents/{id}', [TripDocumentController::class, 'update'])->middleware('perm:trip_docs.manage');

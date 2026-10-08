@@ -19,18 +19,27 @@ class TripController extends Controller
 {
     // ------------------------------------------------------------------ helpers
 
-    private function summary(Deal $deal): array
+    private function summary(Deal $deal, ?User $user = null): array
     {
         $deal->loadMissing(['customer:id,customer_no,name', 'owner:id,name']);
+        $payment = TripPlan::payment($deal);
+        $progress = TripPlan::progress($deal);
+        $docs = \App\Services\TripDocuments::summary($deal);
+        $costs = null;
+        if ($user && $user->hasPermission('suppliers.view')) { // supplier costs are for Operations and Admin
+            $tasks = TripTask::where('deal_id', $deal->id)->whereNotNull('cost')->where('status', '<>', 'na')->get(['cost']);
+            $planned = round((float) $tasks->sum('cost'), 2);
+            $costs = ['planned' => $planned, 'items' => $tasks->count(), 'margin' => round($payment['invoiced'] - $planned, 2)];
+        }
 
-        return [
+        return ['costs' => $costs, 'readiness' => TripPlan::readiness($payment, $progress, $docs), 
             'deal' => ['id' => (string) $deal->id, 'deal_no' => $deal->deal_no, 'name' => $deal->name, 'destination' => $deal->destination, 'travel_date' => $deal->travel_date?->format('Y-m-d'),
                 'duration_days' => $deal->duration_days, 'adults' => $deal->adults, 'children' => $deal->children, 'stage' => $deal->stage, 'trip_status' => $deal->trip_status],
             'customer' => $deal->customer ? ['id' => (string) $deal->customer->id, 'name' => $deal->customer->name] : null,
             'owner' => $deal->owner ? ['id' => (string) $deal->owner->id, 'name' => $deal->owner->name] : null,
             'confirmed' => TripPlan::confirmed($deal), 'trip_type' => $deal->trip_type, 'confirmed_at' => $deal->trip_confirmed_at?->utc()->toIso8601String(),
             'days_left' => $deal->travel_date ? (int) now('Asia/Kolkata')->startOfDay()->diffInDays($deal->travel_date->copy()->startOfDay(), false) : null,
-            'payment' => TripPlan::payment($deal), 'progress' => TripPlan::progress($deal), 'documents' => \App\Services\TripDocuments::summary($deal),
+            'payment' => $payment, 'progress' => $progress, 'documents' => $docs,
         ];
     }
 
@@ -58,6 +67,27 @@ class TripController extends Controller
         return (int) $u->id;
     }
 
+    /** Supplier and cost are for Operations and Admin (the people who may see suppliers). */
+    private function costFields(array $d, User $user): void
+    {
+        if ((array_key_exists('cost', $d) || array_key_exists('supplier_id', $d)) && ! $user->hasPermission('suppliers.view')) {
+            Fail::forbidden('Supplier and cost are set by Operations');
+        }
+    }
+
+    private function supplierId(mixed $v): ?int
+    {
+        if ($v === null || $v === '') {
+            return null;
+        }
+        $s = ctype_digit((string) $v) ? \App\Models\Supplier::find((int) $v) : null;
+        if (! $s) {
+            Fail::unprocessable(['supplier_id' => 'Supplier not found']);
+        }
+
+        return (int) $s->id;
+    }
+
     private function date(mixed $v): ?string
     {
         if ($v === null || $v === '') {
@@ -78,8 +108,11 @@ class TripController extends Controller
         $users = User::where('active', true)->where('account_status', 'active')->orderBy('name')->get(['id', 'name'])
             ->filter(fn (User $u) => $u->hasAnyPermission('trips.manage', 'trips.confirm'))->map(fn (User $u) => ['id' => (string) $u->id, 'name' => $u->name])->values();
 
-        return $this->summary($deal) + [
-            'tasks' => TripTask::with('assignee:id,name')->where('deal_id', $deal->id)->orderByRaw('due_date NULLS LAST')->orderBy('position')->orderBy('id')->get()->map(fn (TripTask $t) => $t->toApi())->values()->all(),
+        $cost = $request->user()->hasPermission('suppliers.view');
+
+        return $this->summary($deal, $request->user()) + [
+            'tasks' => TripTask::with(['assignee:id,name', 'supplier:id,name'])->where('deal_id', $deal->id)->orderByRaw('due_date NULLS LAST')->orderBy('position')->orderBy('id')->get()->map(fn (TripTask $t) => $t->toApi($cost))->values()->all(),
+            'can_cost' => $cost, 'suppliers' => $cost ? \App\Models\Supplier::orderBy('name')->get(['id', 'name'])->map(fn ($s) => ['id' => (string) $s->id, 'name' => $s->name])->values() : [],
             'assignees' => $users, 'advance_percent' => TripPlan::advancePercent(),
         ];
     }
@@ -112,16 +145,18 @@ class TripController extends Controller
         }
         $d = Fail::validate(Fail::body($request), [
             'title' => 'required|string|max:200', 'category' => 'nullable|in:'.implode(',', TripTask::CATEGORIES), 'due_date' => 'nullable|string',
-            'notes' => 'nullable|string|max:5000', 'critical' => 'sometimes|boolean', 'assigned_to' => 'nullable',
+            'notes' => 'nullable|string|max:5000', 'critical' => 'sometimes|boolean', 'assigned_to' => 'nullable', 'cost' => 'nullable|numeric|min:0|max:100000000', 'supplier_id' => 'nullable',
         ]);
+        $this->costFields($d, $user);
         $t = TripTask::create([
             'deal_id' => $deal->id, 'status' => 'pending', 'category' => $d['category'] ?? 'other', 'title' => trim($d['title']), 'notes' => $d['notes'] ?? null, 'due_date' => $this->date($d['due_date'] ?? null),
             'critical' => (bool) ($d['critical'] ?? false), 'assigned_to' => $this->assignee($d['assigned_to'] ?? null), 'created_by' => $user->id,
+            'cost' => isset($d['cost']) && $d['cost'] !== '' ? round((float) $d['cost'], 2) : null, 'supplier_id' => $this->supplierId($d['supplier_id'] ?? null),
             'position' => (int) TripTask::where('deal_id', $deal->id)->max('position') + 1,
         ]);
         ActivityLogger::log($user, 'add_trip_task', 'deal', $deal->id, null, ['title' => $t->title]);
 
-        return $t->load('assignee:id,name')->toApi();
+        return $t->load(['assignee:id,name', 'supplier:id,name'])->toApi($user->hasPermission('suppliers.view'));
     }
 
     public function updateTask(Request $request, string $id)
@@ -131,7 +166,9 @@ class TripController extends Controller
         $d = Fail::validate(Fail::body($request), [
             'title' => 'sometimes|required|string|max:200', 'category' => 'sometimes|in:'.implode(',', TripTask::CATEGORIES), 'due_date' => 'nullable|string',
             'notes' => 'nullable|string|max:5000', 'critical' => 'sometimes|boolean', 'assigned_to' => 'nullable', 'status' => 'sometimes|in:'.implode(',', TripTask::STATUSES),
+            'cost' => 'nullable|numeric|min:0|max:100000000', 'supplier_id' => 'nullable',
         ]);
+        $this->costFields($d, $user);
         $before = ['status' => $t->status, 'title' => $t->title];
         foreach (['title', 'category', 'notes', 'critical'] as $k) {
             if (array_key_exists($k, $d)) {
@@ -144,6 +181,12 @@ class TripController extends Controller
         if (array_key_exists('assigned_to', $d)) {
             $t->assigned_to = $this->assignee($d['assigned_to']);
         }
+        if (array_key_exists('cost', $d)) {
+            $t->cost = $d['cost'] === null || $d['cost'] === '' ? null : round((float) $d['cost'], 2);
+        }
+        if (array_key_exists('supplier_id', $d)) {
+            $t->supplier_id = $this->supplierId($d['supplier_id']);
+        }
         if (array_key_exists('status', $d) && $d['status'] !== $t->status) {
             $t->status = $d['status'];
             $done = $d['status'] === 'done';
@@ -153,7 +196,7 @@ class TripController extends Controller
         $t->save();
         ActivityLogger::log($user, 'update_trip_task', 'deal', $t->deal_id, $before, ['status' => $t->status, 'title' => $t->title]);
 
-        return $t->load('assignee:id,name')->toApi();
+        return $t->load(['assignee:id,name', 'supplier:id,name'])->toApi($user->hasPermission('suppliers.view'));
     }
 
     public function deleteTask(Request $request, string $id)
@@ -187,8 +230,8 @@ class TripController extends Controller
             $q->where(fn ($w) => $w->where('deals.deal_no', $op, $like)->orWhere('deals.name', $op, $like)->orWhere('deals.destination', $op, $like)
                 ->orWhereIn('deals.customer_id', \App\Models\Customer::query()->select('id')->where('name', $op, $like)));
         }
-        $rows = $q->orderByRaw('deals.travel_date NULLS LAST')->orderBy('deals.id')->limit(300)->get()->map(fn (Deal $d) => $this->summary($d))->values();
-        $attention = $rows->filter(fn ($r) => $r['progress']['overdue'] > 0 || $r['payment']['overdue'])->count();
+        $rows = $q->orderByRaw('deals.travel_date NULLS LAST')->orderBy('deals.id')->limit(300)->get()->map(fn (Deal $d) => $this->summary($d, $user))->values();
+        $attention = $rows->filter(fn ($r) => $r['progress']['overdue'] > 0 || $r['payment']['overdue'] || (! $r['readiness']['ready'] && $r['days_left'] !== null && $r['days_left'] >= 0 && $r['days_left'] <= 7))->count();
 
         return ['items' => $rows, 'total' => $rows->count(), 'attention' => $attention, 'today' => $today];
     }
@@ -200,7 +243,7 @@ class TripController extends Controller
 
         return DealController::scopeForUser(Deal::query()->with(['customer:id,customer_no,name', 'owner:id,name']), $request->user())
             ->where('deals.customer_id', $c->id)->where('deals.stage', '<>', 'lost')->orderByRaw('deals.travel_date NULLS LAST')->get()
-            ->map(fn (Deal $d) => $this->summary($d))->values();
+            ->map(fn (Deal $d) => $this->summary($d, $request->user()))->values();
     }
 
     // ------------------------------------------------------------------ templates (admin)

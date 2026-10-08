@@ -78,7 +78,10 @@ export default function TripsBoard() {
                   <ProgressBar percent={r.progress.percent} tone={r.progress.overdue > 0 ? "warn" : "default"} />
                   {r.progress.next && <div className="mt-1 truncate text-xs text-muted-foreground">Next: {r.progress.next.title}{r.progress.next.due_date ? ` · ${fmtDate(r.progress.next.due_date)}` : ""}</div>}
                 </div>
-                <div className="mt-2 text-xs text-muted-foreground" data-testid={`trip-docs-${r.deal.id}`}>
+                <div className={cn("mt-2 text-xs font-semibold", r.readiness.ready ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")} data-testid={`trip-ready-${r.deal.id}`}>
+                  {r.readiness.ready ? "Ready to travel" : `Not ready: ${r.readiness.blockers[0]}${r.readiness.blockers.length > 1 ? ` (+${r.readiness.blockers.length - 1})` : ""}`}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground" data-testid={`trip-docs-${r.deal.id}`}>
                   {r.documents.travellers === 0 ? "Documents: travellers not chosen yet" : `Documents ${r.documents.received}/${r.documents.required} received${r.documents.verified === r.documents.required && r.documents.required > 0 ? " · all verified" : r.documents.missing > 0 ? ` · ${r.documents.missing} missing` : ""}`}
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-xs">

@@ -7,7 +7,9 @@ use App\Http\Controllers\Controller;
 use App\Models\CustomerTraveller;
 use App\Models\Deal;
 use App\Models\User;
+use App\Services\TripDocRequests;
 use App\Services\TripDocuments;
+use App\Services\TripUploadLinks;
 use App\Support\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,9 +21,6 @@ use Illuminate\Support\Str;
 /** Customer documents for a trip: travellers on the trip, the documents each must give, and the private, encrypted files. */
 class TripDocumentController extends Controller
 {
-    private const MAX_BYTES = 10 * 1024 * 1024;
-    private const MIMES = ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-
     private function disk()
     {
         return Storage::disk('trip_documents');
@@ -191,24 +190,8 @@ class TripDocumentController extends Controller
     {
         $user = $request->user();
         $r = $this->slot($id, $user);
-        $file = $request->file('file');
-        if (! $file || ! $file->isValid()) {
-            Fail::unprocessable(['file' => 'Choose a file to upload']);
-        }
-        if ($file->getSize() > self::MAX_BYTES) {
-            Fail::unprocessable(['file' => 'The file is larger than 10 MB']);
-        }
-        $bytes = (string) file_get_contents($file->getRealPath());
-        $mime = (string) (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
-        if (! isset(self::MIMES[$mime])) {
-            Fail::unprocessable(['file' => 'Upload a PDF, JPG, PNG or WEBP file']);
-        }
-        $name = Str::limit(preg_replace('/[^\p{L}\p{N}\s._()-]+/u', '_', basename($file->getClientOriginalName())) ?: 'document', 120, '');
-        $path = $r->deal_id.'/'.Str::random(40).'.bin';
-        $this->disk()->put($path, Crypt::encryptString($bytes));
-        $fid = DB::table('trip_document_files')->insertGetId(['document_id' => $r->id, 'path' => $path, 'original_name' => $name, 'mime' => $mime,
-            'size' => strlen($bytes), 'uploaded_by' => $user->id, 'created_at' => now()]);
-        DB::table('trip_documents')->where('id', $r->id)->update(['status' => 'received', 'verified_by' => null, 'verified_at' => null, 'updated_at' => now()]);
+        $fid = \App\Services\TripDocumentFiles::store($r, $request->file('file'), $user->id);
+        $name = DB::table('trip_document_files')->where('id', $fid)->value('original_name');
         ActivityLogger::log($user, 'upload_trip_document', 'deal', $r->deal_id, null, ['doc_type' => $r->doc_type, 'file' => $name, 'file_id' => $fid]);
 
         return $this->show($request, (string) $r->deal_id);
@@ -301,5 +284,57 @@ class TripDocumentController extends Controller
         ActivityLogger::log($user, 'export_trip_manifest', 'deal', $deal->id, null, ['travellers' => $rows->count()]);
 
         return response($out, 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="manifest-'.preg_replace('/[^A-Za-z0-9_-]+/', '-', $deal->deal_no).'.csv"', 'Cache-Control' => 'private, no-store']);
+    }
+
+    // ------------------------------------------------------------------ the customer's upload link
+
+    /** Is there a live link, and when was it last used? (The link itself cannot be shown again.) */
+    public function linkStatus(Request $request, string $id)
+    {
+        $deal = $this->deal($id, $request->user());
+        $l = TripUploadLinks::active($deal);
+        $c = \App\Models\Customer::find($deal->customer_id);
+
+        return ['active' => (bool) $l, 'expires_at' => $l ? Carbon::parse($l->expires_at)->utc()->toIso8601String() : null,
+            'last_used_at' => $l && $l->last_used_at ? Carbon::parse($l->last_used_at)->utc()->toIso8601String() : null,
+            'customer_email' => $c?->email, 'customer_phone' => $c?->phone, 'missing' => TripDocRequests::missing($deal),
+            'default_message' => TripDocRequests::defaultMessage($deal), 'reminders' => DB::table('trip_doc_reminders')->where('deal_id', $deal->id)->orderByDesc('id')->limit(5)
+                ->get(['created_at', 'to_list', 'status', 'trigger'])->map(fn ($r) => (array) $r)->all()];
+    }
+
+    public function createLink(Request $request, string $id)
+    {
+        $user = $request->user();
+        $deal = $this->deal($id, $user);
+        $d = Fail::validate(Fail::body($request), ['days' => 'sometimes|integer|min:1|max:60']);
+        $link = TripUploadLinks::create($deal, $user, (int) ($d['days'] ?? TripUploadLinks::DEFAULT_DAYS));
+        ActivityLogger::log($user, 'create_trip_upload_link', 'deal', $deal->id, null, ['expires_at' => $link['expires_at']]);
+
+        return $link;
+    }
+
+    public function revokeLink(Request $request, string $id)
+    {
+        $deal = $this->deal($id, $request->user());
+        DB::table('trip_upload_links')->where('deal_id', $deal->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+        ActivityLogger::log($request->user(), 'revoke_trip_upload_link', 'deal', $deal->id);
+
+        return ['success' => true];
+    }
+
+    /** Make a fresh link and e-mail it to the customer. */
+    public function emailLink(Request $request, string $id)
+    {
+        $user = $request->user();
+        $deal = $this->deal($id, $user);
+        $d = Fail::validate(Fail::body($request), ['to' => 'required|array|min:1|max:5', 'to.*' => 'required|email|max:200', 'message' => 'nullable|string|max:5000', 'days' => 'sometimes|integer|min:1|max:60']);
+        [$res, $url] = TripDocRequests::send($deal, $d['to'], $d['message'] ?? null, (int) ($d['days'] ?? TripUploadLinks::DEFAULT_DAYS), $user, 'manual');
+        $failed = ($res['status'] ?? '') === 'failed';
+        ActivityLogger::log($user, $failed ? 'trip_doc_request_failed' : 'trip_doc_request_sent', 'deal', $deal->id, null, ['to' => $d['to']]);
+        if ($failed) {
+            Fail::http(502, 'The e-mail could not be sent: '.($res['error'] ?? 'unknown error'));
+        }
+
+        return ['status' => $res['status'], 'note' => $res['note'] ?? null, 'url' => $url];
     }
 }

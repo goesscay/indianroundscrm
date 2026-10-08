@@ -4,6 +4,7 @@ export interface TripTask {
   id: string; deal_id: string; category: string; title: string; notes: string | null; due_date: string | null;
   status: "pending" | "in_progress" | "done" | "na"; critical: boolean; overdue: boolean;
   assigned_to: { id: string; name: string } | null; completed_at: string | null; position: number;
+  cost?: number | null; supplier?: { id: string; name: string } | null;
 }
 export interface TripPayment {
   invoiced: number; paid: number; balance: number; percent: number; status: "not_paid" | "part_paid" | "paid";
@@ -15,9 +16,11 @@ export interface TripSummary {
   customer: { id: string; name: string } | null; owner: { id: string; name: string } | null;
   confirmed: boolean; trip_type: string | null; confirmed_at: string | null; days_left: number | null;
   payment: TripPayment; progress: TripProgress;
+  readiness: { ready: boolean; blockers: string[] };
+  costs: { planned: number; items: number; margin: number } | null;
   documents: { required: number; received: number; verified: number; complete: boolean; all_verified: boolean; missing: number; travellers: number };
 }
-export interface TripDetail extends TripSummary { tasks: TripTask[]; assignees: { id: string; name: string }[]; advance_percent: number }
+export interface TripDetail extends TripSummary { tasks: TripTask[]; assignees: { id: string; name: string }[]; advance_percent: number; can_cost: boolean; suppliers: { id: string; name: string }[] }
 export interface TripTemplateItem { id?: string; category: string; title: string; due_days_before: number | null; critical: boolean }
 export interface TripTemplate { id: string; name: string; trip_type: string; active: boolean; items: TripTemplateItem[] }
 

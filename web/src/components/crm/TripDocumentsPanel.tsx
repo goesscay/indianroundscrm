@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, Check, Download, FileText, Loader2, Trash2, Upload, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Check, Copy, Download, FileText, Link2, Loader2, Mail, MessageCircle, Trash2, Upload, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { fmtDate } from "./shared";
 import { ProgressBar } from "./tripShared";
@@ -27,6 +29,8 @@ const STATUS: Record<Slot["status"], { label: string; cls: string }> = {
   rejected: { label: "Send again", cls: "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300" },
   na: { label: "Not needed", cls: "bg-secondary text-muted-foreground" },
 };
+interface LinkStatus { active: boolean; expires_at: string | null; last_used_at: string | null; customer_email: string | null; customer_phone: string | null; missing: string[]; default_message: string; reminders: { created_at: string; to_list: string; status: string; trigger: string }[] }
+
 const kb = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 /** Who is travelling and the documents each person (and the trip) must give. Shown under the trip plan once the trip is confirmed. */
@@ -42,6 +46,46 @@ export default function TripDocumentsPanel({ dealId, onChanged }: { dealId: stri
   const [nt, setNt] = useState({ name: "", relation: "", dob: "", gender: "", nationality: "India", passport_no: "", passport_expiry: "" });
   const fileRef = useRef<HTMLInputElement>(null);
   const target = useRef<string | null>(null);
+  const [reqOpen, setReqOpen] = useState(false);
+  const [ls, setLs] = useState<LinkStatus | null>(null);
+  const [to, setTo] = useState("");
+  const [message, setMessage] = useState("");
+  const [days, setDays] = useState("14");
+  const [url, setUrl] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const openRequest = async () => {
+    setReqOpen(true); setUrl("");
+    try { const { data } = await api.get<LinkStatus>(`/deals/${dealId}/trip/upload-link`); setLs(data); setTo(data.customer_email ?? ""); setMessage(data.default_message); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+  const sendEmail = async () => {
+    const list = to.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+    if (!list.length) { toast.error("Enter the customer's e-mail address"); return; }
+    setSending(true);
+    try {
+      const { data } = await api.post<{ status: string; note?: string | null; url: string }>(`/deals/${dealId}/trip/upload-link/email`, { to: list, message, days: Number(days) });
+      setUrl(data.url);
+      if (data.status === "simulated_sent") toast.warning(data.note || "Mail is in log mode: nothing was really sent.");
+      else toast.success("Request e-mailed to the customer");
+      const st = await api.get<LinkStatus>(`/deals/${dealId}/trip/upload-link`); setLs(st.data);
+    } catch (e) { toast.error(formatApiError(e)); }
+    finally { setSending(false); }
+  };
+  const makeLink = async () => {
+    setSending(true);
+    try {
+      const { data } = await api.post<{ url: string }>(`/deals/${dealId}/trip/upload-link`, { days: Number(days) });
+      setUrl(data.url);
+      const st = await api.get<LinkStatus>(`/deals/${dealId}/trip/upload-link`); setLs(st.data);
+    } catch (e) { toast.error(formatApiError(e)); }
+    finally { setSending(false); }
+  };
+  const revoke = async () => {
+    try { await api.delete(`/deals/${dealId}/trip/upload-link`); setUrl(""); const st = await api.get<LinkStatus>(`/deals/${dealId}/trip/upload-link`); setLs(st.data); toast.success("Link switched off"); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+  const copy = async () => { try { await navigator.clipboard.writeText(url); toast.success("Link copied"); } catch { toast.error("Could not copy. Select the link and copy it."); } };
 
   const load = useCallback(async () => {
     try { const { data } = await api.get<Docs>(`/deals/${dealId}/trip/documents`); setD(data); setError(""); }
@@ -128,6 +172,7 @@ export default function TripDocumentsPanel({ dealId, onChanged }: { dealId: stri
       <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={onFile} data-testid="doc-file-input" />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 font-display text-lg font-bold"><FileText size={16} className="text-muted-foreground" /> Customer documents</h3>
+        {canUpload && selected.length > 0 && <Button variant="outline" size="sm" onClick={openRequest} data-testid="doc-request-btn"><Link2 size={13} className="mr-1" />Ask the customer to upload</Button>}
         {canOpen && selected.length > 0 && <a href={`/api/deals/${dealId}/trip/manifest`}><Button variant="outline" size="sm" data-testid="doc-manifest"><Download size={13} className="mr-1" />Traveller manifest (CSV)</Button></a>}
       </div>
 
@@ -186,6 +231,39 @@ export default function TripDocumentsPanel({ dealId, onChanged }: { dealId: stri
           </section>
         )}
       </div>
+
+      <Dialog open={reqOpen} onOpenChange={(o) => !sending && setReqOpen(o)}>
+        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto" data-testid="doc-request-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-black">Ask the customer for documents</DialogTitle>
+            <DialogDescription>The customer gets a private link to upload from their phone. No login. Making a new link switches the old one off.</DialogDescription>
+          </DialogHeader>
+          {!ls ? <div className="py-6 text-sm text-muted-foreground"><Loader2 size={14} className="mr-2 inline animate-spin" />Loading…</div> : (
+            <div className="space-y-3">
+              {ls.missing.length > 0 && <div className="rounded-md bg-secondary/50 p-2 text-xs"><div className="mb-1 font-semibold">Still needed ({ls.missing.length})</div><ul className="list-disc pl-4">{ls.missing.slice(0, 8).map((m) => <li key={m}>{m}</li>)}{ls.missing.length > 8 && <li>and {ls.missing.length - 8} more</li>}</ul></div>}
+              <div><Label className="label-caps">E-mail to</Label><Input className="mt-1" value={to} onChange={(e) => setTo(e.target.value)} placeholder="customer@example.com" data-testid="doc-request-to" /></div>
+              <div><Label className="label-caps">Message</Label><Textarea rows={7} className="mt-1 text-sm" value={message} onChange={(e) => setMessage(e.target.value)} /></div>
+              <div className="flex items-center gap-2 text-sm"><Label className="label-caps">Link works for</Label><Input type="number" min={1} max={60} className="h-8 w-20" value={days} onChange={(e) => setDays(e.target.value)} /> days</div>
+              {url && (
+                <div className="rounded-md border border-border p-2 text-xs" data-testid="doc-request-url">
+                  <div className="mb-1 font-semibold">Customer link</div>
+                  <div className="break-all font-mono">{url}</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={copy}><Copy size={12} className="mr-1" />Copy</Button>
+                    {ls.customer_phone && <a href={`https://wa.me/${ls.customer_phone.replace(/\D/g, "").replace(/^(?=\d{10}$)/, "91")}?text=${encodeURIComponent(`Please upload your trip documents here: ${url}`)}`} target="_blank" rel="noreferrer"><Button type="button" size="sm" variant="outline"><MessageCircle size={12} className="mr-1" />WhatsApp</Button></a>}
+                  </div>
+                </div>
+              )}
+              {ls.active && <div className="text-xs text-muted-foreground">A link is active until {fmtDate(ls.expires_at)}{ls.last_used_at ? `. Last used ${fmtDate(ls.last_used_at)}` : ". Not used yet"}. <button type="button" className="underline" onClick={revoke}>Switch it off</button></div>}
+              {ls.reminders.length > 0 && <div className="text-xs text-muted-foreground">Last sent {fmtDate(ls.reminders[0].created_at)} to {ls.reminders[0].to_list}{ls.reminders[0].trigger === "auto" ? " (automatic)" : ""}.</div>}
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="outline" onClick={makeLink} disabled={sending || !ls}><Link2 size={14} className="mr-1" />Just make a link</Button>
+            <Button type="button" onClick={sendEmail} disabled={sending || !ls} data-testid="doc-request-send"><Mail size={14} className="mr-1" />{sending ? "Sending…" : "E-mail the customer"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

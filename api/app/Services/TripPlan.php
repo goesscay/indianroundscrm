@@ -53,6 +53,33 @@ class TripPlan
             'next' => $next ? ['title' => $next->title, 'due_date' => $next->due_date?->format('Y-m-d')] : null];
     }
 
+    /**
+     * "Ready to travel": every critical item done, the balance paid and every required document verified.
+     *
+     * @return array{ready:bool,blockers:list<string>}
+     */
+    public static function readiness(array $payment, array $progress, array $docs): array
+    {
+        $b = [];
+        if ($progress['total'] === 0) {
+            $b[] = 'No checklist yet';
+        }
+        if ($progress['critical_open'] > 0) {
+            $b[] = $progress['critical_open'].' critical item'.($progress['critical_open'] === 1 ? '' : 's').' open';
+        }
+        if ($payment['balance'] > 0.005) {
+            $b[] = '₹'.number_format($payment['balance']).' balance unpaid';
+        }
+        if ($docs['travellers'] === 0) {
+            $b[] = 'Travellers not chosen';
+        } elseif (! $docs['all_verified']) {
+            $n = max(0, $docs['required'] - $docs['verified']);
+            $b[] = $n.' document'.($n === 1 ? '' : 's').' not verified';
+        }
+
+        return ['ready' => $b === [], 'blockers' => $b];
+    }
+
     /** The trip type already on the deal, else domestic. The person confirming can always choose another. */
     public static function inferType(Deal $deal): string
     {

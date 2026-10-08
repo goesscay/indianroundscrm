@@ -34,9 +34,14 @@ class TripTask extends Model
         return $this->isOpen() && $this->due_date !== null && $this->due_date->lt(now('Asia/Kolkata')->startOfDay());
     }
 
-    public function toApi(): array
+    public function supplier(): BelongsTo
     {
-        return [
+        return $this->belongsTo(Supplier::class);
+    }
+
+    public function toApi(bool $withCost = false): array
+    {
+        return ($withCost ? ['cost' => $this->cost, 'supplier' => $this->supplier ? ['id' => (string) $this->supplier->id, 'name' => $this->supplier->name] : null] : []) + [
             'id' => (string) $this->id, 'deal_id' => (string) $this->deal_id, 'category' => $this->category, 'title' => $this->title, 'notes' => $this->notes,
             'due_date' => $this->due_date?->format('Y-m-d'), 'status' => $this->status, 'critical' => (bool) $this->critical,
             'overdue' => $this->isOverdue(),

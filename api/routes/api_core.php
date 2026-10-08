@@ -1,19 +1,24 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Crm\TripUploadController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => ['service' => 'Indian Rounds CRM', 'status' => 'ok']);
+Route::get('/', fn () => ['service' => 'Indian Rounds ERP', 'status' => 'ok']);
 
 // ---- Auth (public) ----
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-reset');
 Route::get('/auth/verify-reset-token/{token}', [AuthController::class, 'verifyResetToken'])->middleware('throttle:auth-reset');
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
+
+// ---- Customer document upload by secret link (public; the link is the credential) ----
+Route::get('/public/trip-upload/{token}', [TripUploadController::class, 'show'])->middleware('throttle:60,1');
+Route::post('/public/trip-upload/{token}/slots/{slotId}/files', [TripUploadController::class, 'upload'])->middleware('throttle:30,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     // ---- Auth (session) ----
