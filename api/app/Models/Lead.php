@@ -64,6 +64,11 @@ class Lead extends Model
         $supp = (float) ($this->supplier_quote_amount ?? 0);
         $sell = (float) ($this->selling_amount ?? 0);
         $a['profit'] = ($supp || $sell) ? $sell - $supp : 0;
+        // Quote & Pricing (supplier quote, selling price, profit) is for Admin, Operations and anyone with full lead editing; sales never receive these figures
+        $viewer = auth()->user();
+        if ($viewer && ! $viewer->hasAnyPermission('leads.edit', 'suppliers.view', 'rsq.manage')) {
+            $a['supplier_quote_amount'] = $a['selling_amount'] = $a['profit'] = null;
+        }
         $a['quote_pending_days'] = $this->supplier_mail_date
             ? (int) floor((now()->getTimestamp() - $this->supplier_mail_date->getTimestamp()) / 86400)
             : 0;

@@ -367,8 +367,8 @@ export default function LeadDetail() {
           </div>
         </Card>
 
-        <Card className="p-4 rounded-lg lg:col-span-2">
-          <h3 className="font-display text-base font-bold mb-3">Quote & Pricing {canOps ? "" : "(Ops-only)"}</h3>
+        {can("leads.edit", "suppliers.view", "rsq.manage") && <Card className="p-4 rounded-lg lg:col-span-2" data-testid="quote-pricing">
+          <h3 className="font-display text-base font-bold mb-3">Quote & Pricing</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2.5">
             <div>
               <Label className="label-caps">Supplier Quote ₹</Label>
@@ -414,7 +414,7 @@ export default function LeadDetail() {
                 className="mt-1.5" data-testid="upd-remarks" />
             </div>
           </div>
-        </Card>
+        </Card>}
 
         {seeSuppliers && <Card className="p-4 rounded-lg">
           <h3 className="font-display text-base font-bold mb-3">Supplier mail history</h3>          {history.length === 0 && <div className="text-sm text-muted-foreground">No emails sent yet.</div>}

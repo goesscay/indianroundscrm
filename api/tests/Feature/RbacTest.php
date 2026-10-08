@@ -181,7 +181,8 @@ class RbacTest extends TestCase
 
         $this->api('PATCH', "/api/roles/{$r['id']}", ['permissions' => ['leads.edit_limited', 'leads.view_all']], 'adm')->assertOk();
         $res = $this->api('PATCH', "/api/leads/$id", ['supplier_quote_amount' => 1, 'remarks' => 'r'], 'ed')->assertOk();
-        $this->assertEquals(700, $res->json('supplier_quote_amount'));
+        $this->assertNull($res->json('supplier_quote_amount'));                                  // limited editors do not see pricing
+        $this->assertEquals(700, \App\Models\Lead::where('lead_id', $id)->value('supplier_quote_amount'));   // and could not change it
         $this->assertSame('r', $res->json('remarks'));
 
         $this->api('PATCH', "/api/roles/{$r['id']}", ['permissions' => ['leads.view_all']], 'adm')->assertOk();

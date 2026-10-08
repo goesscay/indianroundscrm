@@ -40,7 +40,7 @@ class LeadsApiTest extends TestCase
             ->assertJsonPath('stay_summary', 'Ubud 2N + Seminyak 2N')
             ->assertJsonPath('lead_status', 'New Lead')
             ->assertJsonPath('staff_id', (string) $u->id)
-            ->assertJsonPath('profit', 0);
+            ->assertJsonPath('profit', null);                   // sales do not receive pricing
         $this->assertMatchesRegularExpression('/^IRKA\d{2}001$/', $r->json('lead_id'));
         $this->assertIsString($r->json('id'));
         $this->assertCount(2, $r->json('stay_cities'));
@@ -105,12 +105,12 @@ class LeadsApiTest extends TestCase
         $this->as('sales');
         $id = $this->postJson('/api/leads', $this->leadPayload())->json('lead_id');
 
-        // recompute derived fields on duration change; sales cannot set supplier_quote_amount
+        // recompute derived fields on duration change; sales can set neither the supplier quote nor the selling price
         $r = $this->patchJson("/api/leads/{$id}", ['duration_days' => 7, 'supplier_quote_amount' => 999,
             'selling_amount' => 5000, 'follow_up_date' => '2026-12-01'])->assertOk();
         $r->assertJsonPath('trip_end_date', '2026-12-16')->assertJsonPath('duration_label', '6N / 7D')
-            ->assertJsonPath('supplier_quote_amount', 0)->assertJsonPath('selling_amount', 5000)
-            ->assertJsonPath('profit', 5000);
+            ->assertJsonPath('supplier_quote_amount', null)->assertJsonPath('selling_amount', null)->assertJsonPath('profit', null);
+        $this->assertSame([0.0, 0.0], [(float) \App\Models\Lead::where('lead_id', $id)->value('supplier_quote_amount'), (float) \App\Models\Lead::where('lead_id', $id)->value('selling_amount')]);
 
         $r = $this->patchJson("/api/leads/{$id}", ['stay_cities' => [['city' => 'Kuta', 'nights' => 3]]])->assertOk();
         $r->assertJsonPath('stay_summary', 'Kuta 3N')->assertJsonCount(1, 'stay_cities');
@@ -123,7 +123,7 @@ class LeadsApiTest extends TestCase
 
         // operations can set supplier amounts; only admin deletes
         $this->as('operations');
-        $this->patchJson("/api/leads/{$id}", ['supplier_quote_amount' => 3000])->assertOk()->assertJsonPath('profit', 2000);
+        $this->patchJson("/api/leads/{$id}", ['supplier_quote_amount' => 3000, 'selling_amount' => 5000])->assertOk()->assertJsonPath('profit', 2000);
         $this->deleteJson("/api/leads/{$id}")->assertStatus(403);
         $this->deleteJson("/api/notes/{$nid}")->assertStatus(403);
         $this->as('admin');
@@ -158,6 +158,25 @@ class LeadsApiTest extends TestCase
 
         $this->as('sales');
         $this->postJson("/api/leads/{$id}/reassign", ['consultant_id' => (string) $other->id])->assertStatus(403);
+    }
+
+    public function test_pricing_is_hidden_from_sales_and_they_cannot_set_it(): void
+    {
+        $this->as('admin');
+        $id = $this->postJson('/api/leads', $this->leadPayload())->json('lead_id');
+        $this->patchJson("/api/leads/{$id}", ['supplier_quote_amount' => 30000, 'selling_amount' => 45000])->assertOk()->assertJsonPath('profit', 15000);
+        $this->assertSame(15000, (int) $this->getJson("/api/leads/{$id}")->json('profit'));
+
+        $sales = $this->as('sales');
+        \App\Models\Lead::where('lead_id', $id)->update(['staff_id' => $sales->id]);                  // their own lead now
+        $r = $this->getJson("/api/leads/{$id}")->assertOk();
+        $this->assertSame([null, null, null], [$r->json('supplier_quote_amount'), $r->json('selling_amount'), $r->json('profit')]);
+        $this->assertNull(collect($this->getJson('/api/leads')->json())->firstWhere('lead_id', $id)['profit']);
+        $this->patchJson("/api/leads/{$id}", ['selling_amount' => 1, 'remarks' => 'called'])->assertOk()->assertJsonPath('remarks', 'called');
+        $this->assertSame(45000.0, (float) \App\Models\Lead::where('lead_id', $id)->value('selling_amount'));   // the price is unchanged
+
+        $this->as('operations');                                                                          // Operations still see everything
+        $this->assertSame(15000, (int) $this->getJson("/api/leads/{$id}")->json('profit'));
     }
 
     public function test_rsq_flow(): void
@@ -214,7 +233,8 @@ class LeadsApiTest extends TestCase
     {
         $this->as('sales', ['consultant_code' => 'AA']);
         $id = $this->postJson('/api/leads', $this->leadPayload(['phone' => '9000000001']))->json('lead_id');
-        $this->patchJson("/api/leads/{$id}", ['booking_status' => 'Booked', 'selling_amount' => 10000])->assertOk();
+        $this->patchJson("/api/leads/{$id}", ['booking_status' => 'Booked'])->assertOk();
+        \App\Models\Lead::where('lead_id', $id)->update(['selling_amount' => 10000]);                  // priced by Operations
         $this->postJson('/api/leads', $this->leadPayload(['phone' => '9000000002', 'destination' => 'Dubai']))->assertOk();
 
         $s = $this->getJson('/api/dashboard/stats')->assertOk();

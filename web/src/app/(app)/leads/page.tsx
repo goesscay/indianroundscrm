@@ -40,6 +40,7 @@ function LeadList() {
   const [exportErr, setExportErr] = useState("");
   const router = useRouter();
   const { can } = useCurrentUser();
+  const pricing = can("leads.edit", "suppliers.view", "rsq.manage"); // supplier quote, selling price and profit are not shown to sales
 
   const params = useMemo(() => {
     const p: Record<string, string> = {};
@@ -152,8 +153,8 @@ function LeadList() {
                 <TableHead>Destination</TableHead>
                 <TableHead>Travel</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Selling ₹</TableHead>
-                <TableHead className="text-right">Profit</TableHead>
+                {pricing && <TableHead className="text-right">Selling ₹</TableHead>}
+                {pricing && <TableHead className="text-right">Profit</TableHead>}
                 <TableHead>Staff</TableHead>
               </TableRow>
             </TableHeader>
@@ -196,10 +197,10 @@ function LeadList() {
                   <TableCell>{l.destination}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">{(l.travel_date || "").slice(0, 10)}</TableCell>
                   <TableCell><StatusPill status={l.lead_status} /></TableCell>
-                  <TableCell className="text-right font-semibold">{INR(l.selling_amount)}</TableCell>
-                  <TableCell className={`text-right ${(l.profit || 0) >= 0 ? "text-[#0F766E] dark:text-emerald-400" : "text-[#B91C1C] dark:text-red-400"}`}>
+                  {pricing && <TableCell className="text-right font-semibold">{INR(l.selling_amount)}</TableCell>}
+                  {pricing && <TableCell className={`text-right ${(l.profit || 0) >= 0 ? "text-[#0F766E] dark:text-emerald-400" : "text-[#B91C1C] dark:text-red-400"}`}>
                     {INR(l.profit)}
-                  </TableCell>
+                  </TableCell>}
                   <TableCell className="text-xs text-muted-foreground">{l.staff_name}</TableCell>
                 </TableRow>
                 );

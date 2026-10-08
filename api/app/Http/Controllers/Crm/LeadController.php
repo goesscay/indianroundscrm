@@ -26,7 +26,7 @@ class LeadController extends Controller
         'adults', 'children', 'child_ages', 'rooms', 'room_type',
         'departure_from', 'special_requests', 'lead_status',
         'remarks', 'follow_up_date', 'booking_status',
-        'selling_amount', 'quote_type', 'package_selected',
+        'quote_type', 'package_selected',
         'quote_sent_to_customer', 'quote_sent_date',
         'stay_cities', 'passport_available', 'passport_reason',
     ];
