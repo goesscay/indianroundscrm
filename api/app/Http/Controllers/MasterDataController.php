@@ -153,6 +153,37 @@ class MasterDataController extends Controller
         return $s->fresh();
     }
 
+    public function suppliersUpdate(Request $request, string $sid)
+    {
+        $s = Supplier::find(Ids::parse($sid));
+        if (! $s) {
+            \App\Crm\Fail::notFound('Supplier not found');
+        }
+        $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'email' => ['sometimes', 'required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'destination' => ['nullable', 'string', 'max:255'],
+            'country' => ['nullable', 'string', 'max:255'],
+        ]);
+        if (isset($data['email'])) {
+            $data['email'] = strtolower($data['email']);
+            if (Supplier::where('email', $data['email'])->where('id', '<>', $s->id)->exists()) {
+                abort(400, 'Another supplier already uses this email');
+            }
+        }
+        $before = $s->only(['name', 'email', 'phone', 'destination', 'country']);
+        foreach (['phone', 'destination', 'country'] as $k) {
+            if (array_key_exists($k, $data)) {
+                $data[$k] = (string) ($data[$k] ?? '');
+            }
+        }
+        $s->fill($data)->save();
+        ActivityLogger::log($request->user(), 'update_supplier', 'supplier', $s->id, $before, $s->only(array_keys($before)));
+
+        return $s->fresh();
+    }
+
     public function suppliersDestroy(Request $request, string $sid)
     {
         $id = Ids::parse($sid);

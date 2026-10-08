@@ -66,5 +66,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/suppliers', [MasterDataController::class, 'suppliersIndex'])->middleware('perm:suppliers.view,suppliers.manage');
     Route::post('/suppliers', [MasterDataController::class, 'suppliersStore'])->middleware('perm:suppliers.manage');
+    Route::patch('/suppliers/{sid}', [MasterDataController::class, 'suppliersUpdate'])->middleware('perm:suppliers.manage');
     Route::delete('/suppliers/{sid}', [MasterDataController::class, 'suppliersDestroy'])->middleware('perm:suppliers.manage');
 });

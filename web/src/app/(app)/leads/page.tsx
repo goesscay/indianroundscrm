@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Combobox } from "@/components/ui/combobox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
-import { Search, Download, Phone, MessageCircle, X } from "lucide-react";
+import { Search, Download, Phone, MessageCircle, X, ListPlus } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
+import BulkLeadsDialog from "@/components/app/BulkLeadsDialog";
 import { logContact } from "@/components/app/ContactTimeline";
 import type { Lead } from "@/types";
 
@@ -33,6 +34,8 @@ function LeadList() {
   const [destination, setDestination] = useState("all");
   const [owner, setOwner] = useState("all");
   const [options, setOptions] = useState<FilterOptions>({ sources: [], destinations: [], owners: [] });
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState("");
   const router = useRouter();
@@ -47,7 +50,7 @@ function LeadList() {
     if (owner !== "all") p.staff_id = owner;
     return p;
   }, [applied, status, source, destination, owner]);
-  const { rows: leads, loading, loaded, error, paginationProps } = usePagedList<Lead>("/leads", params);
+  const { rows: leads, loading, loaded, error, paginationProps } = usePagedList<Lead>("/leads", params, refreshTick);
   const err = error || exportErr;
 
   // Filter options (sources / destinations / owners) come from the leads this user can see.
@@ -89,6 +92,11 @@ function LeadList() {
           </h1>
         </div>
         <div className="flex gap-2">
+          {can("leads.create") && (
+            <Button variant="outline" onClick={() => setBulkOpen(true)} data-testid="bulk-add-btn">
+              <ListPlus size={16} /> Bulk add
+            </Button>
+          )}
           {can("leads.export") && (
             <Button variant="outline" onClick={exportCsv} disabled={exporting} data-testid="export-csv">
               <Download size={16} /> Export CSV
@@ -202,6 +210,7 @@ function LeadList() {
         <Pagination {...paginationProps} />
       </Card>
       {err && <div className="text-sm text-destructive">{err}</div>}
+      {can("leads.create") && <BulkLeadsDialog open={bulkOpen} onOpenChange={setBulkOpen} onDone={() => setRefreshTick((t) => t + 1)} />}
     </div>
   );
 }

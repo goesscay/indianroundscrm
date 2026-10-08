@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Pencil } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { Supplier, SupplierCreate } from "@/types";
 
@@ -21,6 +21,7 @@ export default function Suppliers() {
   const EMPTY: SupplierCreate = { name: "", email: "", phone: "", destination: "", country: "" };
   const [f, setF] = useState<SupplierCreate>(EMPTY);
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null); // null = adding
   const [saving, setSaving] = useState(false);
 
   const pg = usePagination(rows);
@@ -31,13 +32,22 @@ export default function Suppliers() {
   };
   useEffect(() => { load(); }, []);
 
-  const create = async (e: FormEvent) => {
+  const openAdd = () => { setEditId(null); setF(EMPTY); setOpen(true); };
+  const openEdit = (s: Supplier) => {
+    setEditId(s.id);
+    setF({ name: s.name ?? "", email: s.email ?? "", phone: s.phone ?? "", destination: s.destination ?? "", country: s.country ?? "" });
+    setOpen(true);
+  };
+
+  const save = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post("/suppliers", f);
-      toast.success("Supplier added");
+      if (editId) await api.patch(`/suppliers/${editId}`, f);
+      else await api.post("/suppliers", f);
+      toast.success(editId ? "Supplier updated" : "Supplier added");
       setF(EMPTY);
+      setEditId(null);
       setOpen(false);
       load();
     } catch (e) { toast.error(formatApiError(e)); }
@@ -58,20 +68,20 @@ export default function Suppliers() {
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Suppliers</h1>
         </div>
         {canEdit && (
-          <Button onClick={() => setOpen(true)} data-testid="s-add-btn">
+          <Button onClick={openAdd} data-testid="s-add-btn">
             <Plus size={15} /> Add supplier
           </Button>
         )}
       </div>
 
       {canEdit && (
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setF(EMPTY); }}>
+        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setF(EMPTY); setEditId(null); } }}>
           <DialogContent className="sm:max-w-lg" data-testid="add-supplier-dialog">
             <DialogHeader>
-              <DialogTitle className="font-display">Add supplier</DialogTitle>
+              <DialogTitle className="font-display">{editId ? "Edit supplier" : "Add supplier"}</DialogTitle>
               <DialogDescription>Supplier details used when sending quote requests.</DialogDescription>
             </DialogHeader>
-            <form onSubmit={create} className="space-y-4" data-testid="add-supplier-form">
+            <form onSubmit={save} className="space-y-4" data-testid="add-supplier-form">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2"><Label className="label-caps">Name</Label><Input className="mt-1.5" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required autoFocus data-testid="s-name" /></div>
                 <div className="sm:col-span-2"><Label className="label-caps">Email</Label><Input type="email" className="mt-1.5" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} required data-testid="s-email" /></div>
@@ -81,7 +91,7 @@ export default function Suppliers() {
               </div>
               <DialogFooter className="gap-2 sm:gap-2">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)} data-testid="s-cancel">Cancel</Button>
-                <Button type="submit" disabled={saving} data-testid="s-add">{saving ? "Adding…" : "Add supplier"}</Button>
+                <Button type="submit" disabled={saving} data-testid="s-add">{saving ? "Saving…" : editId ? "Save changes" : "Add supplier"}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -108,7 +118,8 @@ export default function Suppliers() {
                   <TableCell>{s.destination}</TableCell>
                   <TableCell>{s.country}</TableCell>
                   <TableCell className="text-right">
-                    {canEdit && <Button size="sm" variant="ghost" onClick={() => remove(s.id)}><Trash2 size={14} className="text-destructive" /></Button>}
+                    {canEdit && <Button size="sm" variant="ghost" onClick={() => openEdit(s)} aria-label={`Edit ${s.name}`} title="Edit" data-testid={`s-edit-${s.id}`}><Pencil size={14} /></Button>}
+                    {canEdit && <Button size="sm" variant="ghost" onClick={() => remove(s.id)} aria-label={`Delete ${s.name}`} title="Delete"><Trash2 size={14} className="text-destructive" /></Button>}
                   </TableCell>
                 </TableRow>
               ))}
