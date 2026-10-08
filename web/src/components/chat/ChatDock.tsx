@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, ChevronUp, ExternalLink, MessageSquare, MessageSquarePlus, Search, Users, X } from "lucide-react";
+import { BellRing, ChevronDown, ChevronUp, ExternalLink, MessageSquare, MessageSquarePlus, Search, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth, useCurrentUser } from "@/context/AuthContext";
@@ -91,7 +91,8 @@ function DockInner() {
   const isAdmin = can("chat.create_groups");
   const { total, refresh: refreshUnread } = useChatUnread();
   const { connected } = useChatRealtime();
-  const { convs, loaded, windows, panelOpen, loadConvs, upsertConv, setPanelOpen, openWindow, toggleMinimize, closeWindow } = useChatDock();
+  const { convs, loaded, windows, panelOpen, loadConvs, upsertConv, setPanelOpen, openWindow, toggleMinimize, closeWindow, alerts, setAlerts, desktop, enableDesktop } = useChatDock();
+  const [alertsOpen, setAlertsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
@@ -230,6 +231,9 @@ function DockInner() {
           <header className="flex items-center gap-1.5 px-3 h-10 shrink-0 bg-neutral-900 text-white dark:bg-neutral-800 dark:text-neutral-100">
             <MessageSquare size={14} />
             <span className="text-sm font-semibold flex-1 flex items-center gap-1.5">Chat <LiveDot /></span>
+            <button type="button" onClick={() => setAlertsOpen((o) => !o)} aria-label="Message alerts" aria-expanded={alertsOpen} title="Message alerts" data-testid="chat-dock-alerts-btn" className="p-1 rounded-sm hover:bg-white/15">
+              <BellRing size={14} />
+            </button>
             <Link href="/chat" aria-label="Open full view" title="Open full view" data-testid="chat-dock-full" className="p-1 rounded-sm hover:bg-white/15">
               <ExternalLink size={14} />
             </Link>
@@ -237,6 +241,19 @@ function DockInner() {
               <ChevronDown size={14} />
             </button>
           </header>
+          {alertsOpen && (
+            <div className="border-b border-border bg-secondary/40 p-3 text-xs" data-testid="chat-dock-alerts">
+              <div className="mb-1.5 font-semibold">When a message arrives</div>
+              {([["autoOpen", "Open the chat window"], ["sound", "Play a sound"], ["desktop", "Notify me when this tab is in the background"]] as const).map(([k, label]) => (
+                <label key={k} className="flex cursor-pointer items-center gap-2 py-0.5">
+                  <input type="checkbox" className="accent-black dark:accent-white" checked={alerts[k]} onChange={(e) => setAlerts({ ...alerts, [k]: e.target.checked })} data-testid={`chat-alert-${k}`} />
+                  {label}
+                </label>
+              ))}
+              {alerts.desktop && desktop === "default" && <button type="button" onClick={() => void enableDesktop()} className="mt-1.5 underline" data-testid="chat-alert-enable">Allow notifications in this browser</button>}
+              {alerts.desktop && desktop === "denied" && <p className="mt-1.5 text-muted-foreground">Notifications are blocked in this browser. Allow them in the site settings.</p>}
+            </div>
+          )}
           <div className="p-2 border-b border-border space-y-2">
             <div className="flex gap-1.5">
               <Button size="sm" className="flex-1" onClick={() => setNewChatOpen(true)} data-testid="chat-dock-new-chat">
