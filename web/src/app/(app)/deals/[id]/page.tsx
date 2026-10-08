@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DealDialog from "@/components/crm/DealDialog";
 import CustomerReplies from "@/components/crm/CustomerReplies";
+import TripPlanPanel from "@/components/crm/TripPlanPanel";
 import { DealBooksCard, RecordActivities, RecordInvoices, RecordNotes, RecordQuotes } from "@/components/crm/RecordPanels";
 import { INR, STAGES, StagePill, TRIP_STATUSES, fmtDate } from "@/components/crm/shared";
 import type { Deal, DealStage } from "@/types";
@@ -151,6 +152,7 @@ export default function DealDetail() {
           {can("deals.delete") && <Button variant="ghost" size="sm" className="text-destructive" onClick={remove} data-testid="deal-delete"><Trash2 size={14} /> Delete deal</Button>}
         </div>
         <div className="space-y-6">
+          {can("trips.view") && d.stage !== "lost" && <TripPlanPanel dealId={d.id} onChanged={() => void load()} />}
           <RecordQuotes filter={{ deal_id: d.id }} newHref={`/quotes/new?deal=${d.id}`} />
           <DealBooksCard dealId={d.id} />
           <RecordInvoices filter={{ deal_id: d.id }} newHref={`/invoices/new?deal=${d.id}`} />

@@ -273,8 +273,10 @@ class DealController extends Controller
         if (array_key_exists('owner_id', $d)) {
             $deal->owner_id = $this->resolveOwner($d['owner_id']);
         }
+        $oldTravel = $deal->travel_date?->format('Y-m-d');
         $this->apply($deal, $d, false);
         $deal->save();
+        \App\Services\TripPlan::reschedule($deal, $oldTravel);
         ActivityLogger::log($user, 'update_deal', 'deal', $deal->id, $before, $this->snapshot($deal));
 
         return $deal->fresh(self::WITH)->toApi();

@@ -23,5 +23,7 @@ return [
         'repeat_days' => (int) env('CRM_REMINDER_REPEAT_DAYS', 7),             // gap between reminders
         'max' => (int) env('CRM_REMINDER_MAX', 3),                             // reminders per invoice, manual and automatic together
     ],
+    // A trip is confirmed automatically once this share of its value is paid (a manager can also confirm it by hand).
+    'trip' => ['advance_percent' => (float) env('CRM_TRIP_ADVANCE_PERCENT', 25)],
     'quote_valid_days' => (int) env('CRM_QUOTE_VALID_DAYS', 14),
 ];

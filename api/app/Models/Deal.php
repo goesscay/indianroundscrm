@@ -27,6 +27,7 @@ class Deal extends Model
         'travel_date' => 'date:Y-m-d',
         'expected_close' => 'date:Y-m-d',
         'closed_at' => 'datetime',
+        'trip_confirmed_at' => 'datetime',
     ];
 
     public function customer(): BelongsTo

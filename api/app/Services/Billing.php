@@ -79,6 +79,9 @@ class Billing
             self::settle($inv);
             if ($kind === 'receipt') {
                 self::dealBooked($inv, $user);
+                if ($inv->deal_id && ($deal = Deal::find($inv->deal_id))) {
+                    TripPlan::autoConfirm($deal, $user);
+                }
             }
         }
         Posting::receipt($r, $inv, $user);

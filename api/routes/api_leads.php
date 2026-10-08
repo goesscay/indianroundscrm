@@ -5,6 +5,7 @@ use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\CustomerReplyController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
+use App\Http\Controllers\Crm\TripController;
 use App\Http\Controllers\Crm\AccountController;
 use App\Http\Controllers\Crm\FinanceController;
 use App\Http\Controllers\Crm\HomeController;
@@ -98,6 +99,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/customers', [CustomerController::class, 'store'])->middleware('perm:customers.create');
     Route::get('/customers/{id}', [CustomerController::class, 'show'])->middleware('perm:customers.view');
     Route::get('/customers/{id}/replies', [CustomerReplyController::class, 'customer'])->middleware('perm:customers.view');
+    // ---- Trip plans: payment progress and the operations checklist of a confirmed deal
+    Route::get('/trips', [TripController::class, 'board'])->middleware('perm:trips.view');
+    Route::get('/deals/{id}/trip', [TripController::class, 'show'])->middleware('perm:trips.view');
+    Route::post('/deals/{id}/trip/confirm', [TripController::class, 'confirm'])->middleware('perm:trips.confirm');
+    Route::post('/deals/{id}/trip/tasks', [TripController::class, 'addTask'])->middleware('perm:trips.manage');
+    Route::patch('/trip-tasks/{id}', [TripController::class, 'updateTask'])->middleware('perm:trips.manage');
+    Route::delete('/trip-tasks/{id}', [TripController::class, 'deleteTask'])->middleware('perm:trips.manage');
+    Route::get('/customers/{id}/trips', [TripController::class, 'customerTrips'])->middleware('perm:trips.view');
+    Route::get('/trip-templates', [TripController::class, 'templates'])->middleware('perm:trips.templates');
+    Route::put('/trip-templates/{id}', [TripController::class, 'updateTemplate'])->middleware('perm:trips.templates');
     Route::get('/deals/{id}/replies', [CustomerReplyController::class, 'deal'])->middleware('perm:deals.view');
     Route::get('/quotes/{id}/replies', [CustomerReplyController::class, 'quote'])->middleware('perm:quotes.view');
     Route::get('/invoices/{id}/replies', [CustomerReplyController::class, 'invoice'])->middleware('perm:invoices.view');

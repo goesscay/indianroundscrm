@@ -13,6 +13,7 @@ import CustomerDialog from "@/components/crm/CustomerDialog";
 import DealDialog from "@/components/crm/DealDialog";
 import { RecordActivities, RecordInvoices, RecordNotes, RecordQuotes } from "@/components/crm/RecordPanels";
 import CustomerReplies from "@/components/crm/CustomerReplies";
+import CustomerTrips from "@/components/crm/CustomerTrips";
 import PaymentDialog from "@/components/crm/PaymentDialog";
 import { INR, StagePill, customerTypeLabel, fmtDate } from "@/components/crm/shared";
 import StatusPill from "@/components/app/StatusPill";
@@ -190,6 +191,7 @@ export default function CustomerDetail() {
 
           <RecordQuotes filter={{ customer_id: c.id }} newHref={`/quotes/new?customer=${c.id}`} />
           <RecordInvoices filter={{ customer_id: c.id }} newHref={`/invoices/new?customer=${c.id}`} />
+          <CustomerTrips customerId={c.id} />
           <CustomerReplies base={`/customers/${c.id}`} />
           <RecordActivities base={`/customers/${c.id}`} link={{ customer_id: c.id }} />
           <RecordNotes base={`/customers/${c.id}`} canWrite={canEdit} />
