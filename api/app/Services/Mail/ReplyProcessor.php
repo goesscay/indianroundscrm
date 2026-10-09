@@ -35,6 +35,9 @@ class ReplyProcessor
         if (! $this->claim($reply)) {
             return;
         }
+        if ($reply->relevance === 'chatter') {
+            return; // an internal forward / follow-up after the first reply: kept on the thread, no alert, no activity
+        }
         $tracker = $reply->lead_supplier_id ? LeadSupplier::find($reply->lead_supplier_id) : null;
         $lead = $reply->lead_id ? Lead::where('lead_id', $reply->lead_id)->first() : null;
 
@@ -137,6 +140,15 @@ class ReplyProcessor
     private function createActivity(SupplierReply $reply, ?Lead $lead, ?LeadSupplier $tracker): void
     {
         if ($reply->activity_id || ! $lead) {
+            return;
+        }
+        // one open "review" task per lead is enough, however many quote-like mails arrive
+        $open = Activity::where('lead_id', $lead->lead_id)->where('type', 'email')->whereNull('completed_at')
+            ->where('title', 'like', 'Review supplier reply%')->orderBy('id')->first();
+        if ($open) {
+            SupplierReply::whereKey($reply->id)->update(['activity_id' => $open->id]);
+            $reply->activity_id = (string) $open->id;
+
             return;
         }
         $owner = $lead->staff_id ? User::find($lead->staff_id) : null;

@@ -69,6 +69,8 @@ class SupplierReply extends Model
             'received_at' => $this->received_at?->utc()->toIso8601String(),
             'status' => $this->status,
             'matched_by' => $this->matched_by,
+            'relevance' => $this->relevance ?: 'normal',
+            'is_final' => (bool) $this->is_final,
             'read' => ! in_array((int) $this->id, $unreadIds, true),
             'attachments' => $this->attachments->map(fn ($a) => $a->toApi())->values()->all(),
         ];

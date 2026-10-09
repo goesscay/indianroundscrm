@@ -40,7 +40,7 @@ export function useLeadReplies(leadId: string, enabled = true) {
 const BODY_LINES = 6;
 const needsClamp = (t: string) => t.split("\n").length > BODY_LINES || t.length > 420;
 
-function ReplyItem({ r, onRead }: { r: SupplierReply; onRead: (r: SupplierReply) => void }) {
+function ReplyItem({ r, onRead, onMark }: { r: SupplierReply; onRead: (r: SupplierReply) => void; onMark: (r: SupplierReply, as: "final" | "chatter" | "normal") => void }) {
   const [open, setOpen] = useState(false);
   const clampable = needsClamp(r.body_text || "");
   const bodyId = `reply-body-${r.id}`;
@@ -54,7 +54,8 @@ function ReplyItem({ r, onRead }: { r: SupplierReply; onRead: (r: SupplierReply)
       className={cn(
         "rounded-md border p-3 transition-colors",
         r.read ? "border-border" : "border-primary/40 bg-secondary/40",
-        r.status === "bounce" && "border-red-300/70 dark:border-red-900/70"
+        r.status === "bounce" && "border-red-300/70 dark:border-red-900/70",
+        r.is_final && "border-emerald-500/60 bg-emerald-50/50 dark:bg-emerald-950/20"
       )}
       data-testid={`supplier-reply-${r.id}`}
       onClick={() => { if (!r.read) onRead(r); }}
@@ -64,6 +65,9 @@ function ReplyItem({ r, onRead }: { r: SupplierReply; onRead: (r: SupplierReply)
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-semibold text-sm">{senderLabel(r)}</span>
             {!r.read && <NewBadge />}
+            {r.is_final && <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white" data-testid={`reply-final-${r.id}`}>Final quote</span>}
+            {!r.is_final && r.relevance === "quote" && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">Looks like a quote</span>}
+            {r.relevance === "chatter" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-neutral-800 dark:text-neutral-300">Forward / follow-up</span>}
             {(r.status === "bounce" || r.status === "auto_reply") && <StatusBadge status={r.status} />}
           </div>
           <div className="text-xs text-muted-foreground break-all">{r.supplier?.email || r.from_email}</div>
@@ -91,6 +95,22 @@ function ReplyItem({ r, onRead }: { r: SupplierReply; onRead: (r: SupplierReply)
         </button>
       )}
       <AttachmentList items={r.attachments} className="mt-2" />
+      {r.status === "matched" && (
+        <div className="mt-2 flex flex-wrap gap-3 text-xs">
+          {!r.is_final && (
+            <button type="button" onClick={() => onMark(r, "final")} className="font-medium underline underline-offset-2 hover:text-foreground text-muted-foreground" data-testid={`reply-mark-final-${r.id}`}>This is the quote</button>
+          )}
+          {r.is_final && (
+            <button type="button" onClick={() => onMark(r, "normal")} className="font-medium underline underline-offset-2 text-muted-foreground hover:text-foreground">Not the final quote</button>
+          )}
+          {!r.is_final && r.relevance !== "chatter" && (
+            <button type="button" onClick={() => onMark(r, "chatter")} className="font-medium underline underline-offset-2 text-muted-foreground hover:text-foreground" data-testid={`reply-mark-chatter-${r.id}`}>Mark as forward</button>
+          )}
+          {r.relevance === "chatter" && (
+            <button type="button" onClick={() => onMark(r, "normal")} className="font-medium underline underline-offset-2 text-muted-foreground hover:text-foreground">Not a forward</button>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -105,7 +125,13 @@ export default function SupplierReplies({
   reload: () => Promise<void>;
   show: boolean;
 }) {
-  const lm = useLoadMore(replies, 10);
+  const [showChatter, setShowChatter] = useState(false);
+  const main = useMemo(
+    () => replies.filter((r) => r.relevance !== "chatter").sort((a, b) => Number(!!b.is_final) - Number(!!a.is_final)),
+    [replies]
+  );
+  const chatter = useMemo(() => replies.filter((r) => r.relevance === "chatter"), [replies]);
+  const lm = useLoadMore(main, 10);
   const unread = useMemo(() => replies.filter((r) => !r.read).length, [replies]);
   const [busy, setBusy] = useState(false);
   const deepLinked = useRef(false);
@@ -120,6 +146,17 @@ export default function SupplierReplies({
       toast.error(formatApiError(e));
     }
   }, [patchLocal, bump]);
+
+  const mark = useCallback(async (r: SupplierReply, as: "final" | "chatter" | "normal") => {
+    try {
+      await api.post(`/supplier-replies/${r.id}/mark`, { as });
+      toast.success(as === "final" ? "Marked as the supplier's quote" : as === "chatter" ? "Marked as a forward" : "Updated");
+      await reload();
+      bump();
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  }, [reload, bump]);
 
   const markAll = useCallback(async () => {
     setBusy(true);
@@ -172,9 +209,25 @@ export default function SupplierReplies({
       ) : (
         <>
           <ul className="space-y-3">
-            {lm.visible.map((r) => <ReplyItem key={r.id} r={r} onRead={markRead} />)}
+            {lm.visible.map((r) => <ReplyItem key={r.id} r={r} onRead={markRead} onMark={mark} />)}
           </ul>
           <LoadMore lm={lm} className="mt-3" />
+          {chatter.length > 0 && (
+            <div className="mt-4">
+              <button
+                type="button" onClick={() => setShowChatter((s) => !s)} aria-expanded={showChatter}
+                className="text-xs font-medium underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                data-testid="supplier-replies-chatter-toggle"
+              >
+                {showChatter ? "Hide" : "Show"} {chatter.length} forward{chatter.length === 1 ? "" : "s"} and follow-up{chatter.length === 1 ? "" : "s"}
+              </button>
+              {showChatter && (
+                <ul className="mt-3 space-y-3 opacity-80" data-testid="supplier-replies-chatter">
+                  {chatter.map((r) => <ReplyItem key={r.id} r={r} onRead={markRead} onMark={mark} />)}
+                </ul>
+              )}
+            </div>
+          )}
         </>
       )}
     </Card>

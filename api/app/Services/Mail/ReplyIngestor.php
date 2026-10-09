@@ -94,6 +94,9 @@ class ReplyIngestor
                 if ($m->hasAttachments) {
                     $this->attachments->storeAll($reply, $this->transport->getAttachments($m->id));
                 }
+                if ($status === 'matched') {
+                    $reply->forceFill(['relevance' => ReplyRelevance::classify($reply)])->save();
+                }
 
                 return $reply;
             });

@@ -186,6 +186,47 @@ class SupplierReplyController extends Controller
         return $this->present($reply, $user);
     }
 
+    /**
+     * POST /supplier-replies/{id}/mark  {as: final|chatter|normal}
+     *   final   : this is the supplier's real quote (one per supplier on the lead); the tracker follows it
+     *   chatter : an internal forward / noise; stops counting as unread
+     *   normal  : back to an ordinary reply
+     */
+    public function mark(Request $request, string $id)
+    {
+        $user = $request->user();
+        $b = Fail::validate(Fail::body($request), ['as' => 'required|in:final,chatter,normal']);
+        $reply = $this->find($id);
+        if ($reply->status !== 'matched') {
+            Fail::http(409, 'Only a reply linked to a lead can be marked');
+        }
+        $as = $b['as'];
+
+        DB::transaction(function () use ($reply, $as) {
+            if ($as === 'final') {
+                SupplierReply::where('lead_id', $reply->lead_id)->where('is_final', true)
+                    ->when($reply->lead_supplier_id, fn ($q, $t) => $q->where('lead_supplier_id', $t))
+                    ->whereKeyNot($reply->id)->update(['is_final' => false]);
+                $reply->forceFill(['relevance' => 'quote', 'is_final' => true])->save();
+                if ($tracker = $reply->lead_supplier_id ? LeadSupplier::find($reply->lead_supplier_id) : null) {
+                    $tracker->fill([
+                        'reply_received' => true, 'reply_date' => $reply->received_at ?? now(), 'last_update' => now(),
+                        'inbound_snippet' => mb_substr((string) $reply->body_preview, 0, 300), 'status' => 'Quote Received',
+                    ])->save();
+                }
+                RsqController::markResponseReceived($reply->lead_id);
+            } else {
+                $reply->forceFill(['relevance' => $as, 'is_final' => false])->save();
+            }
+            if ($as === 'chatter') {
+                DB::table('supplier_reply_reads')->where('reply_id', $reply->id)->whereNull('read_at')->update(['read_at' => now()]);
+            }
+        });
+        ActivityLogger::log($user, 'mark_supplier_reply', 'supplier_reply', (string) $reply->id, null, ['as' => $as]);
+
+        return $this->present($reply, $user);
+    }
+
     /** POST /supplier-replies/{id}/ignore */
     public function ignore(Request $request, string $id)
     {

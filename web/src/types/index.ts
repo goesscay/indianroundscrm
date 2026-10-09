@@ -522,6 +522,9 @@ export interface SupplierReply {
   received_at: string;
   status: SupplierReplyStatus;
   matched_by: SupplierReplyMatchedBy | null;
+  /** quote = has a document or a price; chatter = internal forward / follow-up noise */
+  relevance?: "normal" | "quote" | "chatter";
+  is_final?: boolean;
   read: boolean;
   attachments: SupplierReplyAttachment[];
 }

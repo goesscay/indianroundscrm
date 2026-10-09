@@ -23,6 +23,7 @@ use App\Services\Mail\OutgoingMail;
 use App\Services\Mail\ReplyClassifier;
 use App\Services\Mail\ReplyMatcher;
 use App\Services\Mail\ReplyPoller;
+use App\Services\Mail\ReplyRelevance;
 use App\Services\Mail\ReplyText;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -676,7 +677,9 @@ class SupplierMailTest extends TestCase
         $this->assertTrue($tr->reply_received);
         $this->assertSame('Awaiting Quote', $tr->status);
         $this->assertNotNull($tr->reply_date);
-        $this->assertStringContainsString('Second mail', $tr->inbound_snippet);
+        $this->assertStringContainsString('USD 700', $tr->inbound_snippet);   // the later plain mail is a forward: it does not overwrite the quote
+        $this->assertSame('chatter', SupplierReply::where('graph_message_id', 'R2')->value('relevance'));
+        $this->assertSame('quote', SupplierReply::where('graph_message_id', 'R1')->value('relevance'));
         $this->assertSame('response_received', RsqRequest::where('lead_id', $lead->lead_id)->value('status'));
         $this->assertSame('response_received', $lead->fresh()->rsq_status);
 
@@ -688,7 +691,7 @@ class SupplierMailTest extends TestCase
         $this->assertNotContains($bystander->id, $users);
         $this->assertNotContains($inactiveOps->id, $users);
 
-        Event::assertDispatchedTimes(SupplierReplyReceived::class, 2);
+        Event::assertDispatchedTimes(SupplierReplyReceived::class, 1);
         Event::assertDispatched(SupplierReplyReceived::class, function (SupplierReplyReceived $e) use ($r1, $owner, $ops, $admin, $lead) {
             if ($e->reply['id'] !== (string) $r1->id) {
                 return false;
@@ -707,7 +710,7 @@ class SupplierMailTest extends TestCase
         });
 
         $acts = Activity::all();
-        $this->assertCount(2, $acts); // one per reply
+        $this->assertCount(1, $acts); // the forward raises no task
         $a = Activity::whereKey(SupplierReply::where('graph_message_id', 'R1')->value('activity_id'))->first();
         $this->assertSame('email', $a->type);
         $this->assertSame('Review supplier reply — '.$lead->lead_id, $a->title);       // no supplier name: the sales owner can see activities on their lead
@@ -721,7 +724,7 @@ class SupplierMailTest extends TestCase
         // Operations' bell shows it with the supplier name; the sales owner and a bystander get nothing
         $this->as($ops);
         $al = collect($this->getJson('/api/notifications')->assertOk()->json())->where('kind', 'supplier_reply')->values();
-        $this->assertCount(2, $al);
+        $this->assertCount(1, $al);
         $this->assertSame('Reply from Sunrise Travels', $al[0]['title']);
         $this->assertSame($lead->lead_id.' · Asha Rao', $al[0]['detail']);
         $this->assertSame($lead->lead_id, $al[0]['lead_id']);
@@ -731,6 +734,86 @@ class SupplierMailTest extends TestCase
             $this->as($u);
             $this->assertCount(0, collect($this->getJson('/api/notifications')->json())->where('kind', 'supplier_reply'));
         }
+    }
+
+    public function test_relevance_classifier_separates_prices_from_forward_noise(): void
+    {
+        foreach (['Our price is USD 700 pp.', 'Package cost 45,000 for 2 pax', 'Rate: Rs. 52000', '₹ 38,500 total', 'Rates are 42000/- per person'] as $t) {
+            $this->assertTrue(ReplyRelevance::mentionsPrice($t), $t);
+        }
+        foreach (['Please check and revert', 'fwd to Raj for rates', 'From the hotel side we will confirm tomorrow', 'Call me on 9876543210'] as $t) {
+            $this->assertFalse(ReplyRelevance::mentionsPrice($t), $t);
+        }
+        // a price only in the quoted thread underneath does not count
+        $own = ReplyRelevance::ownText("Please check.
+
+On Mon, 5 Oct 2026 at 10:00, Raj <raj@x.test> wrote:
+> Our price is USD 700 pp.");
+        $this->assertFalse(ReplyRelevance::mentionsPrice($own));
+        $own = ReplyRelevance::ownText("pls see
+
+From: Raj
+Sent: Monday
+Cost 45,000 per person");
+        $this->assertFalse(ReplyRelevance::mentionsPrice($own));
+    }
+
+    public function test_forwards_are_silent_but_a_forwarded_quote_with_a_document_still_alerts(): void
+    {
+        [, $ops, $lead, , $tr] = $this->world();
+        Event::fake([SupplierReplyReceived::class]);
+        $f = $this->useFake();
+        $f->attachments['R3'] = [new AttachmentData('a1', 'Quote Vietnam.pdf', 'application/pdf', 100, true, false, null, '%PDF-1.4 x')];
+        $f->inbox = [
+            $this->msg(['id' => 'R1', 'received' => now()->subMinutes(3), 'body' => 'We will revert shortly.']),
+            $this->msg(['id' => 'R2', 'received' => now()->subMinutes(2), 'from' => 'ops@sunrise.test', 'body' => 'Fwd: please check this one.']),
+            $this->msg(['id' => 'R3', 'received' => now()->subMinute(), 'from' => 'ops@sunrise.test', 'body' => 'Attached.', 'hasAttachments' => true]),
+        ];
+        $this->poll();
+
+        $rel = SupplierReply::orderBy('id')->pluck('relevance', 'graph_message_id')->all();
+        $this->assertSame(['R1' => 'normal', 'R2' => 'chatter', 'R3' => 'quote'], $rel);
+        Event::assertDispatchedTimes(SupplierReplyReceived::class, 2);
+        $this->assertCount(1, Activity::all());                                   // one open review task for the lead
+        $this->assertSame(
+            SupplierReply::where('graph_message_id', 'R1')->value('activity_id'),
+            SupplierReply::where('graph_message_id', 'R3')->value('activity_id')
+        );
+        $this->assertSame(0, DB::table('supplier_reply_reads')->whereIn('reply_id', SupplierReply::where('relevance', 'chatter')->pluck('id'))->count());
+    }
+
+    public function test_team_can_pin_the_real_quote_and_relabel_replies(): void
+    {
+        [$owner, $ops, $lead, , $tr] = $this->world();
+        Event::fake([SupplierReplyReceived::class]);
+        $f = $this->useFake();
+        $f->inbox = [
+            $this->msg(['id' => 'R1', 'received' => now()->subMinutes(2), 'body' => 'We will revert shortly.']),
+            $this->msg(['id' => 'R2', 'received' => now()->subMinute(), 'body' => 'Please check.']),
+        ];
+        $this->poll();
+        $r1 = SupplierReply::where('graph_message_id', 'R1')->first();
+        $r2 = SupplierReply::where('graph_message_id', 'R2')->first();
+        $this->assertSame('chatter', $r2->relevance);
+
+        $this->as($owner);
+        $this->postJson("/api/supplier-replies/{$r2->id}/mark", ['as' => 'final'])->assertStatus(403);   // sales cannot
+
+        $this->as($ops);
+        $this->postJson("/api/supplier-replies/{$r2->id}/mark", ['as' => 'bogus'])->assertStatus(422);
+        $this->postJson("/api/supplier-replies/{$r2->id}/mark", ['as' => 'final'])->assertOk()
+            ->assertJsonPath('is_final', true)->assertJsonPath('relevance', 'quote');
+        $this->assertSame('Quote Received', $tr->fresh()->status);
+        $this->assertStringContainsString('Please check', $tr->fresh()->inbound_snippet);
+
+        // only one final per supplier on the lead
+        $this->postJson("/api/supplier-replies/{$r1->id}/mark", ['as' => 'final'])->assertOk();
+        $this->assertFalse((bool) $r2->fresh()->is_final);
+        $this->assertTrue((bool) $r1->fresh()->is_final);
+
+        $this->postJson("/api/supplier-replies/{$r1->id}/mark", ['as' => 'chatter'])->assertOk()
+            ->assertJsonPath('is_final', false)->assertJsonPath('relevance', 'chatter');
+        $this->postJson("/api/supplier-replies/{$r1->id}/mark", ['as' => 'normal'])->assertOk()->assertJsonPath('relevance', 'normal');
     }
 
     public function test_reply_never_downgrades_a_further_tracker_state_and_inactive_owner_gets_unassigned_activity(): void
@@ -862,7 +945,7 @@ class SupplierMailTest extends TestCase
         $this->as($ops);
         $list = $this->getJson("/api/leads/{$lead->lead_id}/supplier-replies")->assertOk();
         $list->assertJsonCount(1);
-        $this->assertSame(['id', 'lead_id', 'customer_name', 'supplier', 'from_email', 'from_name', 'subject', 'body_text', 'preview', 'received_at', 'status', 'matched_by', 'read', 'attachments'], array_keys($list->json(0)));
+        $this->assertSame(['id', 'lead_id', 'customer_name', 'supplier', 'from_email', 'from_name', 'subject', 'body_text', 'preview', 'received_at', 'status', 'matched_by', 'relevance', 'is_final', 'read', 'attachments'], array_keys($list->json(0)));
         $list->assertJsonPath('0.read', false)->assertJsonPath('0.status', 'matched')->assertJsonPath('0.matched_by', 'subject')
             ->assertJsonPath('0.supplier.name', 'Sunrise Travels')->assertJsonPath('0.id', (string) $reply->id);
         $this->getJson('/api/leads/NOPE/supplier-replies')->assertStatus(404);

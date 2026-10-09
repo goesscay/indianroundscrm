@@ -68,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/supplier-replies/{id}/read', [SupplierReplyController::class, 'markRead'])->middleware('perm:rsq.manage');
     Route::middleware('perm:rsq.manage')->post('/supplier-replies/{id}/link', [SupplierReplyController::class, 'link']);
     Route::middleware('perm:rsq.manage')->post('/supplier-replies/{id}/ignore', [SupplierReplyController::class, 'ignore']);
+    Route::middleware('perm:rsq.manage')->post('/supplier-replies/{id}/mark', [SupplierReplyController::class, 'mark']);
     Route::middleware('perm:mail.manage')->get('/mail/status', [MailAdminController::class, 'status']);
     Route::middleware('perm:mail.manage')->post('/mail/poll', [MailAdminController::class, 'poll']);
 

@@ -195,7 +195,11 @@ function InboxInner() {
                       ) : <span className="text-sm text-amber-700 dark:text-amber-300">Unmatched</span>}
                     </TableCell>
                     <TableCell className="text-sm whitespace-nowrap" title={absTime(r.received_at)}>{relTime(r.received_at)}</TableCell>
-                    <TableCell><StatusBadge status={r.status} /></TableCell>
+                    <TableCell>
+                      <StatusBadge status={r.status} />
+                      {r.is_final && <span className="ml-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Final</span>}
+                      {!r.is_final && r.relevance === "chatter" && <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">Forward</span>}
+                    </TableCell>
                   </TableRow>
                 );
               })}
