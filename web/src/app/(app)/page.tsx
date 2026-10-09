@@ -96,7 +96,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" aria-label="Refresh" onClick={() => void load(true)} data-testid="dashboard-refresh"><RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /></Button>
           {can("quotes.create") && <Button variant="outline" onClick={() => router.push("/quotes/new")} data-testid="dashboard-new-quote">+ Quote</Button>}
-          {can("leads.create") && <Button onClick={() => router.push("/leads/new")} data-testid="dashboard-new-lead">+ New lead</Button>}
+          {can("leads.create") && <Button asChild><Link href="/leads/new" data-testid="dashboard-new-lead">+ New lead</Link></Button>}
         </div>
       </div>
 

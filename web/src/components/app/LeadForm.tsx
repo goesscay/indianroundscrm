@@ -13,7 +13,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { AlertTriangle, Plus, X } from "lucide-react";
+import { AlertTriangle, ExternalLink, Plus, X } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { DestinationCities, DuplicateInfo, Lead, LeadCreate, StayCity } from "@/types";
 
@@ -319,6 +319,13 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
     ? "__other__"
     : (reasonIsPreset ? f.passport_reason : undefined);
 
+  /** A plain click opens a separate window; right-click, middle-click and Ctrl/Cmd-click keep the browser's own "open in new tab". */
+  const openNewWindow = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    if (!window.open("/leads/new", "_blank", "popup=yes,width=1280,height=900")) window.open("/leads/new", "_blank");
+  };
+
   if (loadError) return <div className="space-y-3"><Button variant="ghost" size="sm" onClick={() => router.push("/leads")}>Back to leads</Button><div className="text-sm text-destructive">{loadError}</div></div>;
   if (!loaded) return <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>;
 
@@ -330,6 +337,13 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
           <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight mt-0.5">{editing ? `Edit Lead ${leadNo}` : "New Lead"}</h1>
           <p className="text-xs text-muted-foreground mt-1">{editing ? "Change any detail and save. The lead keeps its ID, status and history." : "Lead ID auto-generated on save (e.g. IR07001)."}</p>
         </div>
+        {!editing && (
+          <Button asChild variant="outline" size="sm">
+            <a href="/leads/new" target="_blank" onClick={openNewWindow} title="Open another blank lead form in a separate window" data-testid="new-lead-window">
+              <ExternalLink size={14} /> Open in new window
+            </a>
+          </Button>
+        )}
       </div>
 
       <form onSubmit={submit} className="space-y-3">

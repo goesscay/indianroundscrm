@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
@@ -39,6 +40,13 @@ function LeadList() {
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState("");
   const router = useRouter();
+
+  /** A plain click opens the lead here; Ctrl/Cmd/Shift-click and clicks on links or buttons are left to the browser. */
+  const openRow = (e: React.MouseEvent, leadId: string) => {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("a,button")) return;
+    router.push(`/leads/${leadId}`);
+  };
   const { can } = useCurrentUser();
   const pricing = can("leads.edit", "suppliers.view", "rsq.manage"); // supplier quote, selling price and profit are not shown to sales
 
@@ -104,7 +112,7 @@ function LeadList() {
             </Button>
           )}
           {can("leads.create") && (
-            <Button onClick={() => router.push("/leads/new")} data-testid="new-lead-btn">+ New Lead</Button>
+            <Button asChild><Link href="/leads/new" data-testid="new-lead-btn">+ New Lead</Link></Button>
           )}
         </div>
       </div>
@@ -169,10 +177,11 @@ function LeadList() {
                 const waPhone = tenDigit.length === 10 ? `91${tenDigit}` : digits;
                 return (
                 <TableRow key={l.lead_id} className="cursor-pointer hover:bg-secondary/50"
-                          onClick={() => router.push(`/leads/${l.lead_id}`)}
+                          onClick={(e) => openRow(e, l.lead_id)}
+                          onAuxClick={(e) => { if (e.button === 1 && !(e.target as HTMLElement).closest("a,button")) window.open(`/leads/${l.lead_id}`, "_blank"); }}
                           data-testid={`lead-row-${l.lead_id}`}>
-                  <TableCell className="font-mono font-semibold">{l.lead_id}</TableCell>
-                  <TableCell className="font-medium">{l.customer_name}</TableCell>
+                  <TableCell className="font-mono font-semibold"><Link href={`/leads/${l.lead_id}`} className="hover:underline" data-testid={`lead-link-${l.lead_id}`}>{l.lead_id}</Link></TableCell>
+                  <TableCell className="font-medium"><Link href={`/leads/${l.lead_id}`} className="hover:underline">{l.customer_name}</Link></TableCell>
                   <TableCell className="text-muted-foreground" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs">{l.phone}</span>
