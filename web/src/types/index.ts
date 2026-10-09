@@ -129,6 +129,7 @@ export interface Supplier {
   phone?: string;
   destination?: string;
   country?: string;
+  portal_enabled?: boolean;
 }
 
 export interface SupplierCreate {
@@ -137,6 +138,15 @@ export interface SupplierCreate {
   phone: string;
   destination: string;
   country: string;
+  portal_enabled?: boolean;
+}
+
+export interface PortalUser {
+  id: string;
+  name: string;
+  email: string;
+  active: boolean;
+  last_login_at: string | null;
 }
 
 export interface MasterItem {
@@ -498,7 +508,7 @@ export interface ActivityInput {
 
 // ---- Supplier reply tracking ----
 export type SupplierReplyStatus = "matched" | "unmatched" | "auto_reply" | "bounce" | "ignored";
-export type SupplierReplyMatchedBy = "thread" | "reference" | "subject" | "sender" | "manual";
+export type SupplierReplyMatchedBy = "thread" | "reference" | "subject" | "sender" | "manual" | "portal";
 
 export interface SupplierReplyAttachment {
   id: string;

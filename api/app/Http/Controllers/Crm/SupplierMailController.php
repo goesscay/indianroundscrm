@@ -13,6 +13,7 @@ use App\Models\MailRecipient;
 use App\Models\RsqRequest;
 use App\Models\Supplier;
 use App\Support\ActivityLogger;
+use App\Services\SupplierPortal\PortalMail;
 use App\Support\Ids;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -52,14 +53,58 @@ class SupplierMailController extends Controller
         if (stripos($subject, $leadId) === false) {
             $subject = rtrim($subject).' - '.$leadId; // replies are matched by the lead id in the subject
         }
-        $mailBody = trim((string) ($b['body'] ?? '')) !== '' ? $b['body'] : Rfq::render($lead);
+        $fullBody = trim((string) ($b['body'] ?? '')) !== '' ? $b['body'] : Rfq::render($lead);
         $cc = $b['cc'] ?? [];
         $bcc = $b['bcc'] ?? [];
-        $result = MailSender::send(array_column($suppliers, 'email'), $subject, $mailBody, $cc, $bcc);
 
-        $mail = DB::transaction(function () use ($user, $leadId, $subject, $mailBody, $result, $suppliers, $cc, $bcc, $lead) {
+        // Portal suppliers each get their own short mail with a link; everyone else gets the full enquiry together, as before.
+        $portal = Supplier::whereIn('id', array_column($suppliers, 'id'))->where('portal_enabled', true)->pluck('id')->map(fn ($i) => (int) $i)->all();
+        $units = [];
+        $plain = [];
+        foreach ($suppliers as $s) {
+            if (in_array($s['id'], $portal, true) && PortalMail::ensureUser(Supplier::find($s['id']))) {
+                $units[] = ['suppliers' => [$s], 'body' => PortalMail::render($lead, Supplier::find($s['id'])), 'portal' => true];
+            } else {
+                $plain[] = $s;
+            }
+        }
+        if ($plain) {
+            $units[] = ['suppliers' => $plain, 'body' => $fullBody, 'portal' => false];
+        }
+
+        $mails = [];
+        $results = [];
+        foreach ($units as $unit) {
+            $result = MailSender::send(array_column($unit['suppliers'], 'email'), $subject, $unit['body'], $cc, $bcc);
+            $mails[] = $this->record($user, $lead, $subject, $unit['body'], $result, $unit['suppliers'], $cc, $bcc, $unit['portal']);
+            $results[] = $result;
+        }
+
+        $names = implode(', ', array_column($suppliers, 'name'));
+        $lead->fill([
+            'mail_status' => 'Sent', 'supplier_mail_date' => now(), 'supplier_name' => $names,
+            'lead_status' => $lead->lead_status === 'New Lead' ? 'Supplier Mail Sent' : $lead->lead_status,
+            'updated_by' => $user->email,
+        ])->save();
+        ActivityLogger::log($user, 'send_supplier_mail', 'lead', $leadId, null,
+            ['suppliers' => $names, 'status' => $results[0]['status'] ?? null, 'provider' => $results[0]['provider'] ?? null, 'portal' => count($portal)]);
+        // RSQ lane: new -> pending_reply
+        RsqRequest::upsertFor($leadId, ['status' => 'pending_reply', 'sent_at' => now()]);
+        $lead->forceFill(['rsq_status' => 'pending_reply'])->save();
+
+        // the dialog reports one outcome: a failure anywhere wins over a success
+        $headline = collect($results)->first(fn ($r) => ($r['status'] ?? '') === 'failed') ?? $results[0];
+
+        return array_merge($mails[0]->fresh('recipients')->toApi(), ['send_result' => $headline, 'mails_sent' => count($mails)]);
+    }
+
+    /** Store one outgoing mail with its recipients and move each supplier's tracker row on. */
+    private function record($user, Lead $lead, string $subject, string $body, array $result, array $suppliers, array $cc, array $bcc, bool $portal): MailHistory
+    {
+        return DB::transaction(function () use ($user, $lead, $subject, $body, $result, $suppliers, $cc, $bcc, $portal) {
+            $leadId = $lead->lead_id;
             $mail = MailHistory::create([
-                'lead_id' => $leadId, 'subject' => $subject, 'body' => $mailBody,
+                'lead_id' => $leadId, 'subject' => $subject, 'body' => $body,
                 'sent_by' => $user->email, 'sent_at' => now(),
                 'status' => $result['status'] ?? 'unknown', 'provider' => $result['provider'] ?? null,
                 'message_id' => $result['message_id'] ?? null, 'error' => $result['error'] ?? null,
@@ -82,11 +127,11 @@ class SupplierMailController extends Controller
             // upsert lead_suppliers tracker rows (assign sequence #)
             $count = LeadSupplier::where('lead_id', $leadId)->count();
             foreach ($suppliers as $s) {
+                $extra = ($conversationId ? ['conversation_id' => $conversationId] : []) + ($portal ? ['portal_invited_at' => now()] : []);
                 $row = LeadSupplier::where('lead_id', $leadId)->where('supplier_id', $s['id'])->first();
                 if ($row) {
                     $row->fill(['status' => 'Email Sent', 'last_email_at' => now(), 'last_update' => now(),
-                        'emails_sent' => $row->emails_sent + 1]
-                        + ($conversationId ? ['conversation_id' => $conversationId] : []))->save();
+                        'emails_sent' => $row->emails_sent + 1] + $extra)->save();
                 } else {
                     $count++;
                     LeadSupplier::create([
@@ -94,28 +139,13 @@ class SupplierMailController extends Controller
                         'supplier_email' => $s['email'], 'sequence' => $count, 'status' => 'Email Sent',
                         'emails_sent' => 1, 'first_email_at' => now(), 'last_email_at' => now(),
                         'reply_received' => false, 'quote_received' => false, 'followups' => 0,
-                        'last_update' => now(), 'created_at' => now(), 'conversation_id' => $conversationId,
-                    ]);
+                        'last_update' => now(), 'created_at' => now(),
+                    ] + $extra);
                 }
             }
 
-            $names = implode(', ', array_column($suppliers, 'name'));
-            $lead->fill([
-                'mail_status' => 'Sent', 'supplier_mail_date' => now(), 'supplier_name' => $names,
-                'lead_status' => $lead->lead_status === 'New Lead' ? 'Supplier Mail Sent' : $lead->lead_status,
-                'updated_by' => $user->email,
-            ])->save();
             return $mail;
         });
-
-        $names = implode(', ', array_column($suppliers, 'name'));
-        ActivityLogger::log($user, 'send_supplier_mail', 'lead', $leadId, null,
-            ['suppliers' => $names, 'status' => $result['status'] ?? null, 'provider' => $result['provider'] ?? null]);
-        // RSQ lane: new -> pending_reply
-        RsqRequest::upsertFor($leadId, ['status' => 'pending_reply', 'sent_at' => now()]);
-        $lead->forceFill(['rsq_status' => 'pending_reply'])->save();
-
-        return array_merge($mail->fresh('recipients')->toApi(), ['send_result' => $result]);
     }
 
     public function preview(Request $request, string $leadId)

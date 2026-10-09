@@ -9,5 +9,10 @@ class Supplier extends Model
 {
     use StringId;
 
-    protected $fillable = ['name', 'email', 'phone', 'destination', 'country'];
+    protected $fillable = ['name', 'email', 'phone', 'destination', 'country', 'portal_enabled'];
+
+    protected function casts(): array
+    {
+        return ['portal_enabled' => 'boolean'];
+    }
 }

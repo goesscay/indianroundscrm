@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Crm\SupplierPortalAdminController;
 use App\Http\Controllers\Crm\TripUploadController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\RoleController;
@@ -73,4 +74,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/suppliers', [MasterDataController::class, 'suppliersStore'])->middleware('perm:suppliers.manage');
     Route::patch('/suppliers/{sid}', [MasterDataController::class, 'suppliersUpdate'])->middleware('perm:suppliers.manage');
     Route::delete('/suppliers/{sid}', [MasterDataController::class, 'suppliersDestroy'])->middleware('perm:suppliers.manage');
+    Route::get('/suppliers/{sid}/portal-users', [SupplierPortalAdminController::class, 'index'])->middleware('perm:suppliers.manage');
+    Route::post('/suppliers/{sid}/portal-users', [SupplierPortalAdminController::class, 'store'])->middleware('perm:suppliers.manage');
+    Route::patch('/suppliers/{sid}/portal-users/{uid}', [SupplierPortalAdminController::class, 'update'])->middleware('perm:suppliers.manage');
+    Route::delete('/suppliers/{sid}/portal-users/{uid}', [SupplierPortalAdminController::class, 'destroy'])->middleware('perm:suppliers.manage');
 });

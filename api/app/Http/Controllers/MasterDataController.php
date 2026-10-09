@@ -139,6 +139,7 @@ class MasterDataController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'destination' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
+            'portal_enabled' => ['sometimes', 'boolean'],
         ]);
         $data['email'] = strtolower($data['email']);
         if (Supplier::where('email', $data['email'])->exists()) {
@@ -147,7 +148,11 @@ class MasterDataController extends Controller
         $s = Supplier::create([
             'name' => $data['name'], 'email' => $data['email'],
             'phone' => $data['phone'] ?? '', 'destination' => $data['destination'] ?? '', 'country' => $data['country'] ?? '',
+            'portal_enabled' => (bool) ($data['portal_enabled'] ?? false),
         ]);
+        if ($s->portal_enabled) {
+            \App\Services\SupplierPortal\PortalMail::ensureUser($s);
+        }
         ActivityLogger::log($request->user(), 'create_supplier', 'supplier', $s->id, null, ['name' => $s->name]);
 
         return $s->fresh();
@@ -165,6 +170,7 @@ class MasterDataController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'destination' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
+            'portal_enabled' => ['sometimes', 'boolean'],
         ]);
         if (isset($data['email'])) {
             $data['email'] = strtolower($data['email']);
@@ -172,13 +178,19 @@ class MasterDataController extends Controller
                 abort(400, 'Another supplier already uses this email');
             }
         }
-        $before = $s->only(['name', 'email', 'phone', 'destination', 'country']);
+        $before = $s->only(['name', 'email', 'phone', 'destination', 'country', 'portal_enabled']);
         foreach (['phone', 'destination', 'country'] as $k) {
             if (array_key_exists($k, $data)) {
                 $data[$k] = (string) ($data[$k] ?? '');
             }
         }
         $s->fill($data)->save();
+        if ($s->portal_enabled) {
+            \App\Services\SupplierPortal\PortalMail::ensureUser($s);
+        } elseif (! $s->portal_enabled) {
+            // switching the portal off ends every open supplier session at once
+            \Illuminate\Support\Facades\DB::table('supplier_sessions')->whereIn('supplier_user_id', \App\Models\SupplierUser::where('supplier_id', $s->id)->select('id'))->delete();
+        }
         ActivityLogger::log($request->user(), 'update_supplier', 'supplier', $s->id, $before, $s->only(array_keys($before)));
 
         return $s->fresh();

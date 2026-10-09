@@ -12,13 +12,72 @@ import { Pagination, usePagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { Trash2, Plus, Pencil } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
-import type { Supplier, SupplierCreate } from "@/types";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { PortalUser, Supplier, SupplierCreate } from "@/types";
+
+/** Who at the supplier may sign in to the supplier portal (only meaningful once the supplier exists). */
+function PortalUsers({ supplierId }: { supplierId: string }) {
+  const [users, setUsers] = useState<PortalUser[]>([]);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    try { const { data } = await api.get<PortalUser[]>(`/suppliers/${supplierId}/portal-users`); setUsers(data); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [supplierId]);
+
+  const add = async () => {
+    if (!email.trim()) return;
+    setBusy(true);
+    try { await api.post(`/suppliers/${supplierId}/portal-users`, { name: name.trim(), email: email.trim() }); setName(""); setEmail(""); await load(); toast.success("Added"); }
+    catch (e) { toast.error(formatApiError(e)); }
+    finally { setBusy(false); }
+  };
+  const toggle = async (u: PortalUser) => {
+    try { await api.patch(`/suppliers/${supplierId}/portal-users/${u.id}`, { active: !u.active }); await load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+  const remove = async (u: PortalUser) => {
+    if (!window.confirm(`Remove portal access for ${u.email}?`)) return;
+    try { await api.delete(`/suppliers/${supplierId}/portal-users/${u.id}`); await load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-border p-3" data-testid="portal-users">
+      <div className="label-caps">People who can sign in</div>
+      {users.length === 0 && <div className="text-xs text-muted-foreground">No one yet. The main e-mail of the supplier is added when you save with the portal switched on.</div>}
+      <ul className="divide-y divide-border">
+        {users.map((u) => (
+          <li key={u.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+            <div className="min-w-0">
+              <div className={u.active ? "truncate" : "truncate text-muted-foreground line-through"}>{u.name ? `${u.name} · ` : ""}{u.email}</div>
+              <div className="text-xs text-muted-foreground">{u.last_login_at ? `Last sign-in ${new Date(u.last_login_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : "Never signed in"}</div>
+            </div>
+            <div className="flex shrink-0 gap-1">
+              <Button type="button" size="sm" variant="ghost" onClick={() => toggle(u)}>{u.active ? "Pause" : "Resume"}</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => remove(u)} aria-label={`Remove ${u.email}`}><Trash2 size={14} className="text-destructive" /></Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
+        <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input type="email" placeholder="colleague@supplier.com" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="portal-user-email" />
+        <Button type="button" variant="outline" onClick={add} disabled={busy || !email.trim()} data-testid="portal-user-add">Add</Button>
+      </div>
+    </div>
+  );
+}
 
 export default function Suppliers() {
   const { can } = useCurrentUser();
   const canEdit = can("suppliers.manage");
   const [rows, setRows] = useState<Supplier[]>([]);
-  const EMPTY: SupplierCreate = { name: "", email: "", phone: "", destination: "", country: "" };
+  const EMPTY: SupplierCreate = { name: "", email: "", phone: "", destination: "", country: "", portal_enabled: false };
   const [f, setF] = useState<SupplierCreate>(EMPTY);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null); // null = adding
@@ -35,7 +94,7 @@ export default function Suppliers() {
   const openAdd = () => { setEditId(null); setF(EMPTY); setOpen(true); };
   const openEdit = (s: Supplier) => {
     setEditId(s.id);
-    setF({ name: s.name ?? "", email: s.email ?? "", phone: s.phone ?? "", destination: s.destination ?? "", country: s.country ?? "" });
+    setF({ name: s.name ?? "", email: s.email ?? "", phone: s.phone ?? "", destination: s.destination ?? "", country: s.country ?? "", portal_enabled: !!s.portal_enabled });
     setOpen(true);
   };
 
@@ -89,6 +148,14 @@ export default function Suppliers() {
                 <div><Label className="label-caps">Destination</Label><Input className="mt-1.5" value={f.destination} onChange={e => setF({ ...f, destination: e.target.value })} data-testid="s-destination" /></div>
                 <div className="sm:col-span-2"><Label className="label-caps">Country</Label><Input className="mt-1.5" value={f.country} onChange={e => setF({ ...f, country: e.target.value })} data-testid="s-country" /></div>
               </div>
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-3 text-sm" data-testid="s-portal-label">
+                <Checkbox checked={!!f.portal_enabled} onCheckedChange={(v) => setF({ ...f, portal_enabled: v === true })} data-testid="s-portal" />
+                <span>
+                  <span className="font-medium">Supplier portal access</span>
+                  <span className="block text-xs text-muted-foreground">Enquiries to this supplier go out as a short link e-mail, and they send their quote through the portal instead of by e-mail.</span>
+                </span>
+              </label>
+              {editId && f.portal_enabled && <PortalUsers supplierId={editId} />}
               <DialogFooter className="gap-2 sm:gap-2">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)} data-testid="s-cancel">Cancel</Button>
                 <Button type="submit" disabled={saving} data-testid="s-add">{saving ? "Saving…" : editId ? "Save changes" : "Add supplier"}</Button>
@@ -112,7 +179,7 @@ export default function Suppliers() {
               {rows.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No suppliers yet</TableCell></TableRow>}
               {pg.pageItems.map(s => (
                 <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.name}</TableCell>
+                  <TableCell className="font-medium">{s.name}{s.portal_enabled && <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/60 dark:text-sky-300" title="Uses the supplier portal">Portal</span>}</TableCell>
                   <TableCell>{s.email}</TableCell>
                   <TableCell>{s.phone}</TableCell>
                   <TableCell>{s.destination}</TableCell>

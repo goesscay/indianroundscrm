@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +14,7 @@ export default function InstallPrompt() {
   const [evt, setEvt] = useState<InstallEvent | null>(null);
   const [ios, setIos] = useState(false);
   const [hidden, setHidden] = useState(true);
+  const pathname = usePathname();
 
   useEffect(() => {
     let dismissed = false;
@@ -31,6 +33,7 @@ export default function InstallPrompt() {
   const dismiss = () => { setHidden(true); try { localStorage.setItem(DISMISS_KEY, "1"); } catch { /* ignore */ } };
   const install = async () => { if (!evt) return; await evt.prompt(); await evt.userChoice; setEvt(null); setHidden(true); };
 
+  if (pathname?.startsWith("/portal")) return null; // suppliers are not offered the ERP app
   if (hidden || (!evt && !ios)) return null;
   return (
     <div className="fixed bottom-4 left-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-lg border border-border bg-card p-3 pr-2 shadow-lg" role="dialog" aria-label="Install app" data-testid="install-prompt">

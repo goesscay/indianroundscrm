@@ -28,6 +28,17 @@ class AttachmentStore
         'zip' => ['application/zip', 'application/x-zip-compressed'],
     ];
 
+    public static function allowedExtensions(): array
+    {
+        return array_keys(self::ALLOWED);
+    }
+
+    /** The content type we store a file of this extension under. */
+    public static function canonicalType(string $ext): ?string
+    {
+        return self::ALLOWED[strtolower($ext)][0] ?? null;
+    }
+
     /** @param  list<AttachmentData>  $items */
     public function storeAll(SupplierReply $reply, array $items): void
     {

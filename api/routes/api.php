@@ -9,6 +9,9 @@ require __DIR__.'/api_core.php';
 // Leads / CRM half (Backend-B): require its route file here, e.g.
 require __DIR__.'/api_leads.php';
 
+// Supplier portal (separate sign-in, no ERP access).
+require __DIR__.'/api_portal.php';
+
 // Internal team chat (direct messages + admin-created groups).
 require __DIR__.'/api_chat.php';
 

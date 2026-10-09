@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnforceSession;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\SupplierPortalAuth;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -24,12 +25,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA cookie auth (stateful domains from SANCTUM_STATEFUL_DOMAINS).
         $middleware->statefulApi();
+        // The portal cookie is a random token whose hash is stored server side, so Laravel does not encrypt it.
+        $middleware->encryptCookies(except: ['ir_portal']);
         $middleware->trustProxies(at: ['127.0.0.1', '::1']);
         // Per-session security checks (token_version, revocation, idle timeout, account status).
         $middleware->appendToGroup('api', EnforceSession::class);
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'perm' => PermissionMiddleware::class,
+            'supplier.auth' => SupplierPortalAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

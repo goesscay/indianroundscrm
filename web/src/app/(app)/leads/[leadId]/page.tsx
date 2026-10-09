@@ -576,7 +576,7 @@ export default function LeadDetail() {
                   <label key={s.id} className="flex items-start gap-2 cursor-pointer text-sm" data-testid={`supplier-${s.id}`}>
                     <Checkbox checked={!!selected[s.id]} onCheckedChange={(v) => setSelected(p => ({ ...p, [s.id]: v === true }))} />
                     <div>
-                      <div className="font-medium">{s.name}</div>
+                      <div className="font-medium">{s.name}{s.portal_enabled && <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/60 dark:text-sky-300" title="Gets a short link e-mail and quotes in the portal">Portal</span>}</div>
                       <div className="text-xs text-muted-foreground">{s.email} · {s.destination}</div>
                     </div>
                   </label>

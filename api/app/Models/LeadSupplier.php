@@ -18,6 +18,6 @@ class LeadSupplier extends Model
         'flight_included' => 'boolean', 'transfer_included' => 'boolean',
         'quote_amount' => 'float', 'sequence' => 'integer', 'followups' => 'integer', 'emails_sent' => 'integer',
         'first_email_at' => 'datetime', 'last_email_at' => 'datetime', 'reply_date' => 'datetime',
-        'last_followup_at' => 'datetime', 'last_update' => 'datetime', 'created_at' => 'datetime',
+        'last_followup_at' => 'datetime', 'portal_invited_at' => 'datetime', 'last_update' => 'datetime', 'created_at' => 'datetime',
     ];
 }
