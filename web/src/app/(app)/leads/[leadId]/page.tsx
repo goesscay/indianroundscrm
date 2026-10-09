@@ -217,6 +217,12 @@ export default function LeadDetail() {
           <p className="text-sm text-muted-foreground mt-1">
             {lead.customer_name} · {lead.destination} · Travel {(lead.travel_date || "").slice(0, 10)}
           </p>
+          {lead.created_at && (
+            <p className="text-xs text-muted-foreground mt-0.5" data-testid="lead-created">
+              Created {new Date(lead.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}
+              {lead.staff_name ? ` · Owner ${lead.staff_name}` : ""}
+            </p>
+          )}
         </div>
           <div className="flex gap-2 flex-wrap">
             {canQuote && !lead.quote_type && (

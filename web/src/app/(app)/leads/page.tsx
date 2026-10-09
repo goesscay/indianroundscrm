@@ -34,6 +34,9 @@ function LeadList() {
   const [source, setSource] = useState("all");
   const [destination, setDestination] = useState("all");
   const [owner, setOwner] = useState("all");
+  const [dateField, setDateField] = useState<"created" | "travel">("created");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [options, setOptions] = useState<FilterOptions>({ sources: [], destinations: [], owners: [] });
   const [bulkOpen, setBulkOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -57,8 +60,13 @@ function LeadList() {
     if (source !== "all") p.lead_source = source;
     if (destination !== "all") p.destination = destination;
     if (owner !== "all") p.staff_id = owner;
+    if (dateFrom || dateTo) {
+      p.date_field = dateField;
+      if (dateFrom) p.date_from = dateFrom;
+      if (dateTo) p.date_to = dateTo;
+    }
     return p;
-  }, [applied, status, source, destination, owner]);
+  }, [applied, status, source, destination, owner, dateField, dateFrom, dateTo]);
   const { rows: leads, loading, loaded, error, paginationProps } = usePagedList<Lead>("/leads", params, refreshTick);
   const err = error || exportErr;
 
@@ -73,8 +81,18 @@ function LeadList() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const activeFilters = (q.trim() ? 1 : 0) + [status, source, destination, owner].filter(v => v !== "all").length;
-  const clearFilters = () => { setQ(""); setApplied(""); setStatus("all"); setSource("all"); setDestination("all"); setOwner("all"); };
+  const activeFilters = (q.trim() ? 1 : 0) + [status, source, destination, owner].filter(v => v !== "all").length + (dateFrom || dateTo ? 1 : 0);
+  const clearFilters = () => { setQ(""); setApplied(""); setStatus("all"); setSource("all"); setDestination("all"); setOwner("all"); setDateFrom(""); setDateTo(""); setDateField("created"); };
+
+  // quick ranges for the created date (calendar days as the team sees them)
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const preset = (kind: "today" | "week" | "month") => {
+    const now = new Date();
+    const from = new Date(now);
+    if (kind === "week") from.setDate(now.getDate() - 6);
+    if (kind === "month") from.setDate(1);
+    setDateField("created"); setDateFrom(iso(from)); setDateTo(iso(now));
+  };
 
   // Export ALL rows matching the current filters (legacy un-paged endpoint), not just this page.
   const exportCsv = async () => {
@@ -143,6 +161,25 @@ function LeadList() {
         {can("leads.view_all") && (
           <Combobox className="w-[170px]" value={owner} onChange={setOwner} options={options.owners.map(o => ({ value: o.id, label: o.name }))} placeholder="Everyone's" clearLabel="Everyone's" clearValue="all" searchPlaceholder="Search consultant…" testId="filter-owner" />
         )}
+        <div className="flex flex-wrap items-center gap-2" data-testid="filter-dates">
+          <Select value={dateField} onValueChange={(v) => setDateField(v as "created" | "travel")}>
+            <SelectTrigger className="w-[130px] h-9" aria-label="Date to filter by" data-testid="filter-date-field"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created">Created date</SelectItem>
+              <SelectItem value="travel">Travel date</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="date" className="h-9 w-[150px]" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} aria-label="From date" title="From" data-testid="filter-date-from" />
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input type="date" className="h-9 w-[150px]" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} aria-label="To date" title="To" data-testid="filter-date-to" />
+          {dateField === "created" && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => preset("today")} data-testid="date-today">Today</Button>
+              <Button variant="outline" size="sm" onClick={() => preset("week")} data-testid="date-week">Last 7 days</Button>
+              <Button variant="outline" size="sm" onClick={() => preset("month")} data-testid="date-month">This month</Button>
+            </>
+          )}
+        </div>
         {activeFilters > 0 && (
           <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="clear-filters">
             <X size={14} /> Clear filters
@@ -159,6 +196,7 @@ function LeadList() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Destination</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead>Travel</TableHead>
                 <TableHead>Status</TableHead>
                 {pricing && <TableHead className="text-right">Selling ₹</TableHead>}
@@ -167,9 +205,9 @@ function LeadList() {
               </TableRow>
             </TableHeader>
             <TableBody className={loading && loaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
-              {loading && !loaded && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
+              {loading && !loaded && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
               {loaded && leads.length === 0 && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-12">No leads yet. Create one to get started.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-12">No leads yet. Create one to get started.</TableCell></TableRow>
               )}
               {leads.map((l) => {
                 const digits = (l.phone || "").replace(/\D/g, "");
@@ -204,6 +242,9 @@ function LeadList() {
                     </div>
                   </TableCell>
                   <TableCell>{l.destination}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs whitespace-nowrap" title={l.created_at ? new Date(l.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : ""} data-testid={`lead-created-${l.lead_id}`}>
+                    {l.created_at ? new Date(l.created_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" }) : ""}
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-xs">{(l.travel_date || "").slice(0, 10)}</TableCell>
                   <TableCell><StatusPill status={l.lead_status} /></TableCell>
                   {pricing && <TableCell className="text-right font-semibold">{INR(l.selling_amount)}</TableCell>}

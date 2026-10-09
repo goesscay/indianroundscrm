@@ -209,6 +209,7 @@ class LeadController extends Controller
         if (($v = (string) $request->query('lead_source', '')) !== '') {
             $q->where('lead_source', $v);
         }
+        $this->applyDateRange($q, $request);
         if (($s = (string) $request->query('q', '')) !== '') {
             $like = '%'.addcslashes($s, '\\%_').'%';
             $q->where(function ($w) use ($like) {
@@ -224,6 +225,38 @@ class LeadController extends Controller
         $limit = max(1, (int) $request->query('limit', 500));
         return $q->limit($limit)->get()
             ->map(fn (Lead $l) => $l->toApi())->values();
+    }
+
+    /**
+     * date_field=created|travel with date_from / date_to (YYYY-MM-DD, both inclusive, either may be left out).
+     * "created" counts calendar days in India (IST); "travel" compares the travel date as written on the lead.
+     */
+    private function applyDateRange($q, Request $request): void
+    {
+        $ok = fn (string $d) => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
+        $from = (string) $request->query('date_from', '');
+        $to = (string) $request->query('date_to', '');
+        $from = $ok($from) ? $from : '';
+        $to = $ok($to) ? $to : '';
+        if ($from === '' && $to === '') {
+            return;
+        }
+        if ((string) $request->query('date_field', 'created') === 'travel') {
+            if ($from !== '') {
+                $q->whereRaw('substr(travel_date, 1, 10) >= ?', [$from]);
+            }
+            if ($to !== '') {
+                $q->whereRaw("substr(travel_date, 1, 10) <= ? and travel_date <> ''", [$to]);
+            }
+
+            return;
+        }
+        if ($from !== '') {
+            $q->where('created_at', '>=', \Illuminate\Support\Carbon::parse($from, 'Asia/Kolkata')->startOfDay()->utc());
+        }
+        if ($to !== '') {
+            $q->where('created_at', '<', \Illuminate\Support\Carbon::parse($to, 'Asia/Kolkata')->addDay()->startOfDay()->utc());
+        }
     }
 
     /** Distinct values for the leads list filters, scoped to the leads this user can see. */
