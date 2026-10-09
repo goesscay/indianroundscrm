@@ -85,6 +85,25 @@ export default function Suppliers() {
 
   const pg = usePagination(rows);
 
+  // bulk portal switch
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const pageIds = pg.pageItems.map((s) => s.id);
+  const allOnPage = pageIds.length > 0 && pageIds.every((id) => sel.has(id));
+  const toggleOne = (id: string) => setSel((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const togglePage = () => setSel((p) => { const n = new Set(p); pageIds.forEach((id) => (allOnPage ? n.delete(id) : n.add(id))); return n; });
+  const bulkPortal = async (enabled: boolean) => {
+    const n = sel.size;
+    if (!window.confirm(enabled
+      ? `Switch the supplier portal ON for ${n} supplier${n === 1 ? "" : "s"}?\n\nFrom the next enquiry they get a short link e-mail and send their quote through the portal.`
+      : `Switch the supplier portal OFF for ${n} supplier${n === 1 ? "" : "s"}?\n\nAnyone signed in is signed out, and they get the full enquiry by e-mail again.`)) return;
+    try {
+      const { data } = await api.post<{ changed: number; skipped: { name: string; reason: string }[] }>("/suppliers/portal-bulk", { ids: Array.from(sel), enabled });
+      toast.success(`Portal ${enabled ? "on" : "off"} for ${data.changed} supplier${data.changed === 1 ? "" : "s"}`);
+      if (data.skipped.length) toast.warning(`Skipped: ${data.skipped.map((x) => `${x.name} (${x.reason})`).join("; ")}`, { duration: 12000 });
+      setSel(new Set()); load();
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
+
   const load = async () => {
     try { const { data } = await api.get<Supplier[]>("/suppliers"); setRows(data); }
     catch (e) { toast.error(formatApiError(e)); }
@@ -165,20 +184,31 @@ export default function Suppliers() {
         </Dialog>
       )}
 
+      {canEdit && sel.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm" data-testid="s-bulk-bar">
+          <span className="font-medium">{sel.size} selected</span>
+          <Button size="sm" onClick={() => bulkPortal(true)} data-testid="s-bulk-on">Portal on</Button>
+          <Button size="sm" variant="outline" onClick={() => bulkPortal(false)} data-testid="s-bulk-off">Portal off</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>Clear</Button>
+        </div>
+      )}
+
       <Card className="rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
+                {canEdit && <TableHead className="w-8"><Checkbox checked={allOnPage} onCheckedChange={togglePage} aria-label="Select all on this page" data-testid="s-select-page" /></TableHead>}
                 <TableHead>Name</TableHead><TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead><TableHead>Destination</TableHead>
                 <TableHead>Country</TableHead><TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No suppliers yet</TableCell></TableRow>}
+              {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No suppliers yet</TableCell></TableRow>}
               {pg.pageItems.map(s => (
                 <TableRow key={s.id}>
+                  {canEdit && <TableCell><Checkbox checked={sel.has(s.id)} onCheckedChange={() => toggleOne(s.id)} aria-label={`Select ${s.name}`} data-testid={`s-select-${s.id}`} /></TableCell>}
                   <TableCell className="font-medium">{s.name}{s.portal_enabled && <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/60 dark:text-sky-300" title="Uses the supplier portal">Portal</span>}</TableCell>
                   <TableCell>{s.email}</TableCell>
                   <TableCell>{s.phone}</TableCell>

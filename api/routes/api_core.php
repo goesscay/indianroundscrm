@@ -74,6 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/suppliers', [MasterDataController::class, 'suppliersStore'])->middleware('perm:suppliers.manage');
     Route::patch('/suppliers/{sid}', [MasterDataController::class, 'suppliersUpdate'])->middleware('perm:suppliers.manage');
     Route::delete('/suppliers/{sid}', [MasterDataController::class, 'suppliersDestroy'])->middleware('perm:suppliers.manage');
+    Route::post('/suppliers/portal-bulk', [SupplierPortalAdminController::class, 'bulk'])->middleware('perm:suppliers.manage');
     Route::get('/suppliers/{sid}/portal-users', [SupplierPortalAdminController::class, 'index'])->middleware('perm:suppliers.manage');
     Route::post('/suppliers/{sid}/portal-users', [SupplierPortalAdminController::class, 'store'])->middleware('perm:suppliers.manage');
     Route::patch('/suppliers/{sid}/portal-users/{uid}', [SupplierPortalAdminController::class, 'update'])->middleware('perm:suppliers.manage');

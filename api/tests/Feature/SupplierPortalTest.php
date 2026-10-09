@@ -349,6 +349,210 @@ class SupplierPortalTest extends TestCase
         $this->assertSame('pending_reply', RsqRequest::where('lead_id', 'IRMH10030')->value('status'));
     }
 
+    // ------------------------------------------------------------------ phase 2: messages, reminders, choosing a quote
+
+    private function asUser(User $u): void
+    {
+        $this->unencryptedCookies = [];
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs($u, ['*'], 'sanctum');
+    }
+
+    public function test_supplier_and_team_exchange_messages_and_each_side_is_told(): void
+    {
+        [, , , , $tr] = $this->world();
+        $ops = User::factory()->operations()->create();
+        Event::fake([SupplierReplyReceived::class]);
+        $token = $this->signIn();
+
+        // supplier -> team: stored, shown back to the supplier, and Operations is alerted like for an e-mailed reply
+        $res = $this->portal($token)->postJson('/api/portal/requests/IRMH10023/messages', ['body' => 'Is a sea-view room needed?'])->assertOk();
+        $res->assertJsonPath('request.messages.0.from', 'you')->assertJsonPath('request.messages.0.body', 'Is a sea-view room needed?');
+        $this->assertSame(1, DB::table('supplier_messages')->where('direction', 'supplier')->count());
+        $reply = SupplierReply::where('matched_by', 'portal')->first();
+        $this->assertStringContainsString('sea-view', $reply->body_text);
+        Event::assertDispatchedTimes(SupplierReplyReceived::class, 1);
+        $this->postJson('/api/portal/requests/IRMH10023/messages', ['body' => ''])->assertStatus(422);
+        $this->postJson('/api/portal/requests/IRMH10023/messages', ['body' => str_repeat('x', 2001)])->assertStatus(422);
+
+        // team -> supplier: a mail that points to the portal and does not carry the text
+        $this->asUser($ops);
+        $this->postJson("/api/lead-suppliers/{$tr->id}/messages", ['body' => 'Yes, sea view please. Budget is tight.'])->assertOk()->assertJsonPath('notified', true);
+        $mail = end($this->mail->sent);
+        $this->assertSame(['agent@sunrise.test'], $mail->to);
+        $this->assertStringContainsString('IRMH10023', $mail->subject);
+        $this->assertStringNotContainsString('Budget is tight', $mail->body);
+        $this->assertStringContainsString('https://erp.test/portal/requests/IRMH10023', $mail->body);
+        $thread = $this->getJson("/api/lead-suppliers/{$tr->id}/messages")->assertOk()->json();
+        $this->assertSame(['supplier', 'team'], array_column($thread, 'from'));
+        $this->assertFalse($thread[1]['seen']);
+
+        // the supplier sees an unread badge in the list, and opening the enquiry marks it read
+        $this->portal($token);
+        $this->getJson('/api/portal/requests')->assertJsonPath('0.unread_messages', 1);
+        $d = $this->getJson('/api/portal/requests/IRMH10023')->assertOk();
+        $d->assertJsonPath('messages.1.from', 'team')->assertJsonPath('messages.1.body', 'Yes, sea view please. Budget is tight.');
+        $this->getJson('/api/portal/requests')->assertJsonPath('0.unread_messages', 0);
+        $this->asUser($ops);
+        $this->assertTrue($this->getJson("/api/lead-suppliers/{$tr->id}/messages")->json('1.seen'));
+    }
+
+    public function test_messages_are_for_portal_suppliers_and_for_operations_only(): void
+    {
+        [$owner, $lead, $sup, , $tr] = $this->world();
+        $plain = $this->tracker($lead->lead_id, Supplier::create(['name' => 'Old Co', 'email' => 'old@o.test']), ['sequence' => 2]);
+        $this->asUser($owner);                                                           // sales
+        $this->getJson("/api/lead-suppliers/{$tr->id}/messages")->assertStatus(403);
+        $this->postJson("/api/lead-suppliers/{$tr->id}/messages", ['body' => 'hi'])->assertStatus(403);
+        $this->postJson("/api/lead-suppliers/{$tr->id}/portal-remind")->assertStatus(403);
+        $this->postJson("/api/lead-suppliers/{$tr->id}/use-quote")->assertStatus(403);
+        $this->asUser(User::factory()->operations()->create());
+        $this->getJson("/api/lead-suppliers/{$plain->id}/messages")->assertStatus(404);   // never sent the portal link
+        $this->postJson("/api/lead-suppliers/{$plain->id}/messages", ['body' => 'hi'])->assertStatus(404);
+    }
+
+    public function test_send_sets_the_reply_by_date_and_says_so_in_the_mail(): void
+    {
+        $ops = User::factory()->operations()->create();
+        $lead = Lead::create(['lead_id' => 'IRMH10031', 'customer_name' => 'Asha', 'phone' => '9876501234', 'destination' => 'Bali']);
+        $p = Supplier::create(['name' => 'Portal One', 'email' => 'one@p.test', 'portal_enabled' => true]);
+        $this->asUser($ops);
+        $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'Trip Enquiry - IRMH10031 - Bali'])->assertOk();
+        $by = LeadSupplier::where('supplier_id', $p->id)->first()->respond_by;
+        $this->assertSame(now()->addDays(3)->toDateString(), $by->toDateString());          // the default window
+        $this->assertStringContainsString('Quote needed by : '.$by->format('d M Y'), end($this->mail->sent)->body);
+
+        $custom = now()->addDays(9)->toDateString();
+        $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'Trip Enquiry - IRMH10031 - Bali', 'respond_by' => $custom])->assertOk();
+        $this->assertSame($custom, LeadSupplier::where('supplier_id', $p->id)->first()->respond_by->toDateString());
+        $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'x - IRMH10031', 'respond_by' => '2001-01-01'])->assertStatus(422);
+    }
+
+    public function test_reminders_go_to_suppliers_who_have_not_quoted_at_most_twice_and_never_when_switched_off(): void
+    {
+        [, $lead, $sup, , $tr] = $this->world();
+        $tr->update(['respond_by' => now()->addDay()->toDateString()]);                    // due tomorrow
+        $quoted = Supplier::create(['name' => 'Quick Co', 'email' => 'q@q.test', 'portal_enabled' => true]);
+        SupplierUser::create(['supplier_id' => $quoted->id, 'name' => 'Q', 'email' => 'q@q.test']);
+        $done = $this->tracker($lead->lead_id, $quoted, ['sequence' => 2, 'portal_invited_at' => now(), 'respond_by' => now()->subDay()->toDateString()]);
+        $token = $this->signIn('q@q.test');
+        $this->portal($token)->postJson('/api/portal/requests/IRMH10023/quote', ['amount' => 100])->assertOk();
+        $later = Supplier::create(['name' => 'Later Co', 'email' => 'l@l.test', 'portal_enabled' => true]);
+        SupplierUser::create(['supplier_id' => $later->id, 'name' => 'L', 'email' => 'l@l.test']);
+        $this->tracker($lead->lead_id, $later, ['sequence' => 3, 'portal_invited_at' => now(), 'respond_by' => now()->addDays(5)->toDateString()]);
+        $before = count($this->mail->sent);
+
+        config(['crm.portal.auto_reminders' => false]);
+        $this->artisan('portal:remind')->assertSuccessful();
+        $this->assertCount($before, $this->mail->sent);                                     // off: nothing goes out
+
+        config(['crm.portal.auto_reminders' => true]);
+        $this->artisan('portal:remind')->assertSuccessful();
+        $new = array_slice($this->mail->sent, $before);
+        $this->assertCount(1, $new);                                                        // only the supplier that is due and silent
+        $this->assertSame(['agent@sunrise.test'], $new[0]->to);
+        $this->assertStringContainsString('Reminder', $new[0]->subject);
+        $this->assertSame(1, $tr->fresh()->portal_reminders);
+        $this->artisan('portal:remind')->assertSuccessful();                                // the same day: not again
+        $this->assertCount(1, array_slice($this->mail->sent, $before));
+        $tr->update(['portal_reminded_at' => now()->subDay()]);
+        $this->artisan('portal:remind')->assertSuccessful();                                // a day later: the second
+        $tr->update(['portal_reminded_at' => now()->subDay()]);
+        $this->artisan('portal:remind')->assertSuccessful();                                // never a third
+        $this->assertSame(2, $tr->fresh()->portal_reminders);
+        $this->assertCount(2, array_slice($this->mail->sent, $before));
+    }
+
+    public function test_operations_can_remind_by_hand_only_while_the_supplier_has_not_answered(): void
+    {
+        [, , , , $tr] = $this->world();
+        $ops = User::factory()->operations()->create();
+        $this->asUser($ops);
+        $this->postJson("/api/lead-suppliers/{$tr->id}/portal-remind")->assertOk()->assertJsonPath('portal_reminders', 1);
+        $this->assertStringContainsString('Reminder', end($this->mail->sent)->subject);
+        $token = $this->signIn();
+        $this->portal($token)->postJson('/api/portal/requests/IRMH10023/quote', ['amount' => 100])->assertOk();
+        $this->asUser($ops);
+        $this->postJson("/api/lead-suppliers/{$tr->id}/portal-remind")->assertStatus(409);
+    }
+
+    public function test_using_a_quote_sets_the_lead_supplier_price_and_closes_that_suppliers_enquiry(): void
+    {
+        [$owner, $lead, , , $tr] = $this->world();
+        $ops = User::factory()->operations()->create();
+        $token = $this->signIn();
+        $this->asUser($ops);
+        $this->postJson("/api/lead-suppliers/{$tr->id}/use-quote")->assertStatus(400);        // nothing quoted yet
+
+        $this->portal($token)->postJson('/api/portal/requests/IRMH10023/quote', ['amount' => 700, 'currency' => 'USD'])->assertOk();
+        $this->asUser($ops);
+        $this->postJson("/api/lead-suppliers/{$tr->id}/use-quote")->assertStatus(422);        // not INR: needs the rupee figure
+        $this->postJson("/api/lead-suppliers/{$tr->id}/use-quote", ['amount_inr' => 58000])->assertOk()->assertJsonPath('supplier_quote_amount', 58000);
+
+        $lead->refresh();
+        $this->assertEquals(58000, $lead->supplier_quote_amount);
+        $this->assertSame('Sunrise Travels', $lead->supplier_name);
+        $this->assertTrue((bool) $lead->quote_received);
+        $this->assertSame('Quote Accepted', $tr->fresh()->status);
+        $this->portal($token)->postJson('/api/portal/requests/IRMH10023/quote', ['amount' => 1])->assertStatus(409);   // decided: closed to revisions
+
+        // an INR quote needs no extra figure
+        $other = Supplier::create(['name' => 'Rupee Co', 'email' => 'r@r.test', 'portal_enabled' => true]);
+        $t2 = $this->tracker($lead->lead_id, $other, ['sequence' => 2, 'quote_received' => true, 'quote_amount' => 41000, 'currency' => 'INR']);
+        $this->asUser($ops);
+        $this->postJson("/api/lead-suppliers/{$t2->id}/use-quote")->assertOk();
+        $this->assertEquals(41000, $lead->fresh()->supplier_quote_amount);
+        $this->assertSame('Rupee Co', $lead->fresh()->supplier_name);
+    }
+
+    public function test_tracker_lists_portal_flag_message_count_and_the_quote_files(): void
+    {
+        [, $lead, , , $tr] = $this->world();
+        $ops = User::factory()->operations()->create();
+        $token = $this->signIn();
+        $tmp = tempnam(sys_get_temp_dir(), 'q');
+        file_put_contents($tmp, "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF");
+        $this->portal($token)->post('/api/portal/requests/IRMH10023/quote', ['amount' => 5000, 'files' => [new UploadedFile($tmp, 'Rates.pdf', 'application/pdf', null, true)]], ['Accept' => 'application/json'])->assertOk();
+        $this->portal($token)->postJson('/api/portal/requests/IRMH10023/messages', ['body' => 'hello'])->assertOk();
+        $plain = $this->tracker($lead->lead_id, Supplier::create(['name' => 'Old Co', 'email' => 'old@o.test']), ['sequence' => 2]);
+
+        $this->asUser($ops);
+        $rows = collect($this->getJson("/api/lead-suppliers/{$lead->lead_id}")->assertOk()->json())->keyBy('id');
+        $this->assertTrue($rows[(string) $tr->id]['portal']);
+        $this->assertSame(1, $rows[(string) $tr->id]['messages']);
+        $this->assertSame(['Rates.pdf'], array_column($rows[(string) $tr->id]['quote_files'], 'filename'));
+        $this->assertFalse($rows[(string) $plain->id]['portal']);
+        $this->assertSame([], $rows[(string) $plain->id]['quote_files']);
+    }
+
+    public function test_ops_can_switch_the_portal_on_or_off_for_many_suppliers_at_once(): void
+    {
+        $ops = User::factory()->operations()->create();
+        $a = Supplier::create(['name' => 'A', 'email' => 'a@a.test']);
+        $b = Supplier::create(['name' => 'B', 'email' => 'b@b.test']);
+        $clash = Supplier::create(['name' => 'C', 'email' => 'c@c.test']);
+        $other = Supplier::create(['name' => 'Owner', 'email' => 'x@x.test']);
+        SupplierUser::create(['supplier_id' => $other->id, 'name' => 'X', 'email' => 'c@c.test']);   // c@c.test already signs in for another supplier
+        $this->asUser(User::factory()->sales()->create());
+        $this->postJson('/api/suppliers/portal-bulk', ['ids' => [$a->id], 'enabled' => true])->assertStatus(403);
+
+        $this->asUser($ops);
+        $r = $this->postJson('/api/suppliers/portal-bulk', ['ids' => [$a->id, $b->id, $clash->id], 'enabled' => true])->assertOk()->json();
+        $this->assertSame(2, $r['changed']);
+        $this->assertSame(['C'], array_column($r['skipped'], 'name'));
+        $this->assertTrue((bool) $a->fresh()->portal_enabled);
+        $this->assertFalse((bool) $clash->fresh()->portal_enabled);
+        $this->assertSame(1, SupplierUser::where('supplier_id', $a->id)->count());
+
+        $token = $this->signIn('a@a.test');
+        $this->portal($token)->getJson('/api/portal/me')->assertOk();
+        $this->asUser($ops);
+        $this->postJson('/api/suppliers/portal-bulk', ['ids' => [$a->id, $b->id], 'enabled' => false])->assertOk()->assertJsonPath('changed', 2);
+        $this->portal($token)->getJson('/api/portal/me')->assertStatus(401);                // switched off: signed out at once
+        $this->asUser($ops);
+        $this->postJson('/api/suppliers/portal-bulk', ['ids' => [], 'enabled' => true])->assertStatus(422);
+    }
+
     // ------------------------------------------------------------------ managing portal users
 
     public function test_operations_manage_portal_users_and_sales_cannot(): void

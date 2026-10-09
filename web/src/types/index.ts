@@ -201,6 +201,12 @@ export interface LeadSupplier {
   followups?: number;
   sequence?: number;
   hours_since_email?: number | null;
+  /** supplier portal */
+  portal?: boolean;
+  messages?: number;
+  respond_by?: string | null;
+  portal_reminders?: number;
+  quote_files?: { id: string; filename: string }[];
   [extra: string]: unknown;
 }
 

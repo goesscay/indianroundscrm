@@ -33,6 +33,30 @@ class SupplierPortalAdminController extends Controller
         ];
     }
 
+    /** POST /suppliers/portal-bulk {ids: [...], enabled: bool} */
+    public function bulk(Request $request)
+    {
+        $d = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:500'], 'ids.*' => ['required'], 'enabled' => ['required', 'boolean']]);
+        $changed = 0;
+        $skipped = [];
+        foreach (Supplier::whereIn('id', array_map(fn ($i) => Ids::parse((string) $i), $d['ids']))->get() as $s) {
+            if ($d['enabled']) {
+                if (! \App\Services\SupplierPortal\PortalMail::ensureUser($s)) {
+                    $skipped[] = ['id' => (string) $s->id, 'name' => $s->name, 'reason' => trim((string) $s->email) === '' ? 'No e-mail address' : 'Its e-mail already belongs to another supplier\'s portal account'];
+                    continue;
+                }
+                $s->forceFill(['portal_enabled' => true])->save();
+            } else {
+                $s->forceFill(['portal_enabled' => false])->save();
+                DB::table('supplier_sessions')->whereIn('supplier_user_id', SupplierUser::where('supplier_id', $s->id)->select('id'))->delete();
+            }
+            $changed++;
+        }
+        ActivityLogger::log($request->user(), $d['enabled'] ? 'enable_supplier_portal' : 'disable_supplier_portal', 'supplier', 'bulk', null, ['count' => $changed]);
+
+        return ['changed' => $changed, 'skipped' => $skipped];
+    }
+
     public function index(string $sid)
     {
         $s = $this->supplier($sid);

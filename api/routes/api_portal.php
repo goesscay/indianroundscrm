@@ -15,6 +15,7 @@ Route::prefix('portal')->group(function () {
         Route::get('/requests/{leadId}', [PortalController::class, 'show']);
         Route::post('/requests/{leadId}/quote', [PortalController::class, 'quote'])->middleware('throttle:30,1');
         Route::post('/requests/{leadId}/decline', [PortalController::class, 'decline'])->middleware('throttle:30,1');
+        Route::post('/requests/{leadId}/messages', [PortalController::class, 'message'])->middleware('throttle:30,1');
         Route::get('/files/{id}', [PortalController::class, 'download']);
     });
 });

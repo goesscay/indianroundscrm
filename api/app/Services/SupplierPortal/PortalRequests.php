@@ -5,6 +5,7 @@ namespace App\Services\SupplierPortal;
 use App\Models\Lead;
 use App\Models\LeadSupplier;
 use App\Models\RsqRequest;
+use App\Models\SupplierMessage;
 use App\Models\SupplierQuote;
 use App\Models\SupplierReply;
 use App\Models\SupplierUser;
@@ -61,6 +62,12 @@ class PortalRequests
         return SupplierQuote::where('lead_supplier_id', $t->id)->where('status', '<>', 'superseded')->orderByDesc('version')->first();
     }
 
+    /** open | quoted | declined | closed, for reminders and the portal alike. */
+    public static function stateFor(LeadSupplier $t): string
+    {
+        return self::state($t, self::latest($t));
+    }
+
     private static function state(LeadSupplier $t, ?SupplierQuote $q): string
     {
         if ($q && $q->status === 'submitted') {
@@ -91,6 +98,8 @@ class PortalRequests
                 'adults' => $lead?->adults, 'children' => $lead?->children,
                 'state' => self::state($t, $q),
                 'invited_at' => $t->portal_invited_at?->utc()->toIso8601String(),
+                'respond_by' => $t->respond_by?->format('Y-m-d'),
+                'unread_messages' => SupplierMessage::where('lead_supplier_id', $t->id)->where('direction', 'team')->whereNull('supplier_read_at')->count(),
                 'quote' => $q && $q->status === 'submitted' ? ['amount' => $q->amount, 'currency' => $q->currency, 'version' => $q->version, 'at' => $q->created_at?->utc()->toIso8601String()] : null,
             ];
         })->values()->all();
@@ -105,10 +114,16 @@ class PortalRequests
         $pp = $lead->passport_available;
         $q = self::latest($t);
         $quotes = SupplierQuote::with('reply.attachments')->where('lead_supplier_id', $t->id)->orderByDesc('version')->get();
+        $messages = SupplierMessage::where('lead_supplier_id', $t->id)->orderBy('id')->limit(200)->get();
 
         return [
             'lead_id' => $lead->lead_id,
             'state' => self::state($t, $q),
+            'respond_by' => $t->respond_by?->format('Y-m-d'),
+            'messages' => $messages->map(fn (SupplierMessage $m) => [
+                'id' => (string) $m->id, 'from' => $m->direction === 'supplier' ? 'you' : 'team', 'body' => $m->body,
+                'at' => $m->created_at?->utc()->toIso8601String(), 'unread' => $m->direction === 'team' && $m->supplier_read_at === null,
+            ])->values()->all(),
             'requirement' => [
                 'destination' => $lead->destination,
                 'travel_date' => self::date($lead->travel_date), 'trip_end_date' => self::date($lead->trip_end_date),
@@ -130,6 +145,27 @@ class PortalRequests
                 'files' => ($x->reply?->attachments ?? collect())->where('skipped', false)->map(fn ($a) => ['id' => (string) $a->id, 'filename' => $a->filename, 'size' => (int) $a->size])->values()->all(),
             ])->values()->all(),
         ];
+    }
+
+    /** The team's messages become "read" once the supplier has opened the enquiry. */
+    public static function markMessagesRead(LeadSupplier $t): void
+    {
+        SupplierMessage::where('lead_supplier_id', $t->id)->where('direction', 'team')->whereNull('supplier_read_at')->update(['supplier_read_at' => now()]);
+    }
+
+    /** A question or note from the supplier. The team hears about it exactly like an e-mailed reply (bell, task, inbox). */
+    public static function postMessage(SupplierUser $u, LeadSupplier $t, string $body): SupplierMessage
+    {
+        $reply = null;
+        $msg = DB::transaction(function () use ($u, $t, $body, &$reply) {
+            $msg = SupplierMessage::create(['lead_supplier_id' => $t->id, 'direction' => 'supplier', 'body' => $body, 'supplier_user_id' => $u->id]);
+            $reply = self::syntheticReply($u, $t, 'Message from supplier via portal - '.$t->lead_id, "{$u->name} ({$u->email}) wrote:\n".$body, 'normal', false);
+
+            return $msg;
+        });
+        app(ReplyProcessor::class)->processMatched($reply);
+
+        return $msg;
     }
 
     /** True when this attachment belongs to one of the supplier's own submissions. */

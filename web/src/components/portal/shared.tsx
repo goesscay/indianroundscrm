@@ -5,6 +5,7 @@ export type PortalState = "open" | "quoted" | "declined" | "closed";
 export interface PortalRequestRow {
   lead_id: string; destination: string | null; travel_date: string | null; duration: string | null;
   adults: number | string | null; children: number | string | null; state: PortalState; invited_at: string | null;
+  respond_by: string | null; unread_messages: number;
   quote: { amount: number | null; currency: string | null; version: number; at: string | null } | null;
 }
 
@@ -16,8 +17,10 @@ export interface PortalQuote {
   files: { id: string; filename: string; size: number }[];
 }
 
+export interface PortalMessage { id: string; from: "you" | "team"; body: string; at: string | null; unread: boolean }
+
 export interface PortalRequest {
-  lead_id: string; state: PortalState;
+  lead_id: string; state: PortalState; respond_by: string | null; messages: PortalMessage[];
   requirement: {
     destination: string | null; travel_date: string | null; trip_end_date: string | null; duration: string | null; package_type: string | null;
     stay_cities: { city: string; nights: number | null }[];
@@ -55,4 +58,21 @@ export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** Days from today to a YYYY-MM-DD date: negative once it has passed. */
+export function daysUntil(d: string | null | undefined): number | null {
+  if (!d) return null;
+  const t = new Date(d + "T00:00:00");
+  const n = new Date(); n.setHours(0, 0, 0, 0);
+  return Math.round((t.getTime() - n.getTime()) / 86400000);
+}
+
+export function dueText(d: string | null | undefined): { text: string; late: boolean } | null {
+  const n = daysUntil(d);
+  if (n === null) return null;
+  if (n < 0) return { text: `Was due ${dateText(d)}`, late: true };
+  if (n === 0) return { text: "Please reply today", late: true };
+  if (n === 1) return { text: "Please reply by tomorrow", late: false };
+  return { text: `Please reply by ${dateText(d)}`, late: false };
 }

@@ -30,6 +30,11 @@ return [
         'auto_doc_reminders' => filter_var(env('CRM_AUTO_TRIP_DOC_REMINDERS', false), FILTER_VALIDATE_BOOL),
         'doc_reminder_days' => [14, 7, 3],
     ],
+    // Supplier portal: the default number of days a supplier has to quote, and the daily reminder (off until CRM_AUTO_PORTAL_REMINDERS=true).
+    'portal' => [
+        'respond_days' => (int) env('CRM_PORTAL_RESPOND_DAYS', 3),
+        'auto_reminders' => filter_var(env('CRM_AUTO_PORTAL_REMINDERS', false), FILTER_VALIDATE_BOOL),
+    ],
     'public_url' => env('CRM_PUBLIC_URL'),   // used in links sent to customers; falls back to APP_URL
     'quote_valid_days' => (int) env('CRM_QUOTE_VALID_DAYS', 14),
 ];

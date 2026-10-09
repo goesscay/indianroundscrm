@@ -25,7 +25,7 @@ class PortalMail
         return SupplierUser::create(['supplier_id' => $s->id, 'name' => $s->name, 'email' => $email, 'active' => true]);
     }
 
-    public static function render(Lead $lead, Supplier $s): string
+    public static function render(Lead $lead, Supplier $s, ?string $respondBy = null): string
     {
         $date = '';
         if ($lead->travel_date) {
@@ -43,7 +43,8 @@ class PortalMail
             'We have a new travel enquiry for you.', '',
             'Reference   : '.$lead->lead_id,
             'Destination : '.($lead->destination ?: 'N/A'),
-            $date !== '' ? 'Travel date : '.$date : null, '',
+            $date !== '' ? 'Travel date : '.$date : null,
+            $respondBy ? 'Quote needed by : '.Carbon::parse($respondBy)->format('d M Y') : null, '',
             'Please open our supplier portal to see the full requirement and send your quotation there:', '',
             PortalAuth::url('/portal/requests/'.rawurlencode($lead->lead_id)), '',
             'Sign in with this e-mail address ('.$s->email.'). We will send a one-time code to it. You can upload your quotation as a file or type the details in.', '',

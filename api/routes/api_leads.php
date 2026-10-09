@@ -54,6 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/lead-suppliers/{lead_id}', [RsqController::class, 'leadSuppliers'])->middleware('perm:suppliers.view,suppliers.manage');
     Route::middleware('perm:suppliers.manage')->patch('/lead-suppliers/{tracker_id}', [RsqController::class, 'updateSupplier']);
     Route::middleware('perm:suppliers.manage')->post('/lead-suppliers/{tracker_id}/followup', [RsqController::class, 'followup']);
+    Route::middleware('perm:suppliers.manage')->get('/lead-suppliers/{tracker_id}/messages', [RsqController::class, 'messages']);
+    Route::middleware('perm:suppliers.manage')->post('/lead-suppliers/{tracker_id}/messages', [RsqController::class, 'postMessage']);
+    Route::middleware('perm:suppliers.manage')->post('/lead-suppliers/{tracker_id}/portal-remind', [RsqController::class, 'portalRemind']);
+    Route::middleware('perm:suppliers.manage')->post('/lead-suppliers/{tracker_id}/use-quote', [RsqController::class, 'useQuote']);
 
     // ---- Supplier mail
     Route::middleware('perm:supplier_mail.send')->post('/supplier-mail/send', [SupplierMailController::class, 'send']);

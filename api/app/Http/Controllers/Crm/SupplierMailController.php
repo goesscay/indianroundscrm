@@ -31,6 +31,7 @@ class SupplierMailController extends Controller
             'bcc' => 'nullable|array', 'bcc.*' => 'string',
             'subject' => 'required|string',
             'body' => 'nullable|string',
+            'respond_by' => 'nullable|date|after_or_equal:today',
         ]);
         $leadId = $b['lead_id'];
         $lead = Lead::where('lead_id', $leadId)->with('stayCities')->first();
@@ -58,12 +59,14 @@ class SupplierMailController extends Controller
         $bcc = $b['bcc'] ?? [];
 
         // Portal suppliers each get their own short mail with a link; everyone else gets the full enquiry together, as before.
+        $respondBy = ! empty($b['respond_by']) ? \Illuminate\Support\Carbon::parse($b['respond_by'])->toDateString()
+            : now()->addDays(max(1, (int) config('crm.portal.respond_days', 3)))->toDateString();
         $portal = Supplier::whereIn('id', array_column($suppliers, 'id'))->where('portal_enabled', true)->pluck('id')->map(fn ($i) => (int) $i)->all();
         $units = [];
         $plain = [];
         foreach ($suppliers as $s) {
             if (in_array($s['id'], $portal, true) && PortalMail::ensureUser(Supplier::find($s['id']))) {
-                $units[] = ['suppliers' => [$s], 'body' => PortalMail::render($lead, Supplier::find($s['id'])), 'portal' => true];
+                $units[] = ['suppliers' => [$s], 'body' => PortalMail::render($lead, Supplier::find($s['id']), $respondBy), 'portal' => true];
             } else {
                 $plain[] = $s;
             }
@@ -76,7 +79,7 @@ class SupplierMailController extends Controller
         $results = [];
         foreach ($units as $unit) {
             $result = MailSender::send(array_column($unit['suppliers'], 'email'), $subject, $unit['body'], $cc, $bcc);
-            $mails[] = $this->record($user, $lead, $subject, $unit['body'], $result, $unit['suppliers'], $cc, $bcc, $unit['portal']);
+            $mails[] = $this->record($user, $lead, $subject, $unit['body'], $result, $unit['suppliers'], $cc, $bcc, $unit['portal'], $respondBy);
             $results[] = $result;
         }
 
@@ -99,9 +102,9 @@ class SupplierMailController extends Controller
     }
 
     /** Store one outgoing mail with its recipients and move each supplier's tracker row on. */
-    private function record($user, Lead $lead, string $subject, string $body, array $result, array $suppliers, array $cc, array $bcc, bool $portal): MailHistory
+    private function record($user, Lead $lead, string $subject, string $body, array $result, array $suppliers, array $cc, array $bcc, bool $portal, ?string $respondBy = null): MailHistory
     {
-        return DB::transaction(function () use ($user, $lead, $subject, $body, $result, $suppliers, $cc, $bcc, $portal) {
+        return DB::transaction(function () use ($user, $lead, $subject, $body, $result, $suppliers, $cc, $bcc, $portal, $respondBy) {
             $leadId = $lead->lead_id;
             $mail = MailHistory::create([
                 'lead_id' => $leadId, 'subject' => $subject, 'body' => $body,
@@ -127,7 +130,7 @@ class SupplierMailController extends Controller
             // upsert lead_suppliers tracker rows (assign sequence #)
             $count = LeadSupplier::where('lead_id', $leadId)->count();
             foreach ($suppliers as $s) {
-                $extra = ($conversationId ? ['conversation_id' => $conversationId] : []) + ($portal ? ['portal_invited_at' => now()] : []);
+                $extra = ($conversationId ? ['conversation_id' => $conversationId] : []) + ($portal ? ['portal_invited_at' => now(), 'respond_by' => $respondBy, 'portal_reminders' => 0, 'portal_reminded_at' => null] : []);
                 $row = LeadSupplier::where('lead_id', $leadId)->where('supplier_id', $s['id'])->first();
                 if ($row) {
                     $row->fill(['status' => 'Email Sent', 'last_email_at' => now(), 'last_update' => now(),

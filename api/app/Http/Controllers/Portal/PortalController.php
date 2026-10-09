@@ -70,6 +70,7 @@ class PortalController extends Controller
         if (! $detail) {
             return response()->json(['detail' => 'Not found'], 404);
         }
+        PortalRequests::markMessagesRead($t);
 
         return $detail;
     }
@@ -118,6 +119,19 @@ class PortalController extends Controller
         }
         $d = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:1000']]);
         PortalRequests::decline($u, $t, trim($d['reason']));
+
+        return ['ok' => true, 'request' => PortalRequests::detail($t->fresh())];
+    }
+
+    public function message(Request $request, string $leadId)
+    {
+        $u = $this->user($request);
+        $t = PortalRequests::tracker($u, $leadId);
+        if (! $t) {
+            return response()->json(['detail' => 'Not found'], 404);
+        }
+        $d = $request->validate(['body' => ['required', 'string', 'min:1', 'max:2000']]);
+        PortalRequests::postMessage($u, $t, trim($d['body']));
 
         return ['ok' => true, 'request' => PortalRequests::detail($t->fresh())];
     }

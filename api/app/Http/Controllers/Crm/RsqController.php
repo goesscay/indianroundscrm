@@ -8,6 +8,9 @@ use App\Models\Lead;
 use App\Models\LeadSupplier;
 use App\Models\RsqRequest;
 use App\Models\Supplier;
+use App\Models\SupplierMessage;
+use App\Models\SupplierReply;
+use App\Services\SupplierPortal\PortalNotices;
 use App\Support\ActivityLogger;
 use App\Support\Ids;
 use Illuminate\Http\Request;
@@ -85,9 +88,19 @@ class RsqController extends Controller
     public function leadSuppliers(string $leadId)
     {
         $now = now()->getTimestamp();
-        return LeadSupplier::where('lead_id', $leadId)->orderBy('sequence')->limit(200)->get()->map(function ($t) use ($now) {
+        $canFiles = (bool) auth()->user()?->hasPermission('rsq.manage');
+        return LeadSupplier::where('lead_id', $leadId)->orderBy('sequence')->limit(200)->get()->map(function ($t) use ($now, $canFiles) {
             $a = $t->toArray();
             $a['hours_since_email'] = $t->last_email_at ? (int) floor(($now - $t->last_email_at->getTimestamp()) / 3600) : 0;
+            $a['portal'] = $t->portal_invited_at !== null;
+            $a['messages'] = $a['portal'] ? SupplierMessage::where('lead_supplier_id', $t->id)->count() : 0;
+            // the documents of the quote the team treats as final (else the latest quote-like reply), for the comparison
+            $a['quote_files'] = [];
+            if ($canFiles && $t->quote_received) {
+                $r = SupplierReply::with('attachments')->where('lead_supplier_id', $t->id)->where('status', 'matched')->where('relevance', 'quote')
+                    ->orderByDesc('is_final')->orderByDesc('id')->first();
+                $a['quote_files'] = $r ? $r->attachments->where('skipped', false)->map(fn ($f) => ['id' => (string) $f->id, 'filename' => $f->filename])->values()->all() : [];
+            }
             return $a;
         })->values();
     }
@@ -107,6 +120,7 @@ class RsqController extends Controller
             'hotel_offered' => 'nullable|string', 'flight_included' => 'nullable|boolean',
             'transfer_included' => 'nullable|boolean', 'activities_included' => 'nullable|string',
             'valid_until' => 'nullable|string', 'remarks' => 'nullable|string',
+            'respond_by' => 'nullable|date',
         ]);
         $updates = array_filter($d, fn ($v) => $v !== null);
 
@@ -154,6 +168,89 @@ class RsqController extends Controller
             RsqRequest::upsertFor($leadId, ['status' => 'response_received', 'first_reply_at' => now()]);
             Lead::where('lead_id', $leadId)->update(['rsq_status' => 'response_received']);
         }
+    }
+
+    // ---------------------------------------------------------- supplier portal: messages, reminders, choosing a quote
+
+    private function portalTracker(string $trackerId): LeadSupplier
+    {
+        $row = LeadSupplier::find(Ids::parse($trackerId));
+        if (! $row || $row->portal_invited_at === null) {
+            Fail::notFound('This supplier was not sent the portal link for this enquiry');
+        }
+
+        return $row;
+    }
+
+    private function thread(LeadSupplier $t): array
+    {
+        return SupplierMessage::where('lead_supplier_id', $t->id)->orderBy('id')->limit(200)->get()->map(fn ($m) => [
+            'id' => (string) $m->id, 'from' => $m->direction, 'body' => $m->body,
+            'at' => $m->created_at?->utc()->toIso8601String(),
+            'seen' => $m->direction === 'team' ? $m->supplier_read_at !== null : null,
+        ])->values()->all();
+    }
+
+    public function messages(string $trackerId)
+    {
+        return $this->thread($this->portalTracker($trackerId));
+    }
+
+    public function postMessage(Request $request, string $trackerId)
+    {
+        $t = $this->portalTracker($trackerId);
+        $d = Fail::validate(Fail::body($request), ['body' => 'required|string|min:1|max:2000']);
+        SupplierMessage::create(['lead_supplier_id' => $t->id, 'direction' => 'team', 'body' => trim($d['body']), 'user_id' => $request->user()->id]);
+        $mailed = PortalNotices::newMessage($t);
+        ActivityLogger::log($request->user(), 'message_supplier', 'lead_supplier', (string) $t->id, null, ['lead_id' => $t->lead_id, 'mailed' => $mailed]);
+
+        return ['messages' => $this->thread($t), 'notified' => $mailed];
+    }
+
+    public function portalRemind(Request $request, string $trackerId)
+    {
+        $t = $this->portalTracker($trackerId);
+        if (\App\Services\SupplierPortal\PortalRequests::stateFor($t) !== 'open') {
+            Fail::http(409, 'This supplier has already answered or the enquiry is closed.');
+        }
+        if (! PortalNotices::reminder($t)) {
+            Fail::http(502, 'The reminder could not be sent. Check the supplier has an active portal user and the mailbox is connected.');
+        }
+        ActivityLogger::log($request->user(), 'remind_supplier', 'lead_supplier', (string) $t->id, null, ['lead_id' => $t->lead_id]);
+
+        return ['success' => true, 'portal_reminders' => (int) $t->fresh()->portal_reminders];
+    }
+
+    /** Take this supplier's figure as the lead's supplier quote (INR) and mark their quote accepted. */
+    public function useQuote(Request $request, string $trackerId)
+    {
+        $user = $request->user();
+        $t = LeadSupplier::find(Ids::parse($trackerId));
+        if (! $t) {
+            Fail::notFound('Tracker not found');
+        }
+        $d = Fail::validate(Fail::body($request), ['amount_inr' => 'nullable|numeric|gt:0']);
+        if (! $t->quote_received || ! $t->quote_amount) {
+            Fail::bad('This supplier has no quote amount yet');
+        }
+        $currency = strtoupper((string) ($t->currency ?: 'INR'));
+        $inr = $currency === 'INR' ? (float) $t->quote_amount : (isset($d['amount_inr']) ? (float) $d['amount_inr'] : null);
+        if ($inr === null) {
+            Fail::unprocessable(['amount_inr' => "This quote is in $currency. Enter the amount in INR to use it."]);
+        }
+        $lead = Lead::where('lead_id', $t->lead_id)->first();
+        if (! $lead) {
+            Fail::notFound('Lead not found');
+        }
+        $before = $lead->only(['supplier_quote_amount', 'supplier_name']);
+        $lead->fill([
+            'supplier_quote_amount' => $inr, 'supplier_name' => $t->supplier_name, 'quote_received' => true,
+            'quote_received_date' => now()->toIso8601String(), 'updated_by' => $user->email,
+        ])->save();
+        $t->fill(['status' => 'Quote Accepted', 'last_update' => now(), 'updated_by' => $user->email])->save();
+        ActivityLogger::log($user, 'use_supplier_quote', 'lead', $lead->lead_id, $before, ['supplier_quote_amount' => $inr, 'supplier' => $t->supplier_name, 'currency' => $currency]);
+
+        return ['success' => true, 'supplier_quote_amount' => $inr, 'supplier_name' => $t->supplier_name];
     }
 
     public function followup(string $trackerId)

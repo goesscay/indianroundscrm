@@ -42,6 +42,7 @@ export default function LeadDetail() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [cc, setCc] = useState("");
+  const [respondBy, setRespondBy] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [mailPreviewText, setMailPreviewText] = useState("");
@@ -155,12 +156,14 @@ export default function LeadDetail() {
         cc: cc.split(",").map(s => s.trim()).filter(Boolean),
         bcc: [],
         subject, body,
+        ...(respondBy ? { respond_by: respondBy } : {}),
       });
       const r = data.send_result || {};
       if (r.status === "sent") toast.success("Email sent. Replies will show up on this lead.");
       else if (r.status === "failed") toast.error(`Email failed: ${r.error || "unknown error"}`);
       else toast.info("Email simulated — the Microsoft 365 mailbox isn't connected yet, so nothing was sent.");
       setMailOpen(false);
+      setRespondBy("");
       load();
     } catch (e) { toast.error(formatApiError(e)); }
   };
@@ -444,7 +447,7 @@ export default function LeadDetail() {
         </Card>}
       </div>
 
-      {seeSuppliers && lead.quote_type === "rsq" && <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} replies={supplierReplies.replies} />}
+      {seeSuppliers && lead.quote_type === "rsq" && <SupplierTracker leadId={lead.lead_id} leadPhone={lead.phone} replies={supplierReplies.replies} onUsed={() => void load()} />}
 
       <SupplierReplies
         leadId={lead.lead_id}
@@ -586,6 +589,13 @@ export default function LeadDetail() {
             <div>
               <Label className="label-caps">CC (comma-separated)</Label>
               <Input className="mt-1.5" value={cc} onChange={(e) => setCc(e.target.value)} data-testid="mail-cc" />
+              {suppliers.some((x) => x.portal_enabled && selected[x.id]) && (
+                <div className="mt-3">
+                  <Label className="label-caps">Portal suppliers: quote needed by</Label>
+                  <Input type="date" className="mt-1.5 max-w-[200px]" min={new Date().toISOString().slice(0, 10)} value={respondBy} onChange={(e) => setRespondBy(e.target.value)} data-testid="mail-respond-by" />
+                  <div className="text-[11px] text-muted-foreground mt-1">Leave empty for the usual 3 days. They are sent a short link e-mail; the text below goes to the other suppliers.</div>
+                </div>
+              )}
             </div>
             <div>
               <Label className="label-caps">Subject</Label>

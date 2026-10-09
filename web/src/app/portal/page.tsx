@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import PortalShell from "@/components/portal/PortalShell";
-import { StateBadge, dateText, money, type PortalRequestRow } from "@/components/portal/shared";
+import { StateBadge, dateText, dueText, money, type PortalRequestRow } from "@/components/portal/shared";
 
 function RequestList() {
   const [rows, setRows] = useState<PortalRequestRow[] | null>(null);
@@ -35,11 +35,13 @@ function RequestList() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-sm font-semibold">{r.lead_id}</span>
                   <StateBadge state={r.state} />
+                  {r.unread_messages > 0 && <span className="rounded bg-sky-600 px-1.5 py-0.5 text-[11px] font-semibold text-white" data-testid={`portal-unread-${r.lead_id}`}>{r.unread_messages} new message{r.unread_messages === 1 ? "" : "s"}</span>}
                 </div>
                 <div className="mt-1 truncate text-base font-medium">{r.destination || "Trip enquiry"}</div>
                 <div className="mt-0.5 text-xs text-neutral-600">
                   {[r.travel_date ? `Travel ${dateText(r.travel_date)}` : null, r.duration, r.adults != null ? `${r.adults} adult${Number(r.adults) === 1 ? "" : "s"}` : null, r.children ? `${r.children} child${Number(r.children) === 1 ? "" : "ren"}` : null].filter(Boolean).join(" · ")}
                 </div>
+                {r.state === "open" && dueText(r.respond_by) && <div className={`mt-1 text-xs font-medium ${dueText(r.respond_by)!.late ? "text-red-700" : "text-amber-700"}`}>{dueText(r.respond_by)!.text}</div>}
                 {r.quote && <div className="mt-1 text-xs text-emerald-700">Your quote{r.quote.amount != null ? `: ${money(r.quote.amount, r.quote.currency)}` : " sent"} (version {r.quote.version})</div>}
               </div>
               <ChevronRight size={18} className="shrink-0 text-neutral-400" aria-hidden />

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import PortalShell from "@/components/portal/PortalShell";
-import { StateBadge, dateText, formatBytes, money, timeText, type PortalQuote, type PortalRequest } from "@/components/portal/shared";
+import { StateBadge, dateText, dueText, formatBytes, money, timeText, type PortalQuote, type PortalRequest } from "@/components/portal/shared";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "THB", "LKR", "NPR", "IDR", "VND", "MYR"];
 const SELECT = "mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 text-sm";
@@ -222,6 +222,50 @@ function QuoteForm({ leadId, last, revising, onSaved }: { leadId: string; last: 
   );
 }
 
+function Messages({ req, onChange }: { req: PortalRequest; onChange: (r: PortalRequest) => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const send = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setBusy(true); setError("");
+    try {
+      const { data } = await api.post<{ request: PortalRequest }>(`/portal/requests/${encodeURIComponent(req.lead_id)}/messages`, { body: text.trim() });
+      setText(""); onChange(data.request);
+    } catch (err) { setError(formatApiError(err)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <section className="rounded-xl bg-white p-5 shadow-sm" data-testid="portal-messages">
+      <h2 className="text-base font-bold">Questions and messages</h2>
+      <p className="mt-1 text-sm text-neutral-600">Ask us anything about this enquiry, or read our reply here.</p>
+      {req.messages.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {req.messages.map((m) => (
+            <li key={m.id} className={m.from === "you" ? "ml-8" : "mr-8"} data-testid={`portal-msg-${m.from}`}>
+              <div className={`rounded-lg p-3 text-sm ${m.from === "you" ? "bg-neutral-100" : "bg-sky-50"}`}>
+                <div className="mb-0.5 flex items-center justify-between gap-2 text-xs text-neutral-500">
+                  <span className="font-semibold text-neutral-700">{m.from === "you" ? "You" : "Indian Rounds"}{m.unread && <span className="ml-1.5 rounded bg-sky-600 px-1 py-px text-[10px] text-white">new</span>}</span>
+                  <span>{timeText(m.at)}</span>
+                </div>
+                <div className="whitespace-pre-wrap break-words">{m.body}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={send} className="mt-3 space-y-2">
+        <Textarea rows={2} value={text} maxLength={2000} placeholder="Write a message" onChange={(e) => setText(e.target.value)} data-testid="portal-msg-text" aria-label="Message" />
+        {error && <div className="text-sm text-red-700" role="alert">{error}</div>}
+        <Button type="submit" variant="outline" size="sm" disabled={busy || !text.trim()} data-testid="portal-msg-send">{busy ? "Sending…" : "Send message"}</Button>
+      </form>
+    </section>
+  );
+}
+
 function RequestDetail({ leadId }: { leadId: string }) {
   const [req, setReq] = useState<PortalRequest | null>(null);
   const [error, setError] = useState("");
@@ -251,12 +295,16 @@ function RequestDetail({ leadId }: { leadId: string }) {
         <span className="font-mono text-sm text-neutral-500">{req.lead_id}</span>
         <StateBadge state={req.state} />
       </div>
+      {req.state === "open" && dueText(req.respond_by) && (
+        <div className={`rounded-lg px-4 py-2.5 text-sm font-medium ${dueText(req.respond_by)!.late ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-900"}`} data-testid="portal-due">{dueText(req.respond_by)!.text}</div>
+      )}
       <Requirement r={req.requirement} />
       {closed ? (
         <div className="rounded-xl bg-white p-5 text-sm shadow-sm" data-testid="portal-closed">This enquiry is closed. Please write to us if you need to change your quote.</div>
       ) : (
         <QuoteForm key={`${history.length}-${last?.id ?? "new"}`} leadId={req.lead_id} last={last} revising={history.length > 0} onSaved={setReq} />
       )}
+      <Messages req={req} onChange={setReq} />
       {history.length > 0 && (
         <section className="rounded-xl bg-white p-5 shadow-sm">
           <h2 className="text-base font-bold">What you sent us</h2>

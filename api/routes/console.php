@@ -16,3 +16,6 @@ Schedule::command("invoices:remind")->dailyAt("10:00")->timezone("Asia/Kolkata")
 
 // Trip preparation: overdue checklist items as tasks for the team, and (when enabled) document reminders to customers. 09:00 IST daily.
 Schedule::command("trips:remind")->dailyAt("09:00")->timezone("Asia/Kolkata")->withoutOverlapping(30);
+
+// Reminds portal suppliers who have not quoted an enquiry that is due. 11:00 IST daily. Does nothing unless CRM_AUTO_PORTAL_REMINDERS=true.
+Schedule::command("portal:remind")->dailyAt("11:00")->timezone("Asia/Kolkata")->withoutOverlapping(30);
