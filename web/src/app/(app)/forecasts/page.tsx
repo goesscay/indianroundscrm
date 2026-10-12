@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { INR, StagePill, fmtDate, inrShort } from "@/components/crm/shared";
+import { CustomerLink, INR, StagePill, fmtDate, inrShort } from "@/components/crm/shared";
 import type { Deal, Forecast, ForecastQuarter } from "@/types";
 
 type Cell = { kind: "won" | "open" | "overdue" | "undated"; quarter: number };
@@ -284,7 +284,7 @@ export default function ForecastsPage() {
                     {cellDeals?.map((d) => (
                       <TableRow key={d.id} data-testid={`drill-deal-${d.id}`}>
                         <TableCell><Link href={`/deals/${d.id}`} className="font-medium hover:underline">{d.name}</Link><div className="font-mono text-xs text-muted-foreground">{d.deal_no}</div></TableCell>
-                        <TableCell className="text-sm">{d.customer?.name}</TableCell>
+                        <TableCell className="text-sm"><CustomerLink customer={d.customer} /></TableCell>
                         <TableCell><StagePill stage={d.stage} /></TableCell>
                         <TableCell className="text-right font-semibold">{INR(d.selling_amount)}</TableCell>
                         <TableCell className="text-right">{INR(d.weighted)}</TableCell>

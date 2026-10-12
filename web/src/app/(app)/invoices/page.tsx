@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { INR2, PayPill, fmtDate, useCrmOptions } from "@/components/crm/shared";
+import { CustomerLink, INR2, PayPill, fmtDate, useCrmOptions } from "@/components/crm/shared";
 import type { Invoice } from "@/types";
 
 function InvoiceList() {
@@ -90,7 +90,7 @@ function InvoiceList() {
               {rows.map((x) => (
                 <TableRow key={x.id} className="cursor-pointer hover:bg-secondary/50" onClick={() => router.push(`/invoices/${x.id}`)} data-testid={`invoice-row-${x.id}`}>
                   <TableCell><div className="font-medium">{x.title}</div><div className="font-mono text-xs text-muted-foreground">{x.invoice_no ?? "Draft"}</div></TableCell>
-                  <TableCell className="text-sm">{x.customer?.name}</TableCell>
+                  <TableCell className="text-sm"><CustomerLink customer={x.customer} /></TableCell>
                   <TableCell><PayPill status={x.payment_status} /></TableCell>
                   <TableCell className="text-right font-semibold">{INR2(x.total)}</TableCell>
                   <TableCell className="text-right">{x.status === "issued" ? INR2(x.balance) : "—"}</TableCell>

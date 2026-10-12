@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import DealDialog from "@/components/crm/DealDialog";
-import { INR, STAGES, StagePill, fmtDate, inrShort, stageMeta, useCrmOptions } from "@/components/crm/shared";
+import { CustomerLink, INR, STAGES, StagePill, fmtDate, inrShort, stageMeta, useCrmOptions } from "@/components/crm/shared";
 import type { Deal, DealStage } from "@/types";
 
 type View = "board" | "list";
@@ -87,7 +87,7 @@ function Board({ params, tick, onChanged, onNew }: { params: Record<string, stri
                         className={cn("cursor-pointer rounded-md p-3 shadow-none transition-shadow hover:shadow-md", dragId === d.id && "opacity-50")}
                         data-testid={`deal-card-${d.id}`}>
                     <div className="truncate text-sm font-semibold">{d.name}</div>
-                    <div className="mt-0.5 truncate text-xs text-muted-foreground">{d.customer?.name}</div>
+                    <div className="mt-0.5 truncate text-xs text-muted-foreground"><CustomerLink customer={d.customer} /></div>
                     <div className="mt-2 flex items-center justify-between text-xs">
                       <span className="font-semibold">{inrShort(d.selling_amount)}</span>
                       {d.expected_close && <span className={cn(d.overdue ? "font-medium text-red-600 dark:text-red-400" : "text-muted-foreground")}>{d.overdue ? "Overdue · " : ""}{fmtDate(d.expected_close).replace(/ \d{4}$/, "")}</span>}
@@ -127,7 +127,7 @@ function DealTable({ params, tick }: { params: Record<string, string>; tick: num
             {rows.map((d) => (
               <TableRow key={d.id} className="cursor-pointer hover:bg-secondary/50" onClick={() => router.push(`/deals/${d.id}`)} data-testid={`deal-row-${d.id}`}>
                 <TableCell><div className="font-medium">{d.name}</div><div className="font-mono text-xs text-muted-foreground">{d.deal_no}</div></TableCell>
-                <TableCell className="text-sm">{d.customer?.name}</TableCell>
+                <TableCell className="text-sm"><CustomerLink customer={d.customer} /></TableCell>
                 <TableCell><StagePill stage={d.stage} /></TableCell>
                 <TableCell className="text-xs text-muted-foreground">{fmtDate(d.travel_date)}</TableCell>
                 <TableCell className="text-right font-semibold">{INR(d.selling_amount)}</TableCell>

@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useCurrentUser } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import type { CrmOptions, CustomerType, DealStage, TripStatus } from "@/types";
 
@@ -152,3 +154,19 @@ export const SOURCE_LABEL: Record<string, string> = {
   manual: "Manual", opening: "Opening balance", invoice: "Invoice", receipt: "Receipt", advance_apply: "Advance applied", credit_note: "Credit note", reversal: "Reversal",
   bill: "Supplier bill", supplier_payment: "Supplier payment", supplier_adv_apply: "Supplier advance applied", money_entry: "Money in / out",
 };
+
+/**
+ * A customer's name that opens the customer. Safe inside a clickable row or card (it does not trigger the row);
+ * people without access to customers see the plain name.
+ */
+export function CustomerLink({ customer, className }: { customer: { id: string; name: string } | null | undefined; className?: string }) {
+  const { can } = useCurrentUser();
+  if (!customer) return null;
+  if (!can("customers.view")) return <span className={className}>{customer.name}</span>;
+  return (
+    <Link href={`/customers/${customer.id}`} onClick={(e) => e.stopPropagation()} onAuxClick={(e) => e.stopPropagation()}
+          className={cn("hover:underline underline-offset-2", className)} title="Open customer" data-testid={`customer-link-${customer.id}`}>
+      {customer.name}
+    </Link>
+  );
+}

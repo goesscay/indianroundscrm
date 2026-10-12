@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { INR2, PAY_MODES, fmtDate, modeLabel } from "@/components/crm/shared";
+import { CustomerLink, INR2, PAY_MODES, fmtDate, modeLabel } from "@/components/crm/shared";
 import type { Receipt } from "@/types";
 
 function ReceiptList() {
@@ -82,7 +82,7 @@ function ReceiptList() {
                 <TableRow key={r.id} className="cursor-pointer hover:bg-secondary/50" onClick={() => router.push(`/receipts/${r.id}`)} data-testid={`receipt-row-${r.id}`}>
                   <TableCell><div className={cn("font-mono font-medium", r.status === "cancelled" && "line-through text-muted-foreground")}>{r.receipt_no}</div>{r.kind === "refund" && <div className="text-xs text-amber-700 dark:text-amber-300">Refund</div>}{r.status === "cancelled" && <div className="text-xs text-muted-foreground">Cancelled</div>}</TableCell>
                   <TableCell className="text-sm">{fmtDate(r.received_date)}</TableCell>
-                  <TableCell className="text-sm">{r.customer?.name}</TableCell>
+                  <TableCell className="text-sm"><CustomerLink customer={r.customer} /></TableCell>
                   <TableCell className="text-sm">{r.invoice ? <span className="font-mono">{r.invoice.invoice_no}</span> : <span className="text-muted-foreground">Advance</span>}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{modeLabel(r.mode)}{r.reference ? ` · ${r.reference}` : ""}</TableCell>
                   <TableCell className={cn("text-right font-semibold", r.kind === "refund" && "text-amber-700 dark:text-amber-300")}>{r.kind === "refund" ? "− " : ""}{INR2(r.amount)}</TableCell>
