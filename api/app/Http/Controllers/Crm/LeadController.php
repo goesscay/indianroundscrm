@@ -189,16 +189,13 @@ class LeadController extends Controller
         return $events;
     }
 
-    public function index(Request $request)
+    /** Every list filter except the status / stage (so the stage tabs can count against the same filters). */
+    private function filtered(Request $request, $user)
     {
-        $user = $request->user();
-        $q = self::scopeForUser(Lead::query()->with('stayCities'), $user);
+        $q = self::scopeForUser(Lead::query(), $user);
         $staffId = (string) $request->query('staff_id', '');
         if ($staffId !== '' && $user->hasPermission('leads.view_all')) {
             $q->where('staff_id', ctype_digit($staffId) ? (int) $staffId : -1);
-        }
-        if (($v = (string) $request->query('status', '')) !== '') {
-            $q->where('lead_status', $v);
         }
         if (($v = (string) $request->query('destination', '')) !== '') {
             $q->where('destination', $v);
@@ -218,6 +215,19 @@ class LeadController extends Controller
                 }
             });
         }
+
+        return $q;
+    }
+
+    public function index(Request $request)
+    {
+        $q = $this->filtered($request, $request->user())->with('stayCities');
+        if (($v = (string) $request->query('status', '')) !== '') {
+            $q->where('lead_status', $v);
+        }
+        if (($stage = (string) $request->query('stage', '')) !== '' && $stage !== 'all') {
+            $q->whereIn('lead_status', \App\Support\LeadStages::statuses($stage) ?? ['__none__']);
+        }
         $q->orderByDesc('created_at')->orderByDesc('id');
         if (\App\Support\Paging::requested($request)) {
             return \App\Support\Paging::paginate($request, $q, fn (Lead $l) => $l->toApi());
@@ -225,6 +235,18 @@ class LeadController extends Controller
         $limit = max(1, (int) $request->query('limit', 500));
         return $q->limit($limit)->get()
             ->map(fn (Lead $l) => $l->toApi())->values();
+    }
+
+    /** GET /leads/stage-counts: how many leads sit in each stage (and in each status) under the current search / filters. */
+    public function stageCounts(Request $request)
+    {
+        $by = $this->filtered($request, $request->user())->select('lead_status', DB::raw('count(*) as n'))->groupBy('lead_status')->pluck('n', 'lead_status');
+        $stages = ['all' => (int) $by->sum()];
+        foreach (\App\Support\LeadStages::MAP as $stage => $statuses) {
+            $stages[$stage] = (int) collect($statuses)->sum(fn ($s) => $by[$s] ?? 0);
+        }
+
+        return ['stages' => $stages, 'statuses' => $by->map(fn ($n) => (int) $n)->all()];
     }
 
     /**
