@@ -154,10 +154,10 @@ class AccountsLedgerTest extends TestCase
         $other = $this->issue($this->customer($u, ['state' => 'Kerala']), ['tcs_rate' => 5]);
         $e2 = $this->entryFor('invoice', $other['id']);
         $by2 = $e2->lines->mapWithKeys(fn ($l) => [$l->account->code => [(float) $l->debit, (float) $l->credit]]);
-        $this->assertSame([44100.0, 0.0], $by2['1100']);      // 42000 + 5% TCS
+        $this->assertSame([44000.0, 0.0], $by2['1100']);      // 42000 + 5% TCS on the 40000 subtotal (not on the GST)
         $this->assertSame([0.0, 2000.0], $by2['2230']);       // IGST
-        $this->assertSame([0.0, 2100.0], $by2['2240']);       // TCS payable
-        $this->assertSame(86100.0, $this->bal('1100'));
+        $this->assertSame([0.0, 2000.0], $by2['2240']);       // TCS payable
+        $this->assertSame(86000.0, $this->bal('1100'));
         $this->assertAllBalanced();
     }
 

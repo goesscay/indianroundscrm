@@ -4,7 +4,7 @@ namespace App\Support;
 
 use App\Crm\Fail;
 
-/** Line and total arithmetic shared by invoices (same rules as quotes): amount = qty*unit - discount, tax = amount*rate. */
+/** Line and total arithmetic shared by invoices (same rules as quotes): amount = qty*unit - discount, tax = amount*rate. GST and TCS both work from the subtotal (less any discount); TCS is not charged on the GST. */
 class LineMath
 {
     public const KINDS = ['package', 'hotel', 'flight', 'transfer', 'visa', 'insurance', 'activity', 'other'];
@@ -52,7 +52,7 @@ class LineMath
         }
         $tax = round($tax, 2);
         $taxable = $sub - $disc;
-        $tcs = round(($taxable + $tax) * $tcsRate / 100, 2);
+        $tcs = round($taxable * $tcsRate / 100, 2);   // on the subtotal after discount, like GST: never on the GST itself
         $cgst = $mode === 'cgst_sgst' ? round($tax / 2, 2) : 0.0;
         $sgst = $mode === 'cgst_sgst' ? round($tax - $cgst, 2) : 0.0;
 

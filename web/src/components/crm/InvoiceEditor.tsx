@@ -46,13 +46,15 @@ export default function InvoiceEditor({ invoiceId }: { invoiceId?: string }) {
   const [travel, setTravel] = useState("");
   const [adults, setAdults] = useState("2");
   const [children, setChildren] = useState("0");
-  const [tcs, setTcs] = useState("0");
+  const [tcs, setTcs] = useState(editing ? "0" : "2");   // a new invoice starts at 2%; a draft keeps what was saved
   const [notes, setNotes] = useState("");
   const [terms, setTerms] = useState("");
   const [lines, setLines] = useState<QuoteLine[]>([blankLine()]);
   const [sched, setSchedRaw] = useState<Installment[] | null>(null); // null = let the server build the default plan
   const [touched, setTouched] = useState(false);
   const [loadedTotal, setLoadedTotal] = useState<number | null>(null);
+  const autoTitle = useRef<string | null>(null);   // the title we suggested, so a deal change may replace it but never your own words
+  const dealLine = useRef<{ description: string; price: number } | null>(null);   // the charge we filled in from the chosen deal
   const setSched: typeof setSchedRaw = (v) => { setTouched(true); setSchedRaw(v); };
   const [invNo, setInvNo] = useState("");
   const [saving, setSaving] = useState(false);
@@ -77,7 +79,7 @@ export default function InvoiceEditor({ invoiceId }: { invoiceId?: string }) {
             if (off) return;
             setCustomer(d.customer); setDealId(d.id); setTitle(d.destination ? `${d.destination} trip` : d.name);
             setDestination(d.destination ?? ""); setTravel(d.travel_date ?? ""); setAdults(String(d.adults)); setChildren(String(d.children));
-            if (d.selling_amount > 0) setLines([{ kind: "package", description: d.name, qty: 1, unit_price: d.selling_amount, discount: 0, tax_rate: 5 }]);
+            if (d.selling_amount > 0) { dealLine.current = { description: d.name, price: d.selling_amount }; setLines([{ kind: "package", description: d.name, qty: 1, unit_price: d.selling_amount, discount: 0, tax_rate: 5 }]); }
           } else if (custParam) {
             const { data: c } = await api.get<Customer>(`/customers/${custParam}`);
             if (off) return;
@@ -105,6 +107,32 @@ export default function InvoiceEditor({ invoiceId }: { invoiceId?: string }) {
     if (!customer) { setDeals([]); return; }
     api.get<Deal[]>("/deals", { params: { customer_id: customer.id, limit: 100 } }).then((r) => setDeals(r.data)).catch(() => setDeals([]));
   }, [customer]);
+
+  /** Choosing a deal fills in its trip details and its amount, unless charges were already typed in by hand. */
+  const pickDeal = (id: string) => {
+    setDealId(id);
+    const auto = dealLine.current;
+    const untouched = lines.every((l) => !l.description.trim() && !(Number(l.unit_price) > 0));
+    const ours = !!auto && lines.length === 1 && lines[0].description === auto.description && Number(lines[0].unit_price) === auto.price;
+    if (id === NONE) {                                         // un-linking takes back only what we had filled in
+      if (ours) { setLines([blankLine()]); dealLine.current = null; }
+      return;
+    }
+    const d = deals.find((x) => x.id === id);
+    if (!d) return;
+    if (!title.trim() || title === (autoTitle.current ?? "")) { const t = d.destination ? `${d.destination} trip` : d.name; setTitle(t); autoTitle.current = t; }
+    if (d.destination) setDestination(d.destination);
+    if (d.travel_date) setTravel(d.travel_date.slice(0, 10));
+    setAdults(String(d.adults)); setChildren(String(d.children));
+    if (d.selling_amount > 0) {
+      if (untouched || ours) {
+        dealLine.current = { description: d.name, price: d.selling_amount };
+        setLines([{ kind: "package", description: d.name, qty: 1, unit_price: d.selling_amount, discount: 0, tax_rate: 5 }]);
+      } else {
+        toast.info(`The deal amount ${INR2(d.selling_amount)} was not added because this invoice already has charges.`);
+      }
+    }
+  };
 
   const calc = useMemo(() => calcQuote(lines, Number(tcs) || 0), [lines, tcs]);
   const upd = (i: number, patch: Partial<QuoteLine>) => { setLines((l) => l.map((x, k) => (k === i ? { ...x, ...patch } : x))); };
@@ -183,14 +211,14 @@ export default function InvoiceEditor({ invoiceId }: { invoiceId?: string }) {
           <div className="sm:col-span-2"><Label htmlFor="i-title">Invoice title *</Label><Input id="i-title" className={field} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Goa family getaway" data-testid="invoice-title" /></div>
           <div>
             <Label>Deal</Label>
-            <Select value={dealId} onValueChange={setDealId} disabled={!customer}>
+            <Select value={dealId} onValueChange={pickDeal} disabled={!customer}>
               <SelectTrigger className={field}><SelectValue placeholder="Not linked" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>Not linked to a deal</SelectItem>
                 {deals.map((d) => <SelectItem key={d.id} value={d.id}>{d.deal_no} · {d.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <p className="mt-1 text-xs text-muted-foreground">The first payment on a linked deal marks it Won.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Choosing a deal fills in its trip and amount. The first payment on it marks it Won.</p>
           </div>
           <div><Label htmlFor="i-dest">Destination</Label><Input id="i-dest" className={field} value={destination} onChange={(e) => setDestination(e.target.value)} /></div>
           <div><Label htmlFor="i-travel">Travel date</Label><Input id="i-travel" type="date" className={field} value={travel} onChange={(e) => setTravel(e.target.value)} /></div>
@@ -240,6 +268,7 @@ export default function InvoiceEditor({ invoiceId }: { invoiceId?: string }) {
             <span className="flex items-center gap-2 text-muted-foreground">TCS % <Input type="number" min={0} max={100} step="0.5" value={tcs} onChange={(e) => setTcs(e.target.value)} className="h-8 w-20" aria-label="TCS percent" /></span>
             <span>{INR2(calc.tcs)}</span>
           </div>
+          <p className="-mt-1 text-right text-[11px] text-muted-foreground" data-testid="invoice-tcs-base">TCS is {Number(tcs) || 0}% of the subtotal {INR2(calc.taxable)}, not of the GST.</p>
           <div className="flex justify-between border-t border-border pt-2 text-base font-bold"><span>Total</span><span data-testid="invoice-total">{INR2(calc.total)}</span></div>
           <p className="text-xs text-muted-foreground">CGST/SGST or IGST is worked out from the customer&apos;s state when the invoice is issued.</p>
         </div>

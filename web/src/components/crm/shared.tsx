@@ -106,7 +106,7 @@ export function QuotePill({ status, className }: { status: string; className?: s
   return <span className={cn("inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium", m.chip, className)}>{m.label}</span>;
 }
 
-/** Same maths as the server: amount = qty*unit - discount, tax = amount*rate, TCS on (taxable + tax). */
+/** Same maths as the server: amount = qty*unit - discount, tax = amount*rate, TCS = taxable subtotal * rate (GST and TCS both come from the subtotal). */
 export function calcQuote(lines: { qty: number; unit_price: number; discount: number; tax_rate: number }[], tcsRate: number) {
   let subtotal = 0, discount = 0, tax = 0;
   const rows = lines.map((l) => {
@@ -118,9 +118,9 @@ export function calcQuote(lines: { qty: number; unit_price: number; discount: nu
     return { gross, amount, tax: t, total: amount + t };
   });
   const taxable = subtotal - discount;
-  const tcs = Math.round((taxable + tax) * (Number(tcsRate) || 0)) / 100;
+  const tcs = Math.round(taxable * (Number(tcsRate) || 0)) / 100;
   const r = (n: number) => Math.round(n * 100) / 100;
-  return { rows, subtotal: r(subtotal), discount: r(discount), tax: r(tax), tcs: r(tcs), total: r(taxable + tax + tcs) };
+  return { rows, subtotal: r(subtotal), discount: r(discount), taxable: r(taxable), tax: r(tax), tcs: r(tcs), total: r(taxable + tax + tcs) };
 }
 
 export const INR2 = (n: number | null | undefined) => "₹" + (Number(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

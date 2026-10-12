@@ -127,7 +127,7 @@ class QuoteController extends Controller
             QuoteLine::create($l + ['quote_id' => $q->id, 'position' => $i]);
         }
         $taxable = $sub - $disc;
-        $tcs = round(($taxable + $tax) * $tcsRate / 100, 2);
+        $tcs = round($taxable * $tcsRate / 100, 2);   // on the subtotal after discount, like GST: never on the GST itself
         $q->forceFill([
             'subtotal' => round($sub, 2), 'discount_total' => round($disc, 2), 'tax_total' => round($tax, 2),
             'tcs_rate' => $tcsRate, 'tcs_total' => $tcs, 'total' => round($taxable + $tax + $tcs, 2),

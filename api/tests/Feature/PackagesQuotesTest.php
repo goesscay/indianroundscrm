@@ -110,8 +110,8 @@ class PackagesQuotesTest extends TestCase
         $this->assertSame(50000.0, (float) $r->json('subtotal'));
         $this->assertSame(1000.0, (float) $r->json('discount_total'));
         $this->assertSame(2450.0, (float) $r->json('tax_total'));
-        $this->assertSame(round((49000 + 2450) * 0.05, 2), (float) $r->json('tcs_total'));
-        $this->assertSame(round(49000 + 2450 + 2572.5, 2), (float) $r->json('total'));
+        $this->assertSame(round(49000 * 0.05, 2), (float) $r->json('tcs_total'));            // TCS comes from the subtotal after discount, not from subtotal + GST
+        $this->assertSame(round(49000 + 2450 + 2450, 2), (float) $r->json('total'));
         $this->assertSame('2026-10-15', $r->json('issue_date'));
         $this->assertSame('2026-10-29', $r->json('valid_until'));
         $this->assertSame('draft', $r->json('display_status'));
