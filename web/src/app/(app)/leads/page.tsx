@@ -31,7 +31,17 @@ interface FilterOptions {
 
 interface StageCounts { stages: Record<string, number>; statuses: Record<string, number> }
 
-const INR = (n: number | undefined | null) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
+/** The budget is typed by hand ("80,000 – 1,20,000" or "₹6 L"): add the rupee sign only when it starts with a digit. */
+const budgetText = (b: string) => { const t = b.trim(); return /^\d/.test(t) ? `₹ ${t}` : t; };
+
+/** "3N / 4D · 2 adults, 1 child": what the trip looks like, from what the lead already holds. */
+function tripLine(l: Lead): string {
+  const adults = Number(l.adults) || 0;
+  const kids = Number(l.children) || 0;
+  const guests = [adults ? `${adults} adult${adults === 1 ? "" : "s"}` : "", kids ? `${kids} child${kids === 1 ? "" : "ren"}` : ""].filter(Boolean).join(", ");
+  return [l.duration_label, guests].filter(Boolean).join(" · ");
+}
+
 const TABS = [{ key: "all", label: "All", statuses: [] as string[] }, ...STAGES];
 
 function LeadList() {
@@ -54,7 +64,6 @@ function LeadList() {
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState("");
   const { can } = useCurrentUser();
-  const pricing = can("leads.edit", "suppliers.view", "rsq.manage"); // supplier quote, selling price and profit are not shown to sales
   const canMove = can("leads.edit", "leads.edit_limited");
 
   const setStage = useCallback((key: string) => {
@@ -145,8 +154,6 @@ function LeadList() {
     a.download = `leads-${Date.now()}.csv`; a.click();
     setExporting(false);
   };
-
-  const cols = 8 + (pricing ? 2 : 0);
 
   return (
     <div className="space-y-3" data-testid="leads-page">
@@ -243,17 +250,16 @@ function LeadList() {
                 <TableHead className="h-9 px-3 text-xs">Phone</TableHead>
                 <TableHead className="h-9 px-3 text-xs">Destination</TableHead>
                 <TableHead className="h-9 px-3 text-xs">Travel</TableHead>
+                <TableHead className="h-9 px-3 text-xs">Budget</TableHead>
                 <TableHead className="h-9 px-3 text-xs">Created</TableHead>
                 <TableHead className="h-9 px-3 text-xs">Stage</TableHead>
-                {pricing && <TableHead className="h-9 px-3 text-xs text-right">Selling ₹</TableHead>}
-                {pricing && <TableHead className="h-9 px-3 text-xs text-right">Profit</TableHead>}
                 <TableHead className="h-9 px-3 text-xs">Owner</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className={loading && loaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
-              {loading && !loaded && <TableRow><TableCell colSpan={cols + 1} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
+              {loading && !loaded && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
               {loaded && leads.length === 0 && (
-                <TableRow><TableCell colSpan={cols + 1} className="text-center text-muted-foreground py-12" data-testid="leads-empty">
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12" data-testid="leads-empty">
                   {activeFilters > 0 || stage !== "all" ? "No leads match. Try another stage or clear the filters." : "No leads yet. Create one to get started."}
                 </TableCell></TableRow>
               )}
@@ -292,9 +298,16 @@ function LeadList() {
                     </div>
                   </TableCell>
                   <TableCell className="px-3 py-1.5"><span className="block max-w-[170px] truncate" title={l.destination}>{l.destination}</span></TableCell>
-                  <TableCell className="px-3 py-1.5 text-muted-foreground text-xs whitespace-nowrap">{(l.travel_date || "").slice(0, 10)}</TableCell>
+                  <TableCell className="px-3 py-1.5 whitespace-nowrap" data-testid={`lead-travel-${l.lead_id}`}>
+                    <div className="text-xs">{(l.travel_date || "").slice(0, 10) || <span className="text-muted-foreground">Not set</span>}</div>
+                    {tripLine(l) && <div className="text-[11px] text-muted-foreground">{tripLine(l)}</div>}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-xs" data-testid={`lead-budget-${l.lead_id}`}>
+                    {l.budget?.trim() ? <span className="block max-w-[130px] truncate" title={budgetText(l.budget)}>{budgetText(l.budget)}</span> : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className="px-3 py-1.5 text-muted-foreground text-xs whitespace-nowrap" title={l.created_at ? new Date(l.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : ""} data-testid={`lead-created-${l.lead_id}`}>
                     {l.created_at ? new Date(l.created_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" }) : ""}
+                    {l.lead_source && <div className="max-w-[110px] truncate text-[11px]" title={`Source: ${l.lead_source}`}>{l.lead_source}</div>}
                   </TableCell>
                   <TableCell className="px-3 py-1.5">
                     {canMove ? (
@@ -316,10 +329,6 @@ function LeadList() {
                       </Select>
                     ) : <StatusPill status={l.lead_status} />}
                   </TableCell>
-                  {pricing && <TableCell className="px-3 py-1.5 text-right font-semibold">{INR(l.selling_amount)}</TableCell>}
-                  {pricing && <TableCell className={`px-3 py-1.5 text-right ${(l.profit || 0) >= 0 ? "text-[#0F766E] dark:text-emerald-400" : "text-[#B91C1C] dark:text-red-400"}`}>
-                    {INR(l.profit)}
-                  </TableCell>}
                   <TableCell className="px-3 py-1.5 text-xs text-muted-foreground whitespace-nowrap">{l.staff_name}</TableCell>
                 </TableRow>
                 );
