@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
+import { mergePlaces, tidyPlace } from "@/lib/places";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -36,10 +37,18 @@ const F = ({ label, required, children, testId }: { label: string; required?: bo
   </div>
 );
 
-function SelectMaster({ options, value, onChange, placeholder, testId }: {
+function SelectMaster({ options, value, onChange, placeholder, testId, custom }: {
   options?: string[]; value?: string; onChange: (v: string) => void; placeholder?: string; testId?: string;
+  /** Let the person type a place that is not in the list. */
+  custom?: boolean;
 }) {
-  return <Combobox options={options || []} value={value} onChange={onChange} placeholder={placeholder} searchPlaceholder="Type to search…" testId={testId} />;
+  return (
+    <Combobox
+      options={options || []} value={value} placeholder={placeholder} testId={testId} allowCustom={custom}
+      onChange={(v) => onChange(custom ? tidyPlace(v) : v)}
+      searchPlaceholder={custom ? "Type to search, or type a new place…" : "Type to search…"}
+    />
+  );
 }
 
 const PASSPORT_REASONS = [
@@ -78,6 +87,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
   const router = useRouter();
   const { user, can } = useCurrentUser();
   const [master, setMaster] = useState<Record<string, string[]>>({});
+  const [used, setUsed] = useState<Record<string, string[]>>({});
   const [destCities, setDestCities] = useState<DestinationCities>({});
   const [f, setF] = useState<LeadFormState>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -107,8 +117,8 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
 
   useEffect(() => {
     // Dropdown values come from /lead-options (open to anyone who can create or edit leads), not from the admin-only Master Data endpoints.
-    api.get<{ master: Record<string, string[]>; cities: DestinationCities; owners?: { id: string; name: string; code: string }[] }>("/lead-options")
-      .then(({ data }) => { setMaster(data.master || {}); setDestCities(data.cities || {}); setOwners(data.owners || []); })
+    api.get<{ master: Record<string, string[]>; used?: Record<string, string[]>; cities: DestinationCities; owners?: { id: string; name: string; code: string }[] }>("/lead-options")
+      .then(({ data }) => { setMaster(data.master || {}); setUsed(data.used || {}); setDestCities(data.cities || {}); setOwners(data.owners || []); })
       .catch((e) => toast.error(`Could not load the dropdown lists: ${formatApiError(e)}`));
   }, []);
 
@@ -366,7 +376,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
             </F>
             <F label="Email"><Input type="email" value={f.email} onChange={set("email")} data-testid="f-email" /></F>
             <F label="Lead Source"><SelectMaster options={master.lead_source} value={f.lead_source} onChange={set("lead_source")} placeholder="Website / Instagram…" testId="f-lead-source" /></F>
-            <F label="Departure From"><SelectMaster options={master.departure_city} value={f.departure_from} onChange={set("departure_from")} placeholder="City" testId="f-departure" /></F>
+            <F label="Departure From"><SelectMaster custom options={mergePlaces(master.departure_city, used.departure_city)} value={f.departure_from} onChange={set("departure_from")} placeholder="Choose or type a city" testId="f-departure" /></F>
           </div>
           {duplicates.length > 0 && (
             <div className="mt-3 p-3 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40" data-testid="duplicate-warning">
@@ -391,9 +401,9 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
           <h3 className="font-display text-base font-bold mb-3">Trip</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-2.5">
             <F label="Destination" required>
-              <SelectMaster options={master.destination} value={f.destination}
+              <SelectMaster custom options={mergePlaces(master.destination, used.destination)} value={f.destination}
                             onChange={(v) => setF(p => ({ ...p, destination: v, stay_cities: [] }))}
-                            placeholder="Choose destination" testId="f-destination" />
+                            placeholder="Choose or type a destination" testId="f-destination" />
             </F>
             <F label="Travel Start Date">
               <Input type="date" value={f.travel_date} onChange={set("travel_date")} data-testid="f-travel-date" />

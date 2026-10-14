@@ -8,6 +8,7 @@ import { useCurrentUser } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
+import { mergePlaces, tidyPlace } from "@/lib/places";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Lead } from "@/types";
 
@@ -37,8 +38,8 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
   useEffect(() => {
     if (!open) return;
     setRows(Array.from({ length: ROWS }, blank)); setAdded([]);
-    api.get<{ master: Record<string, string[]> }>("/lead-options")
-      .then(({ data }) => { setDestinations(data.master?.destination ?? []); setSources(data.master?.lead_source ?? []); })
+    api.get<{ master: Record<string, string[]>; used?: Record<string, string[]> }>("/lead-options")
+      .then(({ data }) => { setDestinations(mergePlaces(data.master?.destination, data.used?.destination)); setSources(data.master?.lead_source ?? []); })
       .catch((e) => toast.error(`Could not load the lists: ${formatApiError(e)}`));
   }, [open]);
 
@@ -112,7 +113,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
                        className={r.error ? "border-destructive" : ""} />
                 <Input value={r.phone} onChange={(e) => set(i, { phone: e.target.value })} placeholder="10-digit mobile" inputMode="tel" aria-label={`Mobile number ${i + 1}`} data-testid={`bulk-phone-${i}`}
                        className={r.error ? "border-destructive" : ""} />
-                <Combobox options={destinations} value={r.destination} onChange={(v) => set(i, { destination: v })} placeholder="Destination" searchPlaceholder="Search…" testId={`bulk-dest-${i}`} />
+                <Combobox options={destinations} value={r.destination} onChange={(v) => set(i, { destination: tidyPlace(v) })} allowCustom placeholder="Destination" searchPlaceholder="Search, or type a new place…" testId={`bulk-dest-${i}`} />
                 <Combobox options={sources} value={r.source} onChange={(v) => set(i, { source: v })} placeholder="Source" searchPlaceholder="Search…" clearLabel="No source" clearValue="" testId={`bulk-src-${i}`} />
                 {r.error && <span className="col-span-5 -mt-1 pl-8 text-xs text-destructive" role="alert" data-testid={`bulk-err-${i}`}>{r.error}</span>}
               </div>

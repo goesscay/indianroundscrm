@@ -27,7 +27,18 @@ class MasterDataController extends Controller
             ->filter(fn (User $u) => $u->hasPermission('leads.assignable'))
             ->map(fn (User $u) => ['id' => (string) $u->id, 'name' => $u->name, 'code' => $u->consultant_code ?: ($u->staff_code ?: '')])->values();
 
-        return ['master' => (object) $master, 'cities' => $this->citiesIndex()->getData(), 'owners' => $owners];
+        // Places the team has typed on leads that are not in Master Data yet, so the next person can pick them instead of retyping
+        $used = [];
+        foreach (['destination' => 'destination', 'departure_from' => 'departure_city'] as $col => $category) {
+            $known = collect($master[$category] ?? [])->map(fn ($v) => mb_strtolower(trim((string) $v)))->all();
+            $used[$category] = \App\Models\Lead::query()->whereNotNull($col)->where($col, '!=', '')->distinct()->orderBy($col)->limit(2000)->pluck($col)
+                ->map(fn ($v) => trim((string) $v))->filter(fn ($v) => $v !== '' && ! in_array(mb_strtolower($v), $known, true))
+                // one entry per place, preferring a spelling that is not all lower case
+                ->groupBy(fn ($v) => mb_strtolower($v))->map(fn ($g) => $g->first(fn ($v) => $v !== mb_strtolower($v)) ?? $g->first())
+                ->sort()->values()->all();
+        }
+
+        return ['master' => (object) $master, 'used' => (object) $used, 'cities' => $this->citiesIndex()->getData(), 'owners' => $owners];
     }
 
     // ---------- /master ----------
