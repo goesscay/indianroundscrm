@@ -14,9 +14,12 @@ import type { Lead } from "@/types";
 
 const ROWS = 10;
 
-interface Row { name: string; phone: string; destination: string; source: string; error?: string }
-const blank = (): Row => ({ name: "", phone: "", destination: "", source: "" });
-const isBlank = (r: Row) => !r.name.trim() && !r.phone.trim() && !r.destination && !r.source;
+const DEFAULT_SOURCE = "WhatsApp";
+
+interface Row { phone: string; destination: string; source: string; error?: string }
+const blank = (): Row => ({ phone: "", destination: "", source: DEFAULT_SOURCE });
+/** A row counts only once a number or a destination is entered: the pre-filled source alone does not. */
+const isBlank = (r: Row) => !r.phone.trim() && !r.destination;
 
 const cleanPhone = (raw: string) => (raw || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "");
 const phoneError = (raw: string) => {
@@ -26,7 +29,7 @@ const phoneError = (raw: string) => {
   return "";
 };
 
-/** Add up to 10 leads at once: customer, mobile number and destination (source optional). Each row goes through the normal lead rules. */
+/** Add up to 10 leads at once from a mobile number and a destination. The source starts as WhatsApp; the lead is named by its number until someone edits it. Each row goes through the normal lead rules. */
 export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void }) {
   const { can } = useCurrentUser();
   const [rows, setRows] = useState<Row[]>(() => Array.from({ length: ROWS }, blank));
@@ -52,8 +55,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
     const checked = rows.map((r) => {
       if (isBlank(r)) return r;
       let error = "";
-      if (!r.name.trim()) error = "Customer name is required";
-      else if (phoneError(r.phone)) error = phoneError(r.phone);
+      if (phoneError(r.phone)) error = phoneError(r.phone);
       else if (!r.destination) error = "Choose a destination";
       else if (seen.has(cleanPhone(r.phone))) error = "Same mobile number appears twice in this list";
       if (!error) seen.add(cleanPhone(r.phone));
@@ -70,7 +72,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
     for (const { r, i } of todo) {
       try {
         const { data } = await api.post<Lead>("/leads", {
-          customer_name: r.name.trim(), phone: cleanPhone(r.phone), destination: r.destination, ...(r.source ? { lead_source: r.source } : {}),
+          customer_name: cleanPhone(r.phone), phone: cleanPhone(r.phone), destination: r.destination, ...(r.source ? { lead_source: r.source } : {}),
         });
         created.push(data.lead_id);
         next[i] = blank();
@@ -93,29 +95,27 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
 
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto" data-testid="bulk-leads-dialog">
+      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto" data-testid="bulk-leads-dialog">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl font-black">Add leads in bulk</DialogTitle>
           <DialogDescription>
-            Up to {ROWS} leads at once. Customer name, mobile number and destination are required.
+            Up to {ROWS} leads at once. Mobile number and destination are required. The source is WhatsApp unless you change it, and each lead carries its mobile number as the name until you edit it.
             {can("leads.reassign") ? " Owners are set from the destination allocation." : " The leads are added in your name."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
-          <div className="grid grid-cols-[1.5rem_1fr_9.5rem_1fr_1fr] items-end gap-2 text-xs sm:text-sm">
+          <div className="grid grid-cols-[1.5rem_11rem_1fr_1fr] items-end gap-2 text-xs sm:text-sm">
             <span />
-            <span className="label-caps">Customer name *</span><span className="label-caps">Mobile number *</span>
+            <span className="label-caps">Mobile number *</span>
             <span className="label-caps">Destination *</span><span className="label-caps">Lead source</span>
             {rows.map((r, i) => (
               <div key={i} className="contents">
                 <span className="pb-2 text-right text-muted-foreground">{i + 1}</span>
-                <Input value={r.name} onChange={(e) => set(i, { name: e.target.value })} placeholder="Name" aria-label={`Customer name ${i + 1}`} data-testid={`bulk-name-${i}`}
-                       className={r.error ? "border-destructive" : ""} />
                 <Input value={r.phone} onChange={(e) => set(i, { phone: e.target.value })} placeholder="10-digit mobile" inputMode="tel" aria-label={`Mobile number ${i + 1}`} data-testid={`bulk-phone-${i}`}
                        className={r.error ? "border-destructive" : ""} />
                 <Combobox options={destinations} value={r.destination} onChange={(v) => set(i, { destination: tidyPlace(v) })} allowCustom placeholder="Destination" searchPlaceholder="Search, or type a new place…" testId={`bulk-dest-${i}`} />
                 <Combobox options={sources} value={r.source} onChange={(v) => set(i, { source: v })} placeholder="Source" searchPlaceholder="Search…" clearLabel="No source" clearValue="" testId={`bulk-src-${i}`} />
-                {r.error && <span className="col-span-5 -mt-1 pl-8 text-xs text-destructive" role="alert" data-testid={`bulk-err-${i}`}>{r.error}</span>}
+                {r.error && <span className="col-span-4 -mt-1 pl-8 text-xs text-destructive" role="alert" data-testid={`bulk-err-${i}`}>{r.error}</span>}
               </div>
             ))}
           </div>
