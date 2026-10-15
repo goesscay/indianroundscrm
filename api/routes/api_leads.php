@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Crm\ActivityController;
+use App\Http\Controllers\Crm\CallScriptController;
 use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\CustomerReplyController;
 use App\Http\Controllers\Crm\DealController;
@@ -37,6 +38,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/leads/{lead_id}', [LeadController::class, 'show']);
     Route::middleware('perm:leads.edit,leads.edit_limited')->patch('/leads/{lead_id}', [LeadController::class, 'update']);
     Route::middleware('perm:leads.delete')->delete('/leads/{lead_id}', [LeadController::class, 'destroy']);
+
+    // call scripts: team defaults plus each person's own versions
+    Route::middleware('perm:leads.create,leads.edit,leads.edit_limited')->group(function () {
+        Route::get('/scripts', [CallScriptController::class, 'index']);
+        Route::post('/scripts', [CallScriptController::class, 'store']);
+        Route::delete('/scripts/{id}', [CallScriptController::class, 'destroy']);
+    });
     Route::middleware('perm:leads.reassign')->post('/leads/{lead_id}/reassign', [LeadController::class, 'reassign']);
 
     Route::get('/leads/{lead_id}/notes', [LeadController::class, 'notes'])->middleware('perm:leads.notes');

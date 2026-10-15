@@ -848,3 +848,14 @@ export interface DealBooks {
   revenue: { code: string; name: string; amount: number }[]; costs: { code: string; name: string; amount: number }[];
   total_revenue: number; total_costs: number; profit: number; margin_pct: number | null; bills: SupplierBill[];
 }
+
+/** A call script: a team default, or a salesperson's own version. */
+export interface CallScript {
+  id: string;
+  scope: "team" | "mine";
+  /** null = a general script, used when nothing is written for the destination */
+  destination: string | null;
+  title: string;
+  body: string;
+  updated_at: string | null;
+}

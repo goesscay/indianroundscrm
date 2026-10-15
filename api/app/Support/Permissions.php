@@ -44,6 +44,7 @@ class Permissions
                 'contact_events' => ['Contact log', 'Read and log contact events on visible leads.'],
                 'export' => ['Export leads', 'Export lead data (reserved; there is no export endpoint yet).'],
                 'convert' => ['Convert leads', 'Convert a lead into a customer and a deal.'],
+                'scripts' => ['Manage call scripts', 'Edit or remove the team default call scripts. Everyone who works leads can keep scripts of their own.'],
             ]),
             $g('customers', 'Customers', [
                 'view' => ['View customers', 'Open Customers. Sees customers they own or created.'],

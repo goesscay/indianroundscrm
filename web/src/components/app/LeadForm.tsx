@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
+import CallScriptPanel from "@/components/app/CallScriptPanel";
 import { mergePlaces, myDestinations, placesFirst, tidyPlace } from "@/lib/places";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { AlertTriangle, ExternalLink, Plus, X } from "lucide-react";
+import { AlertTriangle, ExternalLink, Plus, ScrollText, X } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { DestinationCities, DuplicateInfo, Lead, LeadCreate, StayCity } from "@/types";
 
@@ -86,6 +87,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
   const editing = !!leadId;
   const router = useRouter();
   const { user, can } = useCurrentUser();
+  const [scriptOpen, setScriptOpen] = useState(false);
   const [master, setMaster] = useState<Record<string, string[]>>({});
   const [used, setUsed] = useState<Record<string, string[]>>({});
   const [destCities, setDestCities] = useState<DestinationCities>({});
@@ -344,13 +346,20 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
           <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight mt-0.5">{editing ? `Edit Lead ${leadNo}` : "New Lead"}</h1>
           <p className="text-xs text-muted-foreground mt-1">{editing ? "Change any detail and save. The lead keeps its ID, status and history." : "Lead ID auto-generated on save (e.g. IR07001)."}</p>
         </div>
-        {!editing && (
-          <Button asChild variant="outline" size="sm">
-            <a href="/leads/new" target="_blank" title="Open another blank lead form in a new tab" data-testid="new-lead-window">
-              <ExternalLink size={14} /> Open in new tab
-            </a>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant={scriptOpen ? "default" : "outline"} size="sm" onClick={() => setScriptOpen((o) => !o)} aria-pressed={scriptOpen}
+                  title="Show the call script for this destination" data-testid="script-btn">
+            <ScrollText size={14} /> Script
           </Button>
-        )}
+          {!editing && (
+            <Button asChild variant="outline" size="sm">
+              <a href="/leads/new" target="_blank" title="Open another blank lead form in a new tab" data-testid="new-lead-window">
+                <ExternalLink size={14} /> Open in new tab
+              </a>
+            </Button>
+          )}
+        </div>
+        {scriptOpen && <CallScriptPanel destination={f.destination} customer={f.customer_name} onClose={() => setScriptOpen(false)} />}
       </div>
 
       <form onSubmit={submit} className="space-y-3">
