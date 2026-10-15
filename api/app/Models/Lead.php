@@ -27,6 +27,7 @@ class Lead extends Model
         'selling_amount' => 'float',
         'booking_amount_received' => 'float',
         'supplier_mail_date' => 'datetime',
+        'archived_at' => 'datetime',
     ];
 
     public function stayCities(): HasMany

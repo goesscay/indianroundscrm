@@ -81,6 +81,7 @@ export interface Lead extends Partial<LeadCreate> {
   customer_id?: string | null;
   deal_id?: string | null;
   converted_at?: string | null;
+  archived_at?: string | null;
   lead_id: string;
   customer_name: string;
   phone: string;

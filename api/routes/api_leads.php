@@ -37,6 +37,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/leads', [LeadController::class, 'index']);
     Route::get('/leads/{lead_id}', [LeadController::class, 'show']);
     Route::middleware('perm:leads.edit,leads.edit_limited')->patch('/leads/{lead_id}', [LeadController::class, 'update']);
+    Route::middleware('perm:leads.edit,leads.edit_limited')->post('/leads/{lead_id}/archive', [LeadController::class, 'archive']);
+    Route::middleware('perm:leads.edit,leads.edit_limited')->post('/leads/{lead_id}/unarchive', [LeadController::class, 'unarchive']);
     Route::middleware('perm:leads.delete')->delete('/leads/{lead_id}', [LeadController::class, 'destroy']);
 
     // call scripts: team defaults plus each person's own versions

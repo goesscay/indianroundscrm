@@ -225,8 +225,14 @@ class LeadController extends Controller
         if (($v = (string) $request->query('status', '')) !== '') {
             $q->where('lead_status', $v);
         }
-        if (($stage = (string) $request->query('stage', '')) !== '' && $stage !== 'all') {
-            $q->whereIn('lead_status', \App\Support\LeadStages::statuses($stage) ?? ['__none__']);
+        $stage = (string) $request->query('stage', '');
+        if ($stage === 'archived') {
+            $q->whereNotNull('archived_at');                   // the Archive tab holds every archived lead, whatever its status
+        } else {
+            $q->whereNull('archived_at');                      // archived leads stay out of All and the stage tabs
+            if ($stage !== '' && $stage !== 'all') {
+                $q->whereIn('lead_status', \App\Support\LeadStages::statuses($stage) ?? ['__none__']);
+            }
         }
         $q->orderByDesc('created_at')->orderByDesc('id');
         if (\App\Support\Paging::requested($request)) {
@@ -240,11 +246,12 @@ class LeadController extends Controller
     /** GET /leads/stage-counts: how many leads sit in each stage (and in each status) under the current search / filters. */
     public function stageCounts(Request $request)
     {
-        $by = $this->filtered($request, $request->user())->select('lead_status', DB::raw('count(*) as n'))->groupBy('lead_status')->pluck('n', 'lead_status');
+        $by = $this->filtered($request, $request->user())->whereNull('archived_at')->select('lead_status', DB::raw('count(*) as n'))->groupBy('lead_status')->pluck('n', 'lead_status');
         $stages = ['all' => (int) $by->sum()];
         foreach (\App\Support\LeadStages::MAP as $stage => $statuses) {
             $stages[$stage] = (int) collect($statuses)->sum(fn ($s) => $by[$s] ?? 0);
         }
+        $stages['archived'] = $this->filtered($request, $request->user())->whereNotNull('archived_at')->count();
 
         return ['stages' => $stages, 'statuses' => $by->map(fn ($n) => (int) $n)->all()];
     }
@@ -567,6 +574,32 @@ class LeadController extends Controller
         $logUpdates['updated_at'] = Fail::nowIso();
         $logUpdates['updated_by'] = $user->email;
         ActivityLogger::log($user, 'update_lead', 'lead', $leadId, null, $logUpdates);
+        return $lead->fresh('stayCities')->toApi();
+    }
+
+    /** POST /leads/{id}/archive and /unarchive: put a lead away in the Archive tab, or bring it back. Nothing else about the lead changes. */
+    public function archive(Request $request, string $leadId)
+    {
+        return $this->setArchived($request, $leadId, true);
+    }
+
+    public function unarchive(Request $request, string $leadId)
+    {
+        return $this->setArchived($request, $leadId, false);
+    }
+
+    private function setArchived(Request $request, string $leadId, bool $on)
+    {
+        $user = $request->user();
+        $lead = $this->findLead($leadId);
+        $this->assertCanSee($lead, $user);
+        if ($on !== ($lead->archived_at !== null)) {
+            $lead->archived_at = $on ? now() : null;
+            $lead->updated_by = $user->email;
+            $lead->save();
+            ActivityLogger::log($user, $on ? 'archive_lead' : 'unarchive_lead', 'lead', $leadId);
+        }
+
         return $lead->fresh('stayCities')->toApi();
     }
 

@@ -17,7 +17,7 @@ import StatusPill from "@/components/app/StatusPill";
 import LeadDateFilter, { NO_DATES, type DateFilter } from "@/components/app/LeadDateFilter";
 import { STAGES, stageByKey } from "@/lib/leadStages";
 import { myDestinations } from "@/lib/places";
-import { Search, Download, Phone, MessageCircle, X, ListPlus } from "lucide-react";
+import { Search, Download, Phone, MessageCircle, X, ListPlus, Archive, ArchiveRestore } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import BulkLeadsDialog from "@/components/app/BulkLeadsDialog";
 import { logContact } from "@/components/app/ContactTimeline";
@@ -43,7 +43,8 @@ function tripLine(l: Lead): string {
   return [l.duration_label, guests].filter(Boolean).join(" · ");
 }
 
-const TABS = [{ key: "all", label: "All", statuses: [] as string[] }, ...STAGES];
+// Archive is not a status: any lead can be put away there and brought back, and it keeps its own status meanwhile.
+const TABS = [{ key: "all", label: "All", statuses: [] as string[] }, ...STAGES, { key: "archived", label: "Archive", statuses: [] as string[] }];
 
 function LeadList() {
   const router = useRouter();
@@ -140,6 +141,14 @@ function LeadList() {
     try {
       await api.patch(`/leads/${leadId}`, { lead_status: to });
       toast.success(`${leadId} moved to ${to}`);
+      setRefreshTick((t) => t + 1);
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const setArchived = async (leadId: string, on: boolean) => {
+    try {
+      await api.post(`/leads/${leadId}/${on ? "archive" : "unarchive"}`);
+      toast.success(on ? `${leadId} moved to the Archive` : `${leadId} restored`);
       setRefreshTick((t) => t + 1);
     } catch (e) { toast.error(formatApiError(e)); }
   };
@@ -258,13 +267,15 @@ function LeadList() {
                 <TableHead className="h-9 px-3 text-xs">Created</TableHead>
                 <TableHead className="h-9 px-3 text-xs">Stage</TableHead>
                 <TableHead className="h-9 px-3 text-xs">Owner</TableHead>
+                {canMove && <TableHead className="h-9 w-10 px-2 text-xs"><span className="sr-only">Archive</span></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody className={loading && loaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
-              {loading && !loaded && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
+              {loading && !loaded && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
               {loaded && leads.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12" data-testid="leads-empty">
-                  {activeFilters > 0 || stage !== "all" ? "No leads match. Try another stage or clear the filters." : "No leads yet. Create one to get started."}
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-12" data-testid="leads-empty">
+                  {stage === "archived" && activeFilters === 0 ? "Nothing in the Archive. Use the archive icon at the end of a lead's row to put it away."
+                    : activeFilters > 0 || stage !== "all" ? "No leads match. Try another stage or clear the filters." : "No leads yet. Create one to get started."}
                 </TableCell></TableRow>
               )}
               {leads.map((l) => {
@@ -334,6 +345,19 @@ function LeadList() {
                     ) : <StatusPill status={l.lead_status} />}
                   </TableCell>
                   <TableCell className="px-3 py-1.5 text-xs text-muted-foreground whitespace-nowrap">{l.staff_name}</TableCell>
+                  {canMove && (
+                    <TableCell className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button" onClick={() => void setArchived(l.lead_id, !l.archived_at)}
+                        title={l.archived_at ? "Restore from the Archive" : "Move to the Archive"}
+                        aria-label={l.archived_at ? `Restore ${l.lead_id}` : `Archive ${l.lead_id}`}
+                        className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        data-testid={`${l.archived_at ? "unarchive" : "archive"}-${l.lead_id}`}
+                      >
+                        {l.archived_at ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                      </button>
+                    </TableCell>
+                  )}
                 </TableRow>
                 );
               })}

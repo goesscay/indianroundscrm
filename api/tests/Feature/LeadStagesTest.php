@@ -94,6 +94,43 @@ class LeadStagesTest extends TestCase
         $this->assertSame(0, $c['stages']['lost']);
     }
 
+    public function test_archived_leads_leave_every_other_tab_and_fill_the_archive_tab(): void
+    {
+        $this->seed12();
+        Sanctum::actingAs(User::factory()->admin()->create(), ['*'], 'sanctum');
+        $this->postJson('/api/leads/IRST00001/archive')->assertOk()->assertJsonPath('lead_status', 'New Lead');   // keeps its status
+        $this->postJson('/api/leads/IRST00007/archive')->assertOk();
+        $this->postJson('/api/leads/IRST00007/archive')->assertOk();                                               // twice changes nothing
+
+        $ids = fn (string $qs) => collect($this->getJson('/api/leads?'.$qs)->assertOk()->json())->pluck('lead_id')->sort()->values()->all();
+        $this->assertSame(['IRST00001', 'IRST00007'], $ids('stage=archived'));
+        $this->assertCount(10, $ids('stage=all'));
+        $this->assertNotContains('IRST00001', $ids('stage=new'));
+        $this->assertSame([], $ids('stage=new'));
+        $this->assertSame(['IRST00001'], $ids('stage=archived&q=IRST00001'));                                    // search and filters still apply
+
+        $c = $this->getJson('/api/leads/stage-counts')->assertOk()->json();
+        $this->assertSame(10, $c['stages']['all']);
+        $this->assertSame(0, $c['stages']['new']);
+        $this->assertSame(2, $c['stages']['booked']);
+        $this->assertSame(2, $c['stages']['archived']);
+
+        $this->postJson('/api/leads/IRST00001/unarchive')->assertOk()->assertJsonPath('archived_at', null);
+        $this->assertSame(['IRST00001'], $ids('stage=new'));
+        $this->assertSame(1, $this->getJson('/api/leads/stage-counts')->json('stages.archived'));
+    }
+
+    public function test_sales_can_archive_only_leads_they_can_see(): void
+    {
+        $this->seed12();
+        $sales = User::factory()->sales()->create();
+        DB::table('leads')->where('lead_id', 'IRST00001')->update(['staff_id' => $sales->id]);
+        Sanctum::actingAs($sales, ['*'], 'sanctum');
+        $this->postJson('/api/leads/IRST00001/archive')->assertOk();
+        $this->postJson('/api/leads/IRST00002/archive')->assertStatus(403);
+        $this->assertNull(Lead::where('lead_id', 'IRST00002')->value('archived_at'));
+    }
+
     public function test_one_click_stage_change_uses_the_normal_lead_update(): void
     {
         $this->seed12();
