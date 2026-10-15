@@ -75,7 +75,8 @@ class Permissions
             ]),
             $g('packages', 'Packages', [
                 'view' => ['View packages', 'Browse the tour packages, prices and itineraries.'],
-                'manage' => ['Manage packages', 'Create, edit, deactivate and delete packages, seasonal prices and itineraries.'],
+                'manage' => ['Manage packages', 'Create, edit, deactivate and delete packages, seasonal prices and itineraries, and choose which sales people see which package.'],
+                'view_all' => ['See all packages', 'See every package. Without it a user sees only the packages Admin or Operations have assigned to them.'],
             ]),
             $g('quotes', 'Quotes', [
                 'view' => ['View quotes', 'Open Quotes. Sees quotes they own or created.'],
@@ -204,7 +205,7 @@ class Permissions
                 'activities.view', 'activities.view_all', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',
                 'deals.view', 'deals.view_all', 'deals.create', 'deals.edit', 'forecasts.view', 'forecasts.view_all', 'trips.view', 'trips.manage', 'trips.confirm', 'trip_docs.view', 'trip_docs.upload', 'trip_docs.download', 'trip_docs.manage',
-                'packages.view', 'packages.manage', 'quotes.view', 'quotes.view_all', 'quotes.create', 'quotes.send',
+                'packages.view', 'packages.manage', 'packages.view_all', 'quotes.view', 'quotes.view_all', 'quotes.create', 'quotes.send',
                 'invoices.view', 'invoices.view_all', 'invoices.create', 'invoices.issue', 'receipts.view', 'receipts.record',
             ],
             'accountant' => [

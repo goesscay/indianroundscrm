@@ -735,7 +735,15 @@ export interface TravelPackage {
   nights: number; days: number; summary: string | null; inclusions: string | null; exclusions: string | null; terms: string | null;
   adult_price: number; child_price: number; adult_cost: number; child_cost: number; gst_rate: number; active: boolean;
   seasons?: PackageSeason[]; itinerary?: PackageDay[];
+  /** "website" = brought in from indianrounds.in: its website fields are locked until a manager unlocks it. */
+  source?: "local" | "website"; locked?: string[]; source_unlocked?: boolean; source_synced_at?: string | null;
+  image_url?: string | null; website_url?: string | null; highlights?: string | null;
+  departures?: { id: string; start_date: string; end_date: string | null; seats_left: number | null; status: string | null }[];
+  /** only for people who manage packages */
+  assignees?: { id: string; name: string }[]; assignees_count?: number;
 }
+export interface AssignableUser { id: string; name: string; code: string; destinations: string[] }
+export interface WebsiteSyncResult { created: number; updated: number; unchanged: number; skipped_unlocked: number; deactivated: number; reactivated: number; failed: number; tours: number; departures: number }
 export interface PackageRates { season: string | null; adult_price: number; child_price: number; adult_cost: number; child_cost: number; gst_rate: number }
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "superseded";

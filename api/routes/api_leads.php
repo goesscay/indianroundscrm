@@ -165,6 +165,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---- Packages (catalogue)
     Route::get('/packages/options', [PackageController::class, 'options'])->middleware('perm:packages.view,packages.manage,quotes.create');
+    Route::get('/packages/assignable-users', [PackageController::class, 'assignableUsers'])->middleware('perm:packages.manage');
+    Route::post('/packages/assign', [PackageController::class, 'assign'])->middleware('perm:packages.manage');
+    Route::post('/packages/sync-website', [PackageController::class, 'syncWebsite'])->middleware('perm:packages.manage');
+    Route::put('/packages/{id}/assignees', [PackageController::class, 'setAssignees'])->middleware('perm:packages.manage');
+    Route::post('/packages/{id}/sync-lock', [PackageController::class, 'syncLock'])->middleware('perm:packages.manage');
     Route::get('/packages', [PackageController::class, 'index'])->middleware('perm:packages.view,packages.manage,quotes.create');
     Route::post('/packages', [PackageController::class, 'store'])->middleware('perm:packages.manage');
     Route::get('/packages/{id}', [PackageController::class, 'show'])->middleware('perm:packages.view,packages.manage,quotes.create');

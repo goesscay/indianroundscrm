@@ -35,6 +35,11 @@ return [
         'respond_days' => (int) env('CRM_PORTAL_RESPOND_DAYS', 3),
         'auto_reminders' => filter_var(env('CRM_AUTO_PORTAL_REMINDERS', false), FILTER_VALIDATE_BOOL),
     ],
+    // The public website whose tours are imported as packages (nightly, and on the Packages page). CRM_WEBSITE_SYNC=false pauses the nightly run.
+    'website' => [
+        'url' => env('CRM_WEBSITE_URL', 'https://indianrounds.in'),
+        'sync' => filter_var(env('CRM_WEBSITE_SYNC', true), FILTER_VALIDATE_BOOL),
+    ],
     'public_url' => env('CRM_PUBLIC_URL'),   // used in links sent to customers; falls back to APP_URL
     'quote_valid_days' => (int) env('CRM_QUOTE_VALID_DAYS', 14),
 ];

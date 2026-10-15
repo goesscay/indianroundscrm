@@ -19,3 +19,6 @@ Schedule::command("trips:remind")->dailyAt("09:00")->timezone("Asia/Kolkata")->w
 
 // Reminds portal suppliers who have not quoted an enquiry that is due. 11:00 IST daily. Does nothing unless CRM_AUTO_PORTAL_REMINDERS=true.
 Schedule::command("portal:remind")->dailyAt("11:00")->timezone("Asia/Kolkata")->withoutOverlapping(30);
+
+// Brings the tours of the public website in as packages, 03:30 IST daily. Paused with CRM_WEBSITE_SYNC=false.
+Schedule::command("packages:sync-website")->dailyAt("03:30")->timezone("Asia/Kolkata")->withoutOverlapping(30);

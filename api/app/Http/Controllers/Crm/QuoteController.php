@@ -159,12 +159,17 @@ class QuoteController extends Controller
         return $d;
     }
 
-    private function resolvePackage(mixed $v): ?int
+    private function resolvePackage(mixed $v, mixed $current = null): ?int
     {
         if ($v === null || $v === '') {
             return null;
         }
         if (! is_scalar($v) || ! ctype_digit((string) $v) || ! \App\Models\TravelPackage::where('id', (int) $v)->exists()) {
+            Fail::unprocessable(['package_id' => 'Package not found']);
+        }
+        // keeping the package a quote already has is always fine; choosing another needs it to be one the person can see
+        $keeping = $current !== null && (int) $current === (int) $v;
+        if (! $keeping && ! \App\Models\TravelPackage::visibleTo(auth()->user())->where('packages.id', (int) $v)->exists()) {
             Fail::unprocessable(['package_id' => 'Package not found']);
         }
 
@@ -226,7 +231,7 @@ class QuoteController extends Controller
             $q->valid_until = $this->date($d['valid_until'], 'valid_until');
         }
         if (array_key_exists('package_id', $d)) {
-            $q->package_id = $this->resolvePackage($d['package_id']);
+            $q->package_id = $this->resolvePackage($d['package_id'], $q->package_id);
         }
         if (array_key_exists('itinerary', $d)) {
             $q->itinerary = $this->cleanItinerary($d['itinerary']);
