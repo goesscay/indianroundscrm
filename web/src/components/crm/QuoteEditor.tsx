@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
+import { useCurrentUser } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ export default function QuoteEditor({ quoteId }: { quoteId?: string }) {
   const [packageId, setPackageId] = useState(NONE);
 
   const [title, setTitle] = useState("");
+  const { user } = useCurrentUser();
   const [destination, setDestination] = useState("");
   const [travel, setTravel] = useState("");
   const [days, setDays] = useState("");
@@ -89,10 +91,13 @@ export default function QuoteEditor({ quoteId }: { quoteId?: string }) {
             setCustomer(d.customer); setDealId(d.id); setTitle(d.destination ? `${d.destination} trip` : d.name);
             setDestination(d.destination ?? ""); setTravel(d.travel_date ?? ""); setDays(d.duration_days != null ? String(d.duration_days) : "");
             setAdults(String(d.adults)); setChildren(String(d.children));
-          } else if (custParam) {
-            const { data: c } = await api.get<Customer>(`/customers/${custParam}`);
-            if (off) return;
-            setCustomer({ id: c.id, customer_no: c.customer_no, name: c.name });
+          } else {
+            if (custParam) {
+              const { data: c } = await api.get<Customer>(`/customers/${custParam}`);
+              if (off) return;
+              setCustomer({ id: c.id, customer_no: c.customer_no, name: c.name });
+            }
+            if (user.default_destination?.trim()) setDestination((cur) => cur || user.default_destination!.trim());
           }
         }
       } catch (e) { if (!off) setError(formatApiError(e)); }

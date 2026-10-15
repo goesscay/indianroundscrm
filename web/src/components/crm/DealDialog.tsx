@@ -63,7 +63,7 @@ export default function DealDialog({ open, onOpenChange, deal, customer, stage, 
     const d = deal;
     setCust(d?.customer ?? customer ?? null);
     setName(d?.name ?? ""); setSt(d?.stage ?? stage ?? "enquiry"); setTrip(d?.trip_status ?? NONE);
-    setDestination(d?.destination ?? ""); setTravel(d?.travel_date ?? ""); setDays(d?.duration_days != null ? String(d.duration_days) : "");
+    setDestination(d ? (d.destination ?? "") : (user.default_destination?.trim() ?? "")); setTravel(d?.travel_date ?? ""); setDays(d?.duration_days != null ? String(d.duration_days) : "");
     setAdults(String(d?.adults ?? 1)); setChildren(String(d?.children ?? 0));
     setSelling(d ? String(d.selling_amount || "") : ""); setCost(d ? String(d.supplier_cost || "") : "");
     setClose(d?.expected_close ?? ""); setProb(d ? String(d.probability) : ""); setLost(d?.lost_reason ?? "");

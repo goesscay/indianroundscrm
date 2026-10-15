@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
+import { tidyPlace } from "@/lib/places";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination, usePagination } from "@/components/ui/pagination";
@@ -30,12 +32,12 @@ export default function Users() {
   const [roles, setRoles] = useState<RoleDef[]>([]);
   const [roleFilter, setRoleFilter] = useState("all");
   const [users, setUsers] = useState<User[]>([]);
-  const EMPTY_USER: UserCreate = { email: "", password: "", name: "", role: "sales", staff_code: "", consultant_code: "" };
+  const EMPTY_USER: UserCreate = { email: "", password: "", name: "", role: "sales", staff_code: "", consultant_code: "", default_destination: "" };
   const [f, setF] = useState<UserCreate>(EMPTY_USER);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
-  const [ef, setEf] = useState({ name: "", email: "", mobile: "", role: "sales", staff_code: "", consultant_code: "", password: "" });
+  const [ef, setEf] = useState({ name: "", email: "", mobile: "", role: "sales", staff_code: "", consultant_code: "", default_destination: "", password: "" });
   const [esaving, setEsaving] = useState(false);
   const [allocations, setAllocations] = useState<DestinationAllocation[]>([]);
   const [allocForm, setAllocForm] = useState({ destination: "", consultant_id: "" });
@@ -55,7 +57,7 @@ export default function Users() {
   useEffect(() => { load(); }, []);
 
   const openEdit = (u: User) => {
-    setEf({ name: u.name || "", email: u.email || "", mobile: (u.mobile as string) || "", role: u.role, staff_code: u.staff_code || "", consultant_code: u.consultant_code || "", password: "" });
+    setEf({ name: u.name || "", email: u.email || "", mobile: (u.mobile as string) || "", role: u.role, staff_code: u.staff_code || "", consultant_code: u.consultant_code || "", default_destination: u.default_destination || "", password: "" });
     setEditing(u);
   };
 
@@ -66,7 +68,7 @@ export default function Users() {
     setEsaving(true);
     try {
       const isSelf = editing.id === user.id;
-      const body: Record<string, unknown> = { name: ef.name.trim(), email: ef.email.trim(), mobile: ef.mobile.trim(), staff_code: ef.staff_code.trim(), consultant_code: ef.consultant_code.trim() };
+      const body: Record<string, unknown> = { name: ef.name.trim(), email: ef.email.trim(), mobile: ef.mobile.trim(), staff_code: ef.staff_code.trim(), consultant_code: ef.consultant_code.trim(), default_destination: ef.default_destination.trim() || null };
       if (!isSelf && ef.role !== editing.role) body.role = ef.role;
       if (ef.password) body.password = ef.password;
       await api.patch(`/users/${editing.id}`, body);
@@ -185,6 +187,11 @@ export default function Users() {
                   <Input className="mt-1.5" placeholder="KA" maxLength={2} value={f.consultant_code} onChange={e => setF({ ...f, consultant_code: e.target.value.toUpperCase() })} data-testid="u-consultant" />
                   <div className="text-[10px] text-muted-foreground mt-1">2 letters · used in the Lead ID</div>
                 </div>
+                <div className="sm:col-span-2">
+                  <Label className="label-caps">Default destination</Label>
+                  <div className="mt-1.5"><Combobox allowCustom options={destinations} value={f.default_destination} onChange={(v) => setF({ ...f, default_destination: tidyPlace(v) })} placeholder="Optional: the destination they work" searchPlaceholder="Search, or type a new place…" clearLabel="None" clearValue="" testId="u-default-destination" /></div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Pre-filled on their new leads, quotes and deals, and in their Leads list. They can change it at any time.</div>
+                </div>
               </div>
               <div className="text-xs text-muted-foreground">
                 Password needs 8+ characters with an uppercase letter, a lowercase letter, a number and a special character.
@@ -224,6 +231,11 @@ export default function Users() {
                   <div className="text-[10px] text-muted-foreground mt-1">2 letters · used in new Lead IDs</div>
                 </div>
                 <div className="sm:col-span-2">
+                  <Label className="label-caps">Default destination</Label>
+                  <div className="mt-1.5"><Combobox allowCustom options={destinations} value={ef.default_destination} onChange={(v) => setEf({ ...ef, default_destination: tidyPlace(v) })} placeholder="Optional: the destination they work" searchPlaceholder="Search, or type a new place…" clearLabel="None" clearValue="" testId="eu-default-destination" /></div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Pre-filled on their new leads, quotes and deals, and in their Leads list. They can change it at any time.</div>
+                </div>
+                <div className="sm:col-span-2">
                   <Label className="label-caps">New password</Label>
                   <Input type="password" className="mt-1.5" autoComplete="new-password" value={ef.password} onChange={(e) => setEf({ ...ef, password: e.target.value })} placeholder="Leave empty to keep the current password" data-testid="eu-password" />
                   <div className="text-[10px] text-muted-foreground mt-1">Setting a password signs the user out everywhere. Min 8 characters with upper, lower, number and a special character.</div>
@@ -257,6 +269,7 @@ export default function Users() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Destination</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Login</TableHead>
                 <TableHead>Actions</TableHead>
@@ -271,6 +284,7 @@ export default function Users() {
                     <TableCell className="font-medium">{u.name || "—"}</TableCell>
                     <TableCell className="text-xs">{u.email}</TableCell>
                     <TableCell><span className="label-caps px-2 py-1 rounded bg-secondary whitespace-nowrap" data-testid={`u-role-badge-${u.id}`}>{u.role_name || u.role}</span></TableCell>
+                    <TableCell className="text-xs" data-testid={`u-destination-${u.id}`}>{u.default_destination || <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell>
                       <Select value={status} onValueChange={(v) => setStatus(u, v)} disabled={isSelf || !canManage}>
                         <SelectTrigger className={`h-7 w-[140px] text-xs font-semibold ${STATUS_STYLES[status] || ""}`} data-testid={`u-status-${u.id}`}>

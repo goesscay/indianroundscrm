@@ -18,7 +18,7 @@ class User extends Authenticatable
     public const STATUSES = ['active', 'inactive', 'suspended', 'locked', 'password_reset_required'];
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'staff_code', 'consultant_code', 'mobile', 'active',
+        'name', 'email', 'password', 'role', 'staff_code', 'consultant_code', 'default_destination', 'mobile', 'active',
         'account_status', 'token_version', 'failed_login_attempts', 'locked_until',
         'last_login_at', 'last_logout_at', 'password_changed_at',
     ];

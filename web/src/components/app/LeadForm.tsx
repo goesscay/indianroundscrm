@@ -170,6 +170,9 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
 
   // once the consultants are known, the owner defaults to the logged-in person (create mode)
   useEffect(() => { if (!editing && defaultOwner) setF((p) => (p.owner_id ? p : { ...p, owner_id: defaultOwner })); }, [editing, defaultOwner]);
+  // the destination this person works, unless they pick another
+  const myDestination = (user.default_destination || "").trim();
+  useEffect(() => { if (!editing && myDestination) setF((p) => (p.destination ? p : { ...p, destination: myDestination })); }, [editing, myDestination]);
 
   const set = (k: keyof LeadFormState) => (v: string | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setF((p) => ({ ...p, [k]: typeof v === "string" ? v : v.target.value }));
@@ -299,7 +302,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
       const { data } = await api.post<Lead>(url, payload);
       if (addAnother.current) {
         toast.success(`Lead ${data.lead_id} saved. Add the next one.`);
-        setF({ ...EMPTY, owner_id: f.owner_id }); setAgeErrors({}); setPhoneErr(""); setOtherReason(false);
+        setF({ ...EMPTY, owner_id: f.owner_id, destination: myDestination }); setAgeErrors({}); setPhoneErr(""); setOtherReason(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { usePagedList } from "@/lib/usePagedList";
@@ -17,7 +17,7 @@ import { INR, PACKAGE_CATEGORIES, categoryLabel } from "@/components/crm/shared"
 import type { TravelPackage } from "@/types";
 
 function PackageList() {
-  const { can } = useCurrentUser();
+  const { user, can } = useCurrentUser();
   const canManage = can("packages.manage");
   const [q, setQ] = useState("");
   const [applied, setApplied] = useState("");
@@ -26,6 +26,7 @@ function PackageList() {
   const [active, setActive] = useState("all");
   const [destinations, setDestinations] = useState<string[]>([]);
   const [tick, setTick] = useState(0);
+  const defaultApplied = useRef(false);
   const [dlg, setDlg] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
 
   const params = useMemo(() => {
@@ -40,7 +41,14 @@ function PackageList() {
 
   useEffect(() => { const t = setTimeout(() => setApplied(q), 300); return () => clearTimeout(t); }, [q]);
   useEffect(() => {
-    api.get<{ destinations: string[] }>("/packages/options").then((r) => setDestinations(r.data.destinations)).catch(() => { /* filter stays empty */ });
+    api.get<{ destinations: string[] }>("/packages/options").then((r) => {
+      setDestinations(r.data.destinations);
+      // start on their own destination when the catalogue has packages for it (once, so a later change sticks)
+      const mine = user.default_destination?.trim();
+      if (mine && !defaultApplied.current && r.data.destinations.includes(mine)) { setDestination(mine); }
+      defaultApplied.current = true;
+    }).catch(() => { /* filter stays empty */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
   const activeFilters = (q.trim() ? 1 : 0) + [category, destination, active].filter((v) => v !== "all").length;

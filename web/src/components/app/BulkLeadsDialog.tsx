@@ -17,9 +17,9 @@ const ROWS = 10;
 const DEFAULT_SOURCE = "WhatsApp";
 
 interface Row { phone: string; destination: string; source: string; error?: string }
-const blank = (): Row => ({ phone: "", destination: "", source: DEFAULT_SOURCE });
-/** A row counts only once a number or a destination is entered: the pre-filled source alone does not. */
-const isBlank = (r: Row) => !r.phone.trim() && !r.destination;
+const blank = (destination = ""): Row => ({ phone: "", destination, source: DEFAULT_SOURCE });
+/** A row counts once a number is entered, or a destination other than the pre-filled one: the defaults alone do not. */
+const isBlank = (r: Row, defaultDestination = "") => !r.phone.trim() && (!r.destination || r.destination === defaultDestination);
 
 const cleanPhone = (raw: string) => (raw || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "");
 const phoneError = (raw: string) => {
@@ -31,8 +31,9 @@ const phoneError = (raw: string) => {
 
 /** Add up to 10 leads at once from a mobile number and a destination. The source starts as WhatsApp; the lead is named by its number until someone edits it. Each row goes through the normal lead rules. */
 export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void }) {
-  const { can } = useCurrentUser();
-  const [rows, setRows] = useState<Row[]>(() => Array.from({ length: ROWS }, blank));
+  const { user, can } = useCurrentUser();
+  const myDestination = (user.default_destination || "").trim();
+  const [rows, setRows] = useState<Row[]>(() => Array.from({ length: ROWS }, () => blank(myDestination)));
   const [destinations, setDestinations] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -40,10 +41,11 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
 
   useEffect(() => {
     if (!open) return;
-    setRows(Array.from({ length: ROWS }, blank)); setAdded([]);
+    setRows(Array.from({ length: ROWS }, () => blank(myDestination))); setAdded([]);
     api.get<{ master: Record<string, string[]>; used?: Record<string, string[]> }>("/lead-options")
       .then(({ data }) => { setDestinations(mergePlaces(data.master?.destination, data.used?.destination)); setSources(data.master?.lead_source ?? []); })
       .catch((e) => toast.error(`Could not load the lists: ${formatApiError(e)}`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const set = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch, error: undefined } : r)));
@@ -53,7 +55,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
     // check every filled row first, so nothing is half-saved because of a typo
     const seen = new Set<string>();
     const checked = rows.map((r) => {
-      if (isBlank(r)) return r;
+      if (isBlank(r, myDestination)) return r;
       let error = "";
       if (phoneError(r.phone)) error = phoneError(r.phone);
       else if (!r.destination) error = "Choose a destination";
@@ -62,7 +64,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
       return { ...r, error: error || undefined };
     });
     setRows(checked);
-    const todo = checked.map((r, i) => ({ r, i })).filter(({ r }) => !isBlank(r));
+    const todo = checked.map((r, i) => ({ r, i })).filter(({ r }) => !isBlank(r, myDestination));
     if (todo.length === 0) { toast.error("Fill in at least one row"); return; }
     if (todo.some(({ r }) => r.error)) { toast.error("Fix the highlighted rows"); return; }
 
@@ -75,7 +77,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
           customer_name: cleanPhone(r.phone), phone: cleanPhone(r.phone), destination: r.destination, ...(r.source ? { lead_source: r.source } : {}),
         });
         created.push(data.lead_id);
-        next[i] = blank();
+        next[i] = blank(myDestination);
       } catch (err) {
         const detail = (err as { response?: { data?: { detail?: { existing?: { lead_id: string; staff_name?: string } } } } }).response?.data?.detail;
         const msg = apiErrorStatus(err) === 409 && detail && typeof detail === "object" && detail.existing
@@ -99,7 +101,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
         <DialogHeader>
           <DialogTitle className="font-display text-2xl font-black">Add leads in bulk</DialogTitle>
           <DialogDescription>
-            Up to {ROWS} leads at once. Mobile number and destination are required. The source is WhatsApp unless you change it, and each lead carries its mobile number as the name until you edit it.
+            Up to {ROWS} leads at once. Mobile number and destination are required. The destination is yours ({myDestination || "none set"}) and the source is WhatsApp unless you change them, and each lead carries its mobile number as the name until you edit it.
             {can("leads.reassign") ? " Owners are set from the destination allocation." : " The leads are added in your name."}
           </DialogDescription>
         </DialogHeader>

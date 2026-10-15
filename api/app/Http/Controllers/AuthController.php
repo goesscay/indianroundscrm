@@ -101,6 +101,7 @@ class AuthController extends Controller
             'role_name' => $user->role_name,
             'permissions' => $user->permissionKeys(),
             'staff_code' => $user->staff_code ?? '',
+            'default_destination' => $user->default_destination,
             'account_status' => $user->account_status,
             'password_reset_required' => $user->account_status === 'password_reset_required',
         ];

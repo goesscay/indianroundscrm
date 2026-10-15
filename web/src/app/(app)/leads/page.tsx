@@ -54,7 +54,8 @@ function LeadList() {
   const [applied, setApplied] = useState("");
   const [status, setStatus] = useState("all");     // a precise status inside the open stage
   const [source, setSource] = useState("all");
-  const [destination, setDestination] = useState("all");
+  const { user: me } = useCurrentUser();
+  const [destination, setDestination] = useState(me.default_destination?.trim() || "all");   // their own destination, until they change it
   const [owner, setOwner] = useState("all");
   const [dates, setDates] = useState<DateFilter>(NO_DATES);
   const [options, setOptions] = useState<FilterOptions>({ sources: [], destinations: [], owners: [] });
