@@ -13,12 +13,18 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    /** A destination typed by hand: trimmed, single spaces; empty means none. */
-    private static function place(?string $v): ?string
+    /** Destinations typed by hand: trimmed, single spaces, no blanks, no repeats (any capitalisation), order kept. @return list<string> */
+    private static function places(array $values): array
     {
-        $v = trim(preg_replace('/\s+/', ' ', (string) $v) ?? '');
+        $out = [];
+        foreach ($values as $v) {
+            $v = trim(preg_replace('/\s+/', ' ', (string) $v) ?? '');
+            if ($v !== '' && ! in_array(mb_strtolower($v), array_map('mb_strtolower', $out), true)) {
+                $out[] = mb_substr($v, 0, 120);
+            }
+        }
 
-        return $v === '' ? null : mb_substr($v, 0, 120);
+        return array_slice($out, 0, 30);
     }
 
     public function index()
@@ -37,6 +43,8 @@ class UserController extends Controller
             'role' => ['required', 'string'],
             'staff_code' => ['nullable', 'string', 'max:50'],
             'consultant_code' => ['nullable', 'string'],
+            'destinations' => ['nullable', 'array', 'max:30'],
+            'destinations.*' => ['nullable', 'string', 'max:120'],
             'default_destination' => ['nullable', 'string', 'max:120'],
         ]);
         $email = strtolower($data['email']);
@@ -55,7 +63,7 @@ class UserController extends Controller
             'role' => $data['role'],
             'staff_code' => $data['staff_code'] ?? '',
             'consultant_code' => strtoupper(mb_substr($data['consultant_code'] ?? '', 0, 2)),
-            'default_destination' => self::place($data['default_destination'] ?? null),
+            'destinations' => self::places($data['destinations'] ?? (isset($data['default_destination']) ? [$data['default_destination']] : [])),
             'active' => true,
             'account_status' => 'active',
         ]);
@@ -72,6 +80,8 @@ class UserController extends Controller
             'role' => ['sometimes', 'nullable', 'string'],
             'staff_code' => ['sometimes', 'nullable', 'string', 'max:50'],
             'consultant_code' => ['sometimes', 'nullable', 'string'],
+            'destinations' => ['sometimes', 'nullable', 'array', 'max:30'],
+            'destinations.*' => ['nullable', 'string', 'max:120'],
             'default_destination' => ['sometimes', 'nullable', 'string', 'max:120'],
             'active' => ['sometimes', 'nullable', 'boolean'],
             'password' => ['sometimes', 'nullable', 'string'],
@@ -79,15 +89,17 @@ class UserController extends Controller
             'mobile' => ['sometimes', 'nullable', 'string', 'max:40'],
         ]);
         $updates = array_filter(
-            $request->only(['name', 'role', 'staff_code', 'consultant_code', 'default_destination', 'active', 'password', 'email', 'mobile']),
+            $request->only(['name', 'role', 'staff_code', 'consultant_code', 'active', 'password', 'email', 'mobile']),
             fn ($v) => $v !== null
         );
         if (isset($updates['role']) && ! Permissions::roleExists($updates['role'])) {
             abort(400, 'Invalid role');
         }
-        if ($request->has('default_destination')) {
-            // an empty value arrives as null and means "clear it", so it is handled apart from the null-skipping filter above
-            $updates['default_destination'] = self::place($request->input('default_destination'));
+        if ($request->has('destinations')) {
+            // an empty list (or null) means "none", so it is handled apart from the null-skipping filter above
+            $updates['destinations'] = self::places((array) $request->input('destinations'));
+        } elseif ($request->has('default_destination')) {
+            $updates['destinations'] = self::places([$request->input('default_destination')]);   // the older single-value field
         }
         if (isset($updates['consultant_code'])) {
             $updates['consultant_code'] = strtoupper(mb_substr($updates['consultant_code'], 0, 2));

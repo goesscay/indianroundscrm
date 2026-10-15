@@ -18,14 +18,22 @@ class User extends Authenticatable
     public const STATUSES = ['active', 'inactive', 'suspended', 'locked', 'password_reset_required'];
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'staff_code', 'consultant_code', 'default_destination', 'mobile', 'active',
+        'name', 'email', 'password', 'role', 'staff_code', 'consultant_code', 'destinations', 'mobile', 'active',
         'account_status', 'token_version', 'failed_login_attempts', 'locked_until',
         'last_login_at', 'last_logout_at', 'password_changed_at',
     ];
 
     protected $hidden = ['password', 'remember_token', 'token_version'];
 
-    protected $appends = ['role_name'];
+    protected $appends = ['role_name', 'default_destination'];
+
+    /** The primary destination: the first of their destinations, used wherever one value is pre-filled. */
+    public function getDefaultDestinationAttribute(): ?string
+    {
+        $d = $this->destinations;
+
+        return is_array($d) && isset($d[0]) && $d[0] !== '' ? (string) $d[0] : null;
+    }
 
     public function getRoleNameAttribute(): string
     {
@@ -37,6 +45,7 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'active' => 'boolean',
+            'destinations' => 'array',
             'token_version' => 'integer',
             'failed_login_attempts' => 'integer',
             'locked_until' => 'datetime',

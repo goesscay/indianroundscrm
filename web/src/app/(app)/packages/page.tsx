@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import PackageDialog from "@/components/crm/PackageDialog";
 import { INR, PACKAGE_CATEGORIES, categoryLabel } from "@/components/crm/shared";
+import { myDestinations } from "@/lib/places";
 import type { TravelPackage } from "@/types";
 
 function PackageList() {
@@ -25,6 +26,7 @@ function PackageList() {
   const [destination, setDestination] = useState("all");
   const [active, setActive] = useState("all");
   const [destinations, setDestinations] = useState<string[]>([]);
+  const mineHere = myDestinations(user).filter((d) => destinations.includes(d));   // their destinations that the catalogue has packages for
   const [tick, setTick] = useState(0);
   const defaultApplied = useRef(false);
   const [dlg, setDlg] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
@@ -33,10 +35,11 @@ function PackageList() {
     const p: Record<string, string> = {};
     if (applied.trim()) p.q = applied.trim();
     if (category !== "all") p.category = category;
-    if (destination !== "all") p.destination = destination;
+    if (destination === "mine") p.destination = myDestinations(user).filter((d) => destinations.includes(d)).join("|");
+    else if (destination !== "all") p.destination = destination;
     if (active !== "all") p.active = active;
     return p;
-  }, [applied, category, destination, active]);
+  }, [applied, category, destination, active, user, destinations]);
   const { rows, loading, loaded, error, paginationProps } = usePagedList<TravelPackage>("/packages", params, tick);
 
   useEffect(() => { const t = setTimeout(() => setApplied(q), 300); return () => clearTimeout(t); }, [q]);
@@ -44,8 +47,8 @@ function PackageList() {
     api.get<{ destinations: string[] }>("/packages/options").then((r) => {
       setDestinations(r.data.destinations);
       // start on their own destination when the catalogue has packages for it (once, so a later change sticks)
-      const mine = user.default_destination?.trim();
-      if (mine && !defaultApplied.current && r.data.destinations.includes(mine)) { setDestination(mine); }
+      const mine = myDestinations(user);
+      if (!defaultApplied.current && mine.some((d) => r.data.destinations.includes(d))) { setDestination("mine"); }
       defaultApplied.current = true;
     }).catch(() => { /* filter stays empty */ });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,7 +78,7 @@ function PackageList() {
         </Select>
         <Select value={destination} onValueChange={setDestination}>
           <SelectTrigger className="h-10 w-[170px]" data-testid="filter-package-destination"><SelectValue placeholder="All destinations" /></SelectTrigger>
-          <SelectContent><SelectItem value="all">All destinations</SelectItem>{destinations.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+          <SelectContent><SelectItem value="all">All destinations</SelectItem>{mineHere.length > 0 && <SelectItem value="mine">My destinations ({mineHere.join(", ")})</SelectItem>}{destinations.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
         </Select>
         <Select value={active} onValueChange={setActive}>
           <SelectTrigger className="h-10 w-[150px]"><SelectValue /></SelectTrigger>

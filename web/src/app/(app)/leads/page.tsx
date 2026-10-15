@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import StatusPill from "@/components/app/StatusPill";
 import LeadDateFilter, { NO_DATES, type DateFilter } from "@/components/app/LeadDateFilter";
 import { STAGES, stageByKey } from "@/lib/leadStages";
+import { myDestinations } from "@/lib/places";
 import { Search, Download, Phone, MessageCircle, X, ListPlus } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import BulkLeadsDialog from "@/components/app/BulkLeadsDialog";
@@ -55,7 +56,8 @@ function LeadList() {
   const [status, setStatus] = useState("all");     // a precise status inside the open stage
   const [source, setSource] = useState("all");
   const { user: me } = useCurrentUser();
-  const [destination, setDestination] = useState(me.default_destination?.trim() || "all");   // their own destination, until they change it
+  const mine = myDestinations(me);
+  const [destination, setDestination] = useState(mine.length ? "mine" : "all");   // their own destinations, until they change it
   const [owner, setOwner] = useState("all");
   const [dates, setDates] = useState<DateFilter>(NO_DATES);
   const [options, setOptions] = useState<FilterOptions>({ sources: [], destinations: [], owners: [] });
@@ -81,7 +83,8 @@ function LeadList() {
     const p: Record<string, string> = {};
     if (applied.trim()) p.q = applied.trim();
     if (source !== "all") p.lead_source = source;
-    if (destination !== "all") p.destination = destination;
+    if (destination === "mine") p.destination = myDestinations(me).join("|");
+    else if (destination !== "all") p.destination = destination;
     if (owner !== "all") p.staff_id = owner;
     if (dates.from || dates.to) {
       p.date_field = dates.field;
@@ -89,7 +92,7 @@ function LeadList() {
       if (dates.to) p.date_to = dates.to;
     }
     return p;
-  }, [applied, source, destination, owner, dates]);
+  }, [applied, source, destination, owner, dates, me]);
 
   const params = useMemo(() => {
     const p = { ...baseParams };
@@ -230,7 +233,7 @@ function LeadList() {
           </Select>
         )}
         <Combobox className="w-[150px]" value={source} onChange={setSource} options={options.sources.map(v => ({ value: v }))} placeholder="All sources" clearLabel="All sources" clearValue="all" searchPlaceholder="Search…" testId="filter-source" />
-        <Combobox className="w-[170px]" value={destination} onChange={setDestination} options={options.destinations.map(v => ({ value: v }))} placeholder="All destinations" clearLabel="All destinations" clearValue="all" searchPlaceholder="Search…" testId="filter-destination" />
+        <Combobox className="w-[200px]" value={destination} onChange={setDestination} options={[...(mine.length ? [{ value: "mine", label: `My destinations (${mine.join(", ")})` }] : []), ...options.destinations.map(v => ({ value: v }))]} placeholder="All destinations" clearLabel="All destinations" clearValue="all" searchPlaceholder="Search…" testId="filter-destination" />
         {can("leads.view_all") && (
           <Combobox className="w-[160px]" value={owner} onChange={setOwner} options={options.owners.map(o => ({ value: o.id, label: o.name }))} placeholder="Everyone's" clearLabel="Everyone's" clearValue="all" searchPlaceholder="Search consultant…" testId="filter-owner" />
         )}

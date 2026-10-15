@@ -140,7 +140,7 @@ class PackageController extends Controller
             $q->where('category', $v);
         }
         if (($v = (string) $request->query('destination', '')) !== '') {
-            $q->where('destination', $v);
+            $q->whereIn('destination', array_values(array_filter(explode('|', $v), fn ($x) => $x !== '')));   // one, or several joined with |
         }
         $active = (string) $request->query('active', '');
         if ($active === '1' || $active === '0') {

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
-import { mergePlaces, tidyPlace } from "@/lib/places";
+import { mergePlaces, myDestinations, placesFirst, tidyPlace } from "@/lib/places";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -171,7 +171,8 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
   // once the consultants are known, the owner defaults to the logged-in person (create mode)
   useEffect(() => { if (!editing && defaultOwner) setF((p) => (p.owner_id ? p : { ...p, owner_id: defaultOwner })); }, [editing, defaultOwner]);
   // the destination this person works, unless they pick another
-  const myDestination = (user.default_destination || "").trim();
+  const mine = myDestinations(user);
+  const myDestination = mine[0] ?? "";   // the primary one
   useEffect(() => { if (!editing && myDestination) setF((p) => (p.destination ? p : { ...p, destination: myDestination })); }, [editing, myDestination]);
 
   const set = (k: keyof LeadFormState) => (v: string | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -404,7 +405,7 @@ export default function LeadForm({ leadId }: { leadId?: string }) {
           <h3 className="font-display text-base font-bold mb-3">Trip</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-2.5">
             <F label="Destination" required>
-              <SelectMaster custom options={mergePlaces(master.destination, used.destination)} value={f.destination}
+              <SelectMaster custom options={placesFirst(mergePlaces(master.destination, used.destination), mine)} value={f.destination}
                             onChange={(v) => setF(p => ({ ...p, destination: v, stay_cities: [] }))}
                             placeholder="Choose or type a destination" testId="f-destination" />
             </F>

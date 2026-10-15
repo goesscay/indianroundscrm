@@ -8,7 +8,7 @@ import { useCurrentUser } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
-import { mergePlaces, tidyPlace } from "@/lib/places";
+import { mergePlaces, myDestinations, placesFirst, tidyPlace } from "@/lib/places";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Lead } from "@/types";
 
@@ -32,7 +32,8 @@ const phoneError = (raw: string) => {
 /** Add up to 10 leads at once from a mobile number and a destination. The source starts as WhatsApp; the lead is named by its number until someone edits it. Each row goes through the normal lead rules. */
 export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void }) {
   const { user, can } = useCurrentUser();
-  const myDestination = (user.default_destination || "").trim();
+  const mine = myDestinations(user);
+  const myDestination = mine[0] ?? "";
   const [rows, setRows] = useState<Row[]>(() => Array.from({ length: ROWS }, () => blank(myDestination)));
   const [destinations, setDestinations] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
@@ -43,7 +44,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
     if (!open) return;
     setRows(Array.from({ length: ROWS }, () => blank(myDestination))); setAdded([]);
     api.get<{ master: Record<string, string[]>; used?: Record<string, string[]> }>("/lead-options")
-      .then(({ data }) => { setDestinations(mergePlaces(data.master?.destination, data.used?.destination)); setSources(data.master?.lead_source ?? []); })
+      .then(({ data }) => { setDestinations(placesFirst(mergePlaces(data.master?.destination, data.used?.destination), mine)); setSources(data.master?.lead_source ?? []); })
       .catch((e) => toast.error(`Could not load the lists: ${formatApiError(e)}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -101,7 +102,7 @@ export default function BulkLeadsDialog({ open, onOpenChange, onDone }: { open: 
         <DialogHeader>
           <DialogTitle className="font-display text-2xl font-black">Add leads in bulk</DialogTitle>
           <DialogDescription>
-            Up to {ROWS} leads at once. Mobile number and destination are required. The destination is yours ({myDestination || "none set"}) and the source is WhatsApp unless you change them, and each lead carries its mobile number as the name until you edit it.
+            Up to {ROWS} leads at once. Mobile number and destination are required. The destination is yours ({mine.length ? mine.join(", ") : "none set"}; the first is filled in) and the source is WhatsApp unless you change them, and each lead carries its mobile number as the name until you edit it.
             {can("leads.reassign") ? " Owners are set from the destination allocation." : " The leads are added in your name."}
           </DialogDescription>
         </DialogHeader>

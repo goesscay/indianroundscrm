@@ -16,6 +16,8 @@ export interface User {
   staff_code?: string;
   consultant_code?: string;
   /** The destination this person works: pre-filled on their new leads, quotes and deals and in their lists. */
+  destinations?: string[];
+  /** The first of `destinations`. */
   default_destination?: string | null;
   mobile?: string;
   active?: boolean;
@@ -33,7 +35,7 @@ export interface UserCreate {
   role: Role;
   staff_code?: string;
   consultant_code?: string;
-  default_destination?: string;
+  destinations?: string[];
 }
 
 export interface DestinationAllocation {

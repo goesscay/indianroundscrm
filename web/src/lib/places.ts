@@ -19,3 +19,15 @@ export function mergePlaces(master: string[] | undefined, used: string[] | undef
   }
   return out;
 }
+
+/** A person's destinations, primary first (the signed-in user, or a row of the users list). */
+export function myDestinations(u: { destinations?: string[]; default_destination?: string | null }): string[] {
+  const list = u.destinations?.length ? u.destinations : u.default_destination ? [u.default_destination] : [];
+  return list.map((d) => d.trim()).filter(Boolean);
+}
+
+/** Put the given places first (in their order), then the rest as they were. */
+export function placesFirst(list: string[], first: string[]): string[] {
+  const lower = new Set(first.map((f) => f.toLowerCase()));
+  return [...first.filter((f) => list.some((l) => l.toLowerCase() === f.toLowerCase())).map((f) => list.find((l) => l.toLowerCase() === f.toLowerCase())!), ...list.filter((l) => !lower.has(l.toLowerCase()))];
+}

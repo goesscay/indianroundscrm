@@ -198,7 +198,7 @@ class LeadController extends Controller
             $q->where('staff_id', ctype_digit($staffId) ? (int) $staffId : -1);
         }
         if (($v = (string) $request->query('destination', '')) !== '') {
-            $q->where('destination', $v);
+            $q->whereIn('destination', array_values(array_filter(explode('|', $v), fn ($x) => $x !== '')));   // one, or several joined with |
         }
         if (($v = (string) $request->query('booking_status', '')) !== '') {
             $q->where('booking_status', $v);
