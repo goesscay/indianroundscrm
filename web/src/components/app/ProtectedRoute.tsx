@@ -8,15 +8,17 @@ interface ProtectedRouteProps {
   children: ReactNode;
   /** When set, the user needs ANY of these permission keys; others are sent to the dashboard. */
   permissions?: string[];
+  /** Only a Super Admin gets in; everyone else is sent to the dashboard. */
+  superAdminOnly?: boolean;
   /** Render the loading state inline (inside an existing shell) instead of full-screen. */
   inline?: boolean;
 }
 
-export default function ProtectedRoute({ children, permissions, inline = false }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, permissions, superAdminOnly = false, inline = false }: ProtectedRouteProps) {
   const { user, ready, can } = useAuth();
   const router = useRouter();
 
-  const denied = ready && !!user && !!permissions && !can(...permissions);
+  const denied = ready && !!user && ((!!permissions && !can(...permissions)) || (superAdminOnly && user.role !== "super_admin"));
 
   useEffect(() => {
     if (!ready) return;

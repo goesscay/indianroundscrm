@@ -909,3 +909,32 @@ export interface CallScript {
   body: string;
   updated_at: string | null;
 }
+
+// ---- Team performance (Super Admin only) ----
+export interface TeamMetrics {
+  open_leads: number; new_leads: number; lost: number; untouched: number; untouched_24h: number; first_contact_hours: number | null;
+  calls: number; whatsapps: number; emails: number; leads_touched: number; notes: number;
+  fu_due: number; fu_done: number; fu_overdue: number; activities_overdue: number; activities_done: number;
+  quotes_sent: number; booked: number; booked_value: number; payments: number; payments_value: number; active_days: number;
+  supplier_mails: number; enquiry_leads: number; tasks_open: number; tasks_overdue: number; tasks_done: number; docs_verified: number;
+}
+export interface TeamPerson {
+  id: string; name: string; role: string; role_name: string; group: "sales" | "operations" | "other"; last_login_at: string | null;
+  m: TeamMetrics; prev: TeamMetrics; flags: { key: string; label: string }[];
+}
+export interface TeamReport { period: { from: string; to: string }; previous: { from: string; to: string }; people: TeamPerson[] }
+export interface TeamSummary {
+  period: { from: string; to: string }; previous: { from: string; to: string };
+  tiles: Record<"new_leads" | "booked" | "booked_value" | "contacts" | "untouched_24h" | "fu_overdue" | "tasks_overdue", { now: number; prev: number | null }>;
+  behind: { id: string; name: string; group: string; flags: { key: string; label: string }[] }[];
+}
+export interface TeamDrill {
+  person: { id: string; name: string; role_name: string; group: string };
+  untouched: { lead_id: string; customer_name: string; destination: string; created_at: string }[];
+  overdue_activities: { id: string; type: string; title: string; lead_id: string | null; due_at: string }[];
+  lost: { lead_id: string; customer_name: string; destination: string; lost_reason: string | null }[];
+  lost_reasons: { reason: string; count: number }[];
+  booked: { id: string; deal_no: string; customer: string; destination: string; amount: number }[];
+  overdue_tasks: { id: string; title: string; due_date: string; deal_id: string; deal_no: string }[];
+  daily: { date: string; actions: number }[];
+}

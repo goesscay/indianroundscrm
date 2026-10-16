@@ -6,6 +6,7 @@ use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\CustomerReplyController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
+use App\Http\Controllers\Crm\TeamReportController;
 use App\Http\Controllers\Crm\TripController;
 use App\Http\Controllers\Crm\TripDocumentController;
 use App\Http\Controllers\Crm\AccountController;
@@ -118,6 +119,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/customers/{id}', [CustomerController::class, 'show'])->middleware('perm:customers.view');
     Route::get('/customers/{id}/replies', [CustomerReplyController::class, 'customer'])->middleware('perm:customers.view');
     // ---- Trip plans: payment progress and the operations checklist of a confirmed deal
+    // team performance: Super Admin only (the controller answers 404 to everyone else)
+    Route::get('/reports/team', [TeamReportController::class, 'index']);
+    Route::get('/reports/team/summary', [TeamReportController::class, 'summary']);
+    Route::get('/reports/team/{id}', [TeamReportController::class, 'person']);
     Route::get('/trips', [TripController::class, 'board'])->middleware('perm:trips.view');
     Route::get('/deals/{id}/trip', [TripController::class, 'show'])->middleware('perm:trips.view');
     Route::post('/deals/{id}/trip/confirm', [TripController::class, 'confirm'])->middleware('perm:trips.confirm');

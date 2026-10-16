@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { INR, fmtDate, inrShort } from "@/components/crm/shared";
+import TeamPulse from "@/components/team/TeamPulse";
 
 interface Kpi { key: string; label: string; value: number; format: "inr" | "number"; sub?: string; tone?: "warn" | null; href?: string }
 interface FocusItem { kind: "task" | "followup"; id: string; type: string; title: string; sub: string | null; due_at: string; overdue: boolean; href: string; phone?: string }
@@ -100,6 +101,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {user.role === "super_admin" && <TeamPulse />}
       {error && <div className="text-sm text-destructive">{error}</div>}
       {!d && !error && <div className="py-16 text-center text-sm text-muted-foreground">Loading…</div>}
 

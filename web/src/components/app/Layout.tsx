@@ -12,7 +12,7 @@ import { useSupplierReplies } from "@/context/SupplierRepliesContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  ListChecks, Plane, ClipboardCheck, Bell, Handshake, ContactRound, TrendingUp, Package, FileText, ReceiptText, Wallet, Landmark, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck,
+  ListChecks, Plane, ClipboardCheck, Bell, Handshake, ContactRound, TrendingUp, Package, FileText, ReceiptText, Wallet, Landmark, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck, BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAiPanel } from "@/components/ai/AiPanelContext";
@@ -27,6 +27,8 @@ interface NavItem {
   group: string;
   /** Shown only when the user holds ANY of these permissions. */
   perms: string[];
+  /** Shown only to a Super Admin. */
+  superOnly?: boolean;
 }
 
 // Order matters: items are grouped by consecutive `group`.
@@ -46,6 +48,7 @@ const NAV: NavItem[] = [
   { to: "/supplier-inbox", label: "Supplier Inbox", icon: MailOpen, testId: "nav-supplier-inbox", group: "Operations", perms: ["rsq.manage"] },
   { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers", group: "Operations", perms: ["suppliers.view"] },
   { to: "/accounts", label: "Accounts", icon: Landmark, testId: "nav-accounts", group: "Finance", perms: ["finance.view"] },
+  { to: "/team-performance", label: "Team Performance", icon: BarChart3, testId: "nav-team-performance", group: "Administration", perms: [], superOnly: true },
   { to: "/users", label: "Users", icon: Users, testId: "nav-users", group: "Administration", perms: ["users.view"] },
   { to: "/roles", label: "Roles & Permissions", icon: ShieldCheck, testId: "nav-roles", group: "Administration", perms: ["roles.manage"] },
   { to: "/trip-templates", label: "Trip Checklists", icon: ClipboardCheck, testId: "nav-trip-templates", group: "Administration", perms: ["trips.templates"] },
@@ -61,7 +64,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout, can } = useCurrentUser();
   const router = useRouter();
   const pathname = usePathname();
-  const items = NAV.filter((it) => can(...it.perms));
+  const items = NAV.filter((it) => (it.superOnly ? user?.role === "super_admin" : can(...it.perms)));
   const { total: chatUnread } = useChatUnread();
   const { counts: replyCounts, version: repliesVersion } = useSupplierReplies();
   const inboxUnread = replyCounts?.unread ?? 0;
