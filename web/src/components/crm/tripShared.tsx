@@ -20,7 +20,7 @@ export interface TripSummary {
   costs: { planned: number; items: number; margin: number } | null;
   documents: { required: number; received: number; verified: number; complete: boolean; all_verified: boolean; missing: number; travellers: number };
 }
-export interface TripDetail extends TripSummary { tasks: TripTask[]; assignees: { id: string; name: string }[]; advance_percent: number; can_cost: boolean; suppliers: { id: string; name: string }[] }
+export interface TripDetail extends TripSummary { revert?: { prev_stage: string | null; worked: number; locked: boolean } | null; tasks: TripTask[]; assignees: { id: string; name: string }[]; advance_percent: number; can_cost: boolean; suppliers: { id: string; name: string }[] }
 export interface TripTemplateItem { id?: string; category: string; title: string; due_days_before: number | null; critical: boolean }
 export interface TripTemplate { id: string; name: string; trip_type: string; active: boolean; items: TripTemplateItem[] }
 

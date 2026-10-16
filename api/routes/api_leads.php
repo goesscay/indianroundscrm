@@ -121,6 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/trips', [TripController::class, 'board'])->middleware('perm:trips.view');
     Route::get('/deals/{id}/trip', [TripController::class, 'show'])->middleware('perm:trips.view');
     Route::post('/deals/{id}/trip/confirm', [TripController::class, 'confirm'])->middleware('perm:trips.confirm');
+    Route::post('/deals/{id}/trip/revert', [TripController::class, 'revert'])->middleware('perm:trips.revert');
     Route::post('/deals/{id}/trip/tasks', [TripController::class, 'addTask'])->middleware('perm:trips.manage');
     Route::patch('/trip-tasks/{id}', [TripController::class, 'updateTask'])->middleware('perm:trips.manage');
     Route::delete('/trip-tasks/{id}', [TripController::class, 'deleteTask'])->middleware('perm:trips.manage');

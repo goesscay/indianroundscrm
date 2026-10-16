@@ -119,6 +119,35 @@ class TripPlan
         return $n;
     }
 
+    /**
+     * Undo a confirmation made by mistake: the checklist goes, the trip leaves the Trips board, and (when asked, and when we remember it)
+     * the deal goes back to the stage it had before. Travellers and uploaded documents are kept. Returns how many checklist items were removed.
+     */
+    public static function revert(Deal $deal, ?User $user, string $reason, bool $restoreDeal): int
+    {
+        $prev = $deal->trip_confirm_prev;
+        $n = 0;
+        DB::transaction(function () use ($deal, $restoreDeal, $prev, &$n) {
+            $n = TripTask::where('deal_id', $deal->id)->delete();
+            $deal->trip_confirmed_at = null;
+            $deal->trip_confirmed_by = null;
+            if ($deal->trip_status === 'confirmed') {
+                $deal->trip_status = null;
+            }
+            if ($restoreDeal && is_array($prev)) {
+                $deal->stage = $prev['stage'] ?? $deal->stage;
+                $deal->probability = $prev['probability'] ?? $deal->probability;
+                $deal->closed_at = $prev['closed_at'] ?? null;
+                $deal->lost_reason = $prev['lost_reason'] ?? null;
+            }
+            $deal->trip_confirm_prev = null;
+            $deal->save();
+        });
+        ActivityLogger::log($user, 'revert_trip', 'deal', $deal->id, null, ['reason' => $reason, 'tasks_removed' => $n, 'deal_restored' => $restoreDeal && is_array($prev) ? ($prev['stage'] ?? null) : null]);
+
+        return $n;
+    }
+
     /** After a payment: once enough of the trip is paid, confirm it automatically. */
     public static function autoConfirm(Deal $deal, ?User $user): void
     {

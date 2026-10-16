@@ -203,4 +203,56 @@ class TripPlanTest extends TestCase
         $this->assertSame('2026-12-10', $r->json('tasks.0.due_date'));
         $this->assertSame('2026-12-22', $r->json('tasks.1.due_date'));
     }
+
+    public function test_operations_can_undo_a_mistaken_confirmation_and_the_deal_goes_back_to_its_stage(): void
+    {
+        $ops = $this->as('operations', 'o');
+        $sales = User::factory()->sales()->create();
+        $deal = $this->deal($ops, ['probability' => 40]);
+        $this->api('POST', "/api/deals/{$deal->id}/trip/confirm", ['trip_type' => 'domestic'], 'o')->assertOk();          // confirmed (by someone allowed to)
+        $this->assertSame('won', $deal->fresh()->stage);
+        $this->assertNotNull($this->api('GET', '/api/trips?scope=upcoming', [], 'o')->assertOk()->json('items.0'));
+
+        // sales cannot undo it; a reason is required
+        $this->assertFalse($sales->hasPermission('trips.revert'));
+        $this->assertTrue($ops->hasPermission('trips.revert'));
+        $this->api('POST', "/api/deals/{$deal->id}/trip/revert", [], 'o')->assertStatus(422);
+
+        $show = $this->api('GET', "/api/deals/{$deal->id}/trip", [], 'o')->assertOk()->json();
+        $this->assertSame('negotiation', $show['revert']['prev_stage']);
+        $r = $this->api('POST', "/api/deals/{$deal->id}/trip/revert", ['reason' => 'Confirmed by mistake', 'restore_deal' => true], 'o')->assertOk();
+        $this->assertFalse($r->json('confirmed'));
+        $d = $deal->fresh();
+        $this->assertSame('negotiation', $d->stage);                                  // back to where it was
+        $this->assertSame(40, (int) $d->probability);
+        $this->assertNull($d->closed_at);
+        $this->assertNull($d->trip_confirm_prev);
+        $this->assertSame(0, TripTask::where('deal_id', $deal->id)->count());         // the checklist went
+        $this->assertSame([], $this->api('GET', '/api/trips?scope=all', [], 'o')->json('items'));   // and so did the Trips board row
+        $this->assertTrue(\App\Models\ActivityLog::where('action', 'revert_trip')->exists());
+        $this->api('POST', "/api/deals/{$deal->id}/trip/revert", ['reason' => 'again'], 'o')->assertStatus(409);       // nothing left to undo
+
+        // it can be confirmed again afterwards
+        $this->api('POST', "/api/deals/{$deal->id}/trip/confirm", ['trip_type' => 'domestic'], 'o')->assertOk();
+        $this->assertGreaterThan(0, TripTask::where('deal_id', $deal->id)->count());
+    }
+
+    public function test_undo_keeps_the_deal_won_when_asked_and_warns_about_work_already_done(): void
+    {
+        $ops = $this->as('operations', 'o');
+        $deal = $this->deal($ops);
+        $this->api('POST', "/api/deals/{$deal->id}/trip/confirm", ['trip_type' => 'domestic'], 'o')->assertOk();
+        TripTask::where('deal_id', $deal->id)->first()->update(['status' => 'done']);
+
+        $this->api('POST', "/api/deals/{$deal->id}/trip/revert", ['reason' => 'mistake'], 'o')->assertStatus(409);        // work was done: needs force
+        $this->assertGreaterThan(0, TripTask::where('deal_id', $deal->id)->count());
+        $this->api('POST', "/api/deals/{$deal->id}/trip/revert", ['reason' => 'mistake', 'force' => true], 'o')->assertOk();
+        $this->assertSame('won', $deal->fresh()->stage);                                                                 // restore_deal was not asked for
+        $this->assertNull($deal->fresh()->trip_confirmed_at);
+
+        // a trip that has already finished cannot be taken back
+        $this->api('POST', "/api/deals/{$deal->id}/trip/confirm", ['trip_type' => 'domestic'], 'o')->assertOk();
+        $deal->fresh()->forceFill(['trip_status' => 'completed'])->save();
+        $this->api('POST', "/api/deals/{$deal->id}/trip/revert", ['reason' => 'not needed', 'force' => true], 'o')->assertStatus(409);
+    }
 }

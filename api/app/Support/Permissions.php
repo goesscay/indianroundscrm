@@ -65,6 +65,7 @@ class Permissions
                 'view' => ['View trip plans', 'See the trip plan, payment progress and checklist of the trips they can see, and the Trips board.'],
                 'manage' => ['Update trip plans', 'Tick off, assign, add and remove checklist items on a trip.'],
                 'confirm' => ['Confirm trips', 'Confirm a trip manually so its plan is created before the advance arrives.'],
+                'revert' => ['Undo trip confirmation', 'Take a trip back off the Trips board when it was confirmed by mistake (removes its checklist; the deal can go back to its earlier stage).'],
                 'templates' => ['Edit checklist templates', 'Change the standard trip checklists (items, categories, due days).'],
             ]),
             $g('trip_docs', 'Trip documents', [
@@ -204,7 +205,7 @@ class Permissions
                 'ai.use', 'chat.use',
                 'activities.view', 'activities.view_all', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',
-                'deals.view', 'deals.view_all', 'deals.create', 'deals.edit', 'forecasts.view', 'forecasts.view_all', 'trips.view', 'trips.manage', 'trips.confirm', 'trip_docs.view', 'trip_docs.upload', 'trip_docs.download', 'trip_docs.manage',
+                'deals.view', 'deals.view_all', 'deals.create', 'deals.edit', 'forecasts.view', 'forecasts.view_all', 'trips.view', 'trips.manage', 'trips.confirm', 'trips.revert', 'trip_docs.view', 'trip_docs.upload', 'trip_docs.download', 'trip_docs.manage',
                 'packages.view', 'packages.manage', 'packages.view_all', 'quotes.view', 'quotes.view_all', 'quotes.create', 'quotes.send',
                 'invoices.view', 'invoices.view_all', 'invoices.create', 'invoices.issue', 'receipts.view', 'receipts.record',
             ],

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertTriangle, CalendarCheck, CheckCircle2, Loader2, Plane, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarCheck, CheckCircle2, Loader2, Plane, Plus, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -22,6 +22,10 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
   const { can } = useCurrentUser();
   const canManage = can("trips.manage");
   const canConfirm = can("trips.confirm");
+  const canRevert = can("trips.revert");
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [restoreDeal, setRestoreDeal] = useState(true);
   const [t, setT] = useState<TripDetail | null>(null);
   const [error, setError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -54,6 +58,15 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
     catch (e) { toast.error(formatApiError(e)); }
     finally { setBusy(false); }
   };
+  const revert = async () => {
+    if (reason.trim().length < 3) { toast.error("Please say why the confirmation is being undone"); return; }
+    setBusy(true);
+    try {
+      const { data } = await api.post<TripDetail>(`/deals/${dealId}/trip/revert`, { reason: reason.trim(), restore_deal: restoreDeal && !!t?.revert?.prev_stage, force: (t?.revert?.worked ?? 0) > 0 });
+      setT(data); setRevertOpen(false); setReason(""); toast.success("Trip confirmation undone. It is off the Trips board."); onChanged?.();
+    } catch (e) { toast.error(formatApiError(e)); }
+    finally { setBusy(false); }
+  };
   const addTask = async (e: FormEvent) => {
     e.preventDefault();
     if (!newTask.title.trim()) return;
@@ -78,7 +91,14 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
     <Card className="rounded-lg p-5" data-testid="trip-plan">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 font-display text-lg font-bold"><Plane size={16} className="text-muted-foreground" /> Trip plan</h3>
-        <span className="text-xs text-muted-foreground">{daysLabel(t.days_left)}{t.trip_type ? ` · ${TRIP_TYPES.find((x) => x.value === t.trip_type)?.label ?? t.trip_type}` : ""}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{daysLabel(t.days_left)}{t.trip_type ? ` · ${TRIP_TYPES.find((x) => x.value === t.trip_type)?.label ?? t.trip_type}` : ""}</span>
+          {t.confirmed && canRevert && !t.revert?.locked && (
+            <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setReason(""); setRestoreDeal(true); setRevertOpen(true); }} data-testid="trip-revert-btn" title="Take this trip off the Trips board">
+              <Undo2 size={13} /> Undo confirmation
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* money */}
@@ -238,6 +258,39 @@ export default function TripPlanPanel({ dealId, onChanged }: { dealId: string; o
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={busy}>Cancel</Button>
             <Button onClick={confirm} disabled={busy} data-testid="trip-confirm-submit">{busy ? "Confirming…" : "Confirm trip"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={revertOpen} onOpenChange={(o) => !busy && setRevertOpen(o)}>
+        <DialogContent className="max-w-md" data-testid="trip-revert-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-black">Undo trip confirmation</DialogTitle>
+            <DialogDescription>Use this when the trip was confirmed by mistake. It leaves the Trips board and its checklist is removed. Travellers and uploaded documents are kept.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {(t.revert?.worked ?? 0) > 0 && (
+              <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" data-testid="trip-revert-warning">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <span>{t.revert?.worked} checklist item{t.revert?.worked === 1 ? " has" : "s have"} already been worked on. Undoing removes the whole checklist, including that work.</span>
+              </div>
+            )}
+            {t.revert?.prev_stage ? (
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-1 accent-black dark:accent-white" checked={restoreDeal} onChange={(e) => setRestoreDeal(e.target.checked)} data-testid="trip-revert-restore" />
+                <span>Also move the deal back to <b className="capitalize">{t.revert.prev_stage}</b> (confirming had booked it as Won).</span>
+              </label>
+            ) : (
+              <p className="text-xs text-muted-foreground">The deal keeps its stage ({t.deal.stage}). Change it on the deal if it should not be Won.</p>
+            )}
+            {p.paid > 0 && <p className="text-xs text-muted-foreground">Payments of {INR(p.paid)} are recorded on this deal. They stay, and the next payment can confirm the trip again.</p>}
+            <div>
+              <Label className="label-caps">Why is it being undone?</Label>
+              <Textarea className="mt-1.5" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Confirmed by mistake by sales" data-testid="trip-revert-reason" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevertOpen(false)} disabled={busy}>Keep trip</Button>
+            <Button variant="destructive" onClick={revert} disabled={busy || reason.trim().length < 3} data-testid="trip-revert-submit">{busy ? "Undoing…" : "Undo confirmation"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

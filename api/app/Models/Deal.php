@@ -28,6 +28,7 @@ class Deal extends Model
         'expected_close' => 'date:Y-m-d',
         'closed_at' => 'datetime',
         'trip_confirmed_at' => 'datetime',
+        'trip_confirm_prev' => 'array',
     ];
 
     public function customer(): BelongsTo

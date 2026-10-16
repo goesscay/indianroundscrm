@@ -37,7 +37,8 @@ class TripController extends Controller
                 'duration_days' => $deal->duration_days, 'adults' => $deal->adults, 'children' => $deal->children, 'stage' => $deal->stage, 'trip_status' => $deal->trip_status],
             'customer' => $deal->customer ? ['id' => (string) $deal->customer->id, 'name' => $deal->customer->name] : null,
             'owner' => $deal->owner ? ['id' => (string) $deal->owner->id, 'name' => $deal->owner->name] : null,
-            'confirmed' => TripPlan::confirmed($deal), 'trip_type' => $deal->trip_type, 'confirmed_at' => $deal->trip_confirmed_at?->utc()->toIso8601String(),
+            'confirmed' => TripPlan::confirmed($deal), 'revert' => TripPlan::confirmed($deal) ? ['prev_stage' => $deal->trip_confirm_prev['stage'] ?? null, 'worked' => TripTask::where('deal_id', $deal->id)->where('status', '<>', 'pending')->count(), 'locked' => (bool) ($deal->trip_status && $deal->trip_status !== 'confirmed')] : null,
+            'trip_type' => $deal->trip_type, 'confirmed_at' => $deal->trip_confirmed_at?->utc()->toIso8601String(),
             'days_left' => $deal->travel_date ? (int) now('Asia/Kolkata')->startOfDay()->diffInDays($deal->travel_date->copy()->startOfDay(), false) : null,
             'payment' => $payment, 'progress' => $progress, 'documents' => $docs,
         ];
@@ -128,10 +129,36 @@ class TripController extends Controller
         if ($deal->stage === 'lost') {
             Fail::http(409, 'A lost deal cannot be confirmed as a trip.');
         }
-        if ($deal->stage !== 'won') { // confirming a trip books the deal
+        $prev = null;
+        if ($deal->stage !== 'won') { // confirming a trip books the deal; remember how it was so an undo can put it back
+            $prev = ['stage' => $deal->stage, 'probability' => $deal->probability, 'closed_at' => $deal->closed_at?->toIso8601String(), 'lost_reason' => $deal->lost_reason];
             $deal->forceFill(['stage' => 'won', 'probability' => 100, 'closed_at' => $deal->closed_at ?: now(), 'lost_reason' => null])->save();
         }
         TripPlan::confirm($deal, $user, $d['trip_type'], 'manual');
+        if ($prev) {
+            $deal->forceFill(['trip_confirm_prev' => $prev])->save();
+        }
+
+        return $this->show($request, $id);
+    }
+
+    /** POST /deals/{id}/trip/revert {reason, restore_deal, force}: undo a confirmation made by mistake. */
+    public function revert(Request $request, string $id)
+    {
+        $user = $request->user();
+        $deal = DealController::find($id, $user);
+        $d = Fail::validate(Fail::body($request), ['reason' => 'required|string|min:3|max:500', 'restore_deal' => 'nullable|boolean', 'force' => 'nullable|boolean']);
+        if (! TripPlan::confirmed($deal)) {
+            Fail::http(409, 'This trip is not confirmed.');
+        }
+        if ($deal->trip_status && ! in_array($deal->trip_status, ['confirmed'], true)) {
+            Fail::http(409, 'This trip is already '.str_replace('_', ' ', $deal->trip_status).' and cannot be taken back.');
+        }
+        $worked = TripTask::where('deal_id', $deal->id)->where('status', '<>', 'pending')->count();
+        if ($worked > 0 && empty($d['force'])) {
+            Fail::http(409, "$worked checklist item".($worked === 1 ? ' has' : 's have').' already been worked on. Confirm again to remove the checklist anyway.');
+        }
+        TripPlan::revert($deal, $user, trim($d['reason']), (bool) ($d['restore_deal'] ?? false));
 
         return $this->show($request, $id);
     }
