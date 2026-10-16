@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
 import SupplierTracker from "@/components/app/SupplierTracker";
@@ -22,7 +24,7 @@ import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { Lead, LeadUpdate, Supplier, SupplierMailHistory, SupplierMailPreview, SupplierMailSendResult, User } from "@/types";
-import { Mail, MessageCircle, ArrowLeft, Phone, Copy, UserCog, ArrowRightLeft, Pencil } from "lucide-react";
+import { Mail, MessageCircle, ArrowLeft, Phone, Copy, UserCog, ArrowRightLeft, Pencil, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import ConvertLeadDialog from "@/components/crm/ConvertLeadDialog";
 
@@ -44,10 +46,12 @@ export default function LeadDetail() {
   const [mailOpen, setMailOpen] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [recipOpen, setRecipOpen] = useState(false);       // the To / CC / BCC section, collapsed until needed
   const [toExtra, setToExtra] = useState("");
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
   const [respondBy, setRespondBy] = useState("");
+  const pickedSuppliers = Object.values(selected).filter(Boolean).length;
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [mailPreviewText, setMailPreviewText] = useState("");
@@ -579,83 +583,95 @@ export default function LeadDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Mail Dialog */}
-      <Dialog open={mailOpen} onOpenChange={setMailOpen}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="mail-dialog">
-          <DialogHeader><DialogTitle>Send Supplier Enquiry — {lead.lead_id}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+      {/* Mail panel: slides in from the right, like the AI panel */}
+      <Sheet open={mailOpen} onOpenChange={setMailOpen}>
+        <SheetContent title={`Send Supplier Enquiry — ${lead.lead_id}`} data-testid="mail-dialog">
+          <div className="flex-1 min-h-0 space-y-3 overflow-y-auto px-4 py-3">
             <div>
-              <Label className="label-caps">Select suppliers</Label>
-              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-border rounded-md p-3">
+              <Label className="label-caps">Suppliers{pickedSuppliers > 0 ? ` · ${pickedSuppliers} selected` : ""}</Label>
+              <div className="mt-1.5 max-h-36 space-y-1.5 overflow-y-auto rounded-md border border-border p-2">
                 {suppliers.length === 0 && <div className="text-sm text-muted-foreground">No suppliers. Add some in Suppliers page.</div>}
                 {suppliers.map(s => (
-                  <label key={s.id} className="flex items-start gap-2 cursor-pointer text-sm" data-testid={`supplier-${s.id}`}>
-                    <Checkbox checked={!!selected[s.id]} onCheckedChange={(v) => setSelected(p => ({ ...p, [s.id]: v === true }))} />
-                    <div>
-                      <div className="font-medium">{s.name}{s.portal_enabled && <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/60 dark:text-sky-300" title="Gets a short link e-mail and quotes in the portal">Portal</span>}</div>
-                      <div className="text-xs text-muted-foreground">{s.email} · {s.destination}</div>
+                  <label key={s.id} className="flex cursor-pointer items-start gap-2 text-sm" data-testid={`supplier-${s.id}`}>
+                    <Checkbox className="mt-0.5" checked={!!selected[s.id]} onCheckedChange={(v) => setSelected(p => ({ ...p, [s.id]: v === true }))} />
+                    <div className="min-w-0">
+                      <div className="truncate font-medium leading-tight">{s.name}{s.portal_enabled && <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/60 dark:text-sky-300" title="Gets a short link e-mail and quotes in the portal">Portal</span>}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">{s.email} · {s.destination}</div>
                     </div>
                   </label>
                 ))}
               </div>
             </div>
-            <div className="space-y-3">
-              <div>
-                <Label className="label-caps">To (the selected suppliers) — add more addresses</Label>
-                <Input className="mt-1.5" value={toExtra} onChange={(e) => setToExtra(e.target.value)} placeholder="Optional, separate with commas" data-testid="mail-to" />
-                {suppliers.some((x) => x.portal_enabled && selected[x.id]) && <div className="text-[11px] text-muted-foreground mt-1">Portal suppliers get their own private link mail; extra addresses receive the full enquiry instead.</div>}
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label className="label-caps">CC</Label>
-                  <Input className="mt-1.5" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Everyone sees these" data-testid="mail-cc" />
-                </div>
-                <div>
-                  <Label className="label-caps">BCC</Label>
-                  <Input className="mt-1.5" value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Hidden from the suppliers" data-testid="mail-bcc" />
-                </div>
-              </div>
-              {suppliers.some((x) => x.portal_enabled && selected[x.id]) && (
-                <div className="mt-3">
-                  <Label className="label-caps">Portal suppliers: quote needed by</Label>
-                  <Input type="date" className="mt-1.5 max-w-[200px]" min={new Date().toISOString().slice(0, 10)} value={respondBy} onChange={(e) => setRespondBy(e.target.value)} data-testid="mail-respond-by" />
-                  <div className="text-[11px] text-muted-foreground mt-1">Leave empty for the usual 3 days. They are sent a short link e-mail; the text below goes to the other suppliers.</div>
+
+            {/* To / CC / BCC in one collapsible section */}
+            <div className="rounded-md border border-border" data-testid="mail-recipients">
+              <button type="button" onClick={() => setRecipOpen((o) => !o)} aria-expanded={recipOpen} data-testid="mail-recipients-toggle"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary/50">
+                <ChevronDown size={15} className={cn("shrink-0 transition-transform", recipOpen ? "" : "-rotate-90")} />
+                <span className="label-caps">To · CC · BCC</span>
+                <span className="ml-auto truncate text-xs text-muted-foreground" data-testid="mail-recipients-summary">
+                  {pickedSuppliers + splitAddresses(toExtra).length} to · {splitAddresses(cc).length} cc · {splitAddresses(bcc).length} bcc
+                </span>
+              </button>
+              {recipOpen && (
+                <div className="space-y-2.5 border-t border-border px-3 py-2.5">
+                  <div>
+                    <Label className="text-[11px] font-semibold text-muted-foreground">To — the selected suppliers, plus more addresses</Label>
+                    <Input className="mt-1 h-8 text-[13px]" value={toExtra} onChange={(e) => setToExtra(e.target.value)} placeholder="Optional, separate with commas" data-testid="mail-to" />
+                    {suppliers.some((x) => x.portal_enabled && selected[x.id]) && <div className="mt-1 text-[11px] text-muted-foreground">Portal suppliers get their own private link mail; extra addresses receive the full enquiry instead.</div>}
+                  </div>
+                  <div>
+                    <Label className="text-[11px] font-semibold text-muted-foreground">CC — everyone sees these</Label>
+                    <Input className="mt-1 h-8 text-[13px]" value={cc} onChange={(e) => setCc(e.target.value)} data-testid="mail-cc" />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] font-semibold text-muted-foreground">BCC — hidden from the suppliers</Label>
+                    <Input className="mt-1 h-8 text-[13px]" value={bcc} onChange={(e) => setBcc(e.target.value)} data-testid="mail-bcc" />
+                  </div>
                 </div>
               )}
             </div>
+
+            {suppliers.some((x) => x.portal_enabled && selected[x.id]) && (
+              <div>
+                <Label className="label-caps">Portal suppliers: quote needed by</Label>
+                <Input type="date" className="mt-1.5 h-8 max-w-[200px] text-[13px]" min={new Date().toISOString().slice(0, 10)} value={respondBy} onChange={(e) => setRespondBy(e.target.value)} data-testid="mail-respond-by" />
+                <div className="mt-1 text-[11px] text-muted-foreground">Leave empty for the usual 3 days. They are sent a short link e-mail; the text below goes to the other suppliers.</div>
+              </div>
+            )}
             <div>
               <Label className="label-caps">Subject</Label>
-              <Input className="mt-1.5" value={subject} onChange={(e) => setSubject(e.target.value)} data-testid="mail-subject" />
+              <Input className="mt-1.5 h-8 text-[13px]" value={subject} onChange={(e) => setSubject(e.target.value)} data-testid="mail-subject" />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <Label className="label-caps">Email body — plain text · fully editable</Label>
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={resetMailBody} data-testid="mail-reset">
+              <div className="mb-1.5 flex items-center justify-between">
+                <Label className="label-caps">Email body — editable</Label>
+                <div className="flex gap-1.5">
+                  <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={resetMailBody} data-testid="mail-reset">
                     Reset to template
                   </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={copyMail} data-testid="mail-copy">
-                    <Copy size={14} /> Copy
+                  <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={copyMail} data-testid="mail-copy">
+                    <Copy size={13} /> Copy
                   </Button>
                 </div>
               </div>
-              <Textarea rows={22}
-                        className="font-mono text-[13px] leading-relaxed whitespace-pre"
+              <Textarea rows={16}
+                        className="font-mono text-[12.5px] leading-relaxed whitespace-pre"
                         value={body}
                         onChange={(e) => setBody(e.target.value)}
                         data-testid="mail-body"
                         placeholder="Loading template…" />
-              <div className="text-[11px] text-muted-foreground mt-1">
+              <div className="mt-1 text-[11px] text-muted-foreground">
                 Auto-populated from lead data. Edit freely before sending. Blank fields default to N/A.
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border px-4 py-3">
             <Button variant="outline" onClick={() => setMailOpen(false)}>Cancel</Button>
             <Button onClick={send} data-testid="mail-send">Send Enquiry</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
       <ConvertLeadDialog leadId={leadId} open={convertOpen} onOpenChange={setConvertOpen} onConverted={() => void load()} />
     </div>
   );
