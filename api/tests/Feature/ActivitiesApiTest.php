@@ -79,6 +79,22 @@ class ActivitiesApiTest extends TestCase
         $this->assertStringNotContainsString('secret details', json_encode(ActivityLog::where('entity', 'activity')->get()->toArray()));
     }
 
+    public function test_operations_can_mark_done_the_review_activities_the_system_opens_but_not_other_peoples(): void
+    {
+        $ops = $this->as('operations', 'o');
+        $other = User::factory()->sales()->create();
+        // opened by the system for a supplier / customer reply: nobody assigned, nobody created it
+        $review = $this->mk(['type' => 'email', 'title' => 'Review supplier reply — IRMH10023', 'due_at' => now()]);
+        $reply = $this->mk(['type' => 'email', 'title' => 'Customer replied — Asha', 'due_at' => now()]);
+        $theirs = $this->mk(['type' => 'email', 'title' => 'Customer replied — Ben', 'due_at' => now(), 'assigned_to' => $other->id]);
+
+        $this->api('PATCH', "/api/activities/{$review->id}", ['done' => true], 'o')->assertOk()->assertJsonPath('done', true)->assertJsonPath('completed_by.id', (string) $ops->id);
+        $this->api('PATCH', "/api/activities/{$reply->id}", ['done' => true], 'o')->assertOk();
+        $this->api('PATCH', "/api/activities/{$review->id}", ['done' => false], 'o')->assertOk()->assertJsonPath('done', false);          // and back
+        $this->api('PATCH', "/api/activities/{$theirs->id}", ['done' => true], 'o')->assertStatus(403);                                    // someone else's stays theirs
+        $this->assertNull($theirs->fresh()->completed_at);
+    }
+
     public function test_validation(): void
     {
         $this->as('sales', 's');

@@ -99,5 +99,6 @@ export function dueClass(a: Pick<Activity, "overdue" | "done">): string {
 /** Whether the current user may edit / complete this activity (the API enforces too). */
 export function canEditActivity(can: (...k: string[]) => boolean, myId: string, a: Activity): boolean {
   if (can("activities.manage")) return true;
-  return can("activities.create") && (a.assigned_to?.id === myId || a.created_by?.id === myId);
+  // an activity the system opened by itself (a reply to review) has no owner: anyone who can see it may work on it
+  return can("activities.create") && (a.assigned_to?.id === myId || a.created_by?.id === myId || (!a.assigned_to && !a.created_by));
 }

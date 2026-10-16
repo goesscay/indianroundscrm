@@ -36,7 +36,10 @@ class ActivityController extends Controller
     {
         return $user->hasPermission('activities.manage')
             || (int) $a->created_by === (int) $user->id
-            || (int) $a->assigned_to === (int) $user->id;
+            || (int) $a->assigned_to === (int) $user->id
+            // activities the system opens by itself (a supplier or customer reply to review) belong to nobody until someone takes them:
+            // whoever can see one and may work on activities can mark it done
+            || ($a->assigned_to === null && $a->created_by === null && $user->hasPermission('activities.create'));
     }
 
     private function find(string $id, User $user): Activity
