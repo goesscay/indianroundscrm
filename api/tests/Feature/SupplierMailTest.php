@@ -82,6 +82,45 @@ class SupplierMailTest extends TestCase
         $this->assertCount(1, $this->fake->sent);
     }
 
+    public function test_mail_goes_out_in_the_chosen_design_and_plain_text_stays_available(): void
+    {
+        $this->useFake();
+        $ops = User::factory()->operations()->create();
+        $this->lead($ops);
+        $a = $this->supplier('agent@sunrise.test');
+        $this->as($ops);
+        $text = "Dear Team,
+
+TRIP DETAILS
+Destination   : Vietnam
+Adults        : 2
+
+Regards,
+sri
+Indian Rounds";
+        $payload = ['lead_id' => 'IRMH10023', 'supplier_ids' => [(string) $a->id], 'subject' => 'Enquiry', 'body' => $text];
+
+        $this->postJson('/api/supplier-mail/send', $payload)->assertOk();                                   // default: classic
+        $this->postJson('/api/supplier-mail/send', $payload + ['template' => 'modern'])->assertOk();
+        $this->postJson('/api/supplier-mail/send', $payload + ['template' => 'plain'])->assertOk();
+        $this->postJson('/api/supplier-mail/send', $payload + ['template' => 'fancy'])->assertStatus(422);
+
+        [$classic, $modern, $plain] = $this->fake->sent;
+        $this->assertTrue($classic->html);
+        $this->assertStringContainsString('indian-rounds-logo.png', $classic->body);
+        $this->assertStringContainsString('>Trip Details<', $classic->body);                                // the ALL CAPS line became a heading
+        $this->assertStringContainsString('>Vietnam<', $classic->body);                                     // "Label : value" lines became table rows
+        $this->assertStringContainsString('SUPPLIER ENQUIRY', $modern->body);                               // the modern design's own header
+        $this->assertStringNotContainsString('SUPPLIER ENQUIRY', $classic->body);
+        $this->assertFalse($plain->html);
+        $this->assertSame($text, $plain->body);
+        $this->assertSame($text, MailHistory::latest('id')->first()->body === $text ? $text : 'stored body differs');   // the history keeps what was typed
+
+        $html = $this->postJson('/api/supplier-mail/render', ['template' => 'modern', 'body' => $text, 'lead_id' => 'IRMH10023'])->assertOk()->json('html');
+        $this->assertStringContainsString('IRMH10023', $html);
+        $this->assertStringNotContainsString('<script', $this->postJson('/api/supplier-mail/render', ['template' => 'classic', 'body' => '<script>alert(1)</script>'])->json('html'));
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private function useFake(): FakeMailTransport
@@ -214,7 +253,7 @@ class SupplierMailTest extends TestCase
         $res = $this->postJson('/api/supplier-mail/send', [
             'lead_id' => $lead->lead_id, 'supplier_ids' => [(string) $s1->id, (string) $s2->id],
             'cc' => ['boss@indianrounds.in'], 'bcc' => ['audit@indianrounds.in'],
-            'subject' => 'Trip Enquiry - '.$lead->lead_id.' - Vietnam', 'body' => 'Please quote.',
+            'subject' => 'Trip Enquiry - '.$lead->lead_id.' - Vietnam', 'body' => 'Please quote.', 'template' => 'plain',
         ])->assertOk();
 
         $res->assertJsonPath('status', 'sent')->assertJsonPath('provider', 'graph')

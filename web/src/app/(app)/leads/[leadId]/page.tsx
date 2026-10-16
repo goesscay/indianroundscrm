@@ -46,6 +46,9 @@ export default function LeadDetail() {
   const [mailOpen, setMailOpen] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [design, setDesign] = useState<"classic" | "modern" | "plain">("classic");    // how the mail looks when it goes out
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
   const [recipOpen, setRecipOpen] = useState(false);       // the To / CC / BCC section, collapsed until needed
   const [toExtra, setToExtra] = useState("");
   const [cc, setCc] = useState("");
@@ -55,6 +58,18 @@ export default function LeadDetail() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [mailPreviewText, setMailPreviewText] = useState("");
+
+  // The design preview shows the mail exactly as it will go out, built from the text currently in the box.
+  useEffect(() => {
+    if (!mailOpen || !showPreview || design === "plain") return;
+    let live = true;
+    const t = setTimeout(() => {
+      api.post<{ html: string }>("/supplier-mail/render", { template: design, body, lead_id: lead?.lead_id })
+        .then((r) => { if (live) setPreviewHtml(r.data.html); })
+        .catch(() => { if (live) setPreviewHtml(""); });
+    }, 300);
+    return () => { live = false; clearTimeout(t); };
+  }, [mailOpen, showPreview, design, body, lead?.lead_id]);
   const [timelineKey, setTimelineKey] = useState(0);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [consultants, setConsultants] = useState<User[]>([]);
@@ -162,6 +177,7 @@ export default function LeadDetail() {
       const { data } = await api.post<{ send_result?: SupplierMailSendResult & { status?: string; message_id?: string; error?: string } }>("/supplier-mail/send", {
         lead_id: lead.lead_id,
         supplier_ids: ids,
+        template: design,
         to: splitAddresses(toExtra),
         cc: splitAddresses(cc),
         bcc: splitAddresses(bcc),
@@ -639,6 +655,19 @@ export default function LeadDetail() {
                 <div className="mt-1 text-[11px] text-muted-foreground">Leave empty for the usual 3 days. They are sent a short link e-mail; the text below goes to the other suppliers.</div>
               </div>
             )}
+            <div data-testid="mail-design">
+              <Label className="label-caps">Mail design</Label>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {([["classic", "Classic"], ["modern", "Modern"], ["plain", "Plain text"]] as const).map(([k, label]) => (
+                  <button key={k} type="button" onClick={() => setDesign(k)} aria-pressed={design === k} data-testid={`mail-design-${k}`}
+                          className={cn("rounded-md border px-3 py-1 text-xs font-medium", design === k ? "border-foreground bg-foreground text-background" : "border-border hover:bg-secondary")}>{label}</button>
+                ))}
+                {design !== "plain" && (
+                  <button type="button" onClick={() => setShowPreview((v) => !v)} data-testid="mail-preview-toggle"
+                          className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">{showPreview ? "Edit text" : "Preview design"}</button>
+                )}
+              </div>
+            </div>
             <div>
               <Label className="label-caps">Subject</Label>
               <Input className="mt-1.5 h-8 text-[13px]" value={subject} onChange={(e) => setSubject(e.target.value)} data-testid="mail-subject" />
@@ -655,12 +684,16 @@ export default function LeadDetail() {
                   </Button>
                 </div>
               </div>
+              {showPreview && design !== "plain" ? (
+                <iframe title="Mail preview" srcDoc={previewHtml} sandbox="" className="h-[420px] w-full rounded-md border border-border bg-white" data-testid="mail-preview" />
+              ) : (
               <Textarea rows={16}
                         className="font-mono text-[12.5px] leading-relaxed whitespace-pre"
                         value={body}
                         onChange={(e) => setBody(e.target.value)}
                         data-testid="mail-body"
                         placeholder="Loading template…" />
+              )}
               <div className="mt-1 text-[11px] text-muted-foreground">
                 Auto-populated from lead data. Edit freely before sending. Blank fields default to N/A.
               </div>

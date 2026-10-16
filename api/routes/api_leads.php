@@ -72,6 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---- Supplier mail
     Route::middleware('perm:supplier_mail.send')->post('/supplier-mail/send', [SupplierMailController::class, 'send']);
+    Route::middleware('perm:supplier_mail.send')->post('/supplier-mail/render', [SupplierMailController::class, 'render']);
     Route::middleware('perm:supplier_mail.send')->get('/supplier-mail/preview/{lead_id}', [SupplierMailController::class, 'preview']);
     Route::get('/supplier-mail/{lead_id}', [SupplierMailController::class, 'history'])->middleware('perm:suppliers.view,supplier_mail.send');
 

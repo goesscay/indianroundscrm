@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Crm;
 
 use App\Crm\Fail;
 use App\Crm\MailSender;
+use App\Crm\MailTemplates;
 use App\Crm\Rfq;
 use App\Http\Controllers\Controller;
 use App\Models\Lead;
@@ -27,6 +28,7 @@ class SupplierMailController extends Controller
             'lead_id' => 'required|string',
             'supplier_ids' => 'present|array',
             'supplier_ids.*' => 'required',
+            'template' => 'nullable|string|in:plain,classic,modern',
             'to' => 'nullable|array', 'to.*' => 'string',
             'cc' => 'nullable|array', 'cc.*' => 'string',
             'bcc' => 'nullable|array', 'bcc.*' => 'string',
@@ -80,10 +82,15 @@ class SupplierMailController extends Controller
             $units[] = ['suppliers' => $plain, 'body' => $fullBody, 'portal' => false, 'extra' => $extraTo];
         }
 
+        $design = $b['template'] ?? 'classic';
         $mails = [];
         $results = [];
         foreach ($units as $unit) {
-            $result = MailSender::send(array_merge(array_column($unit['suppliers'], 'email'), $unit['extra'] ?? []), $subject, $unit['body'], $cc, $bcc);
+            // the sender edits plain text; unless they chose "plain", it goes out inside the Indian Rounds design
+            $html = $design !== 'plain';
+            $result = MailSender::send(array_merge(array_column($unit['suppliers'], 'email'), $unit['extra'] ?? []), $subject,
+                $html ? MailTemplates::render($design, $unit['body'], ['title' => 'Travel Enquiry', 'ref' => $leadId, 'destination' => (string) $lead->destination]) : $unit['body'],
+                $cc, $bcc, $html);
             $mails[] = $this->record($user, $lead, $subject, $unit['body'], $result, $unit['suppliers'], $cc, $bcc, $unit['portal'], $respondBy, $unit['extra'] ?? []);
             $results[] = $result;
         }
@@ -128,6 +135,15 @@ class SupplierMailController extends Controller
         }
 
         return $out;
+    }
+
+    /** POST /supplier-mail/render {template, body, lead_id?}: the finished HTML for the panel's preview. */
+    public function render(Request $request)
+    {
+        $b = Fail::validate(Fail::body($request), ['template' => 'required|string|in:classic,modern', 'body' => 'required|string', 'lead_id' => 'nullable|string']);
+        $lead = ! empty($b['lead_id']) ? Lead::where('lead_id', $b['lead_id'])->first() : null;
+
+        return ['html' => MailTemplates::render($b['template'], $b['body'], ['title' => 'Travel Enquiry', 'ref' => (string) ($lead?->lead_id ?? ''), 'destination' => (string) ($lead?->destination ?? '')])];
     }
 
     /** Store one outgoing mail with its recipients and move each supplier's tracker row on. */
