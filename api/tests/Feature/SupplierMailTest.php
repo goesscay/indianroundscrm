@@ -56,6 +56,32 @@ class SupplierMailTest extends TestCase
         $this->fake = new FakeMailTransport;
     }
 
+    public function test_to_cc_and_bcc_addresses_are_sent_cleaned_and_recorded(): void
+    {
+        $this->useFake();
+        $sales = User::factory()->operations()->create();
+        $this->lead($sales);
+        $a = $this->supplier('Agent@Sunrise.test');
+        $this->as($sales);
+
+        $this->postJson('/api/supplier-mail/send', [
+            'lead_id' => 'IRMH10023', 'supplier_ids' => [(string) $a->id], 'subject' => 'Enquiry', 'body' => 'Please quote',
+            'to' => ['boss@indianrounds.in, agent@sunrise.test'], 'cc' => ['Ops@indianrounds.in; ops@indianrounds.in'], 'bcc' => ['audit@indianrounds.in', 'boss@indianrounds.in'],
+        ])->assertOk();
+
+        $sent = $this->fake->sent[0];
+        $this->assertEqualsCanonicalizing(['agent@sunrise.test', 'boss@indianrounds.in'], array_map('strtolower', $sent->to));   // the supplier once, plus the extra address
+        $this->assertSame(['ops@indianrounds.in'], $sent->cc);                                                                    // tidied, no repeats
+        $this->assertSame(['audit@indianrounds.in'], $sent->bcc);                                                                 // not repeated from To
+        $mail = MailHistory::where('lead_id', 'IRMH10023')->first()->toApi();
+        $this->assertSame(['audit@indianrounds.in'], $mail['bcc']);
+
+        $this->postJson('/api/supplier-mail/send', [
+            'lead_id' => 'IRMH10023', 'supplier_ids' => [(string) $a->id], 'subject' => 'Enquiry', 'bcc' => ['not-an-email'],
+        ])->assertStatus(400);
+        $this->assertCount(1, $this->fake->sent);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private function useFake(): FakeMailTransport

@@ -27,6 +27,7 @@ class SupplierMailController extends Controller
             'lead_id' => 'required|string',
             'supplier_ids' => 'present|array',
             'supplier_ids.*' => 'required',
+            'to' => 'nullable|array', 'to.*' => 'string',
             'cc' => 'nullable|array', 'cc.*' => 'string',
             'bcc' => 'nullable|array', 'bcc.*' => 'string',
             'subject' => 'required|string',
@@ -55,8 +56,11 @@ class SupplierMailController extends Controller
             $subject = rtrim($subject).' - '.$leadId; // replies are matched by the lead id in the subject
         }
         $fullBody = trim((string) ($b['body'] ?? '')) !== '' ? $b['body'] : Rfq::render($lead);
-        $cc = $b['cc'] ?? [];
-        $bcc = $b['bcc'] ?? [];
+        // extra To / CC / BCC addresses typed on the form: tidy, check and drop repeats (an address already in an earlier line is not repeated in a later one)
+        $supplierEmails = array_map('strtolower', array_filter(array_column($suppliers, 'email')));
+        $extraTo = $this->addresses($b['to'] ?? [], 'To', $supplierEmails);
+        $cc = $this->addresses($b['cc'] ?? [], 'CC', array_merge($supplierEmails, $extraTo));
+        $bcc = $this->addresses($b['bcc'] ?? [], 'BCC', array_merge($supplierEmails, $extraTo, $cc));
 
         // Portal suppliers each get their own short mail with a link; everyone else gets the full enquiry together, as before.
         $respondBy = ! empty($b['respond_by']) ? \Illuminate\Support\Carbon::parse($b['respond_by'])->toDateString()
@@ -71,15 +75,16 @@ class SupplierMailController extends Controller
                 $plain[] = $s;
             }
         }
-        if ($plain) {
-            $units[] = ['suppliers' => $plain, 'body' => $fullBody, 'portal' => false];
+        if ($plain || $extraTo) {
+            // the full enquiry also goes to the extra To addresses; portal suppliers keep their private link mail to themselves
+            $units[] = ['suppliers' => $plain, 'body' => $fullBody, 'portal' => false, 'extra' => $extraTo];
         }
 
         $mails = [];
         $results = [];
         foreach ($units as $unit) {
-            $result = MailSender::send(array_column($unit['suppliers'], 'email'), $subject, $unit['body'], $cc, $bcc);
-            $mails[] = $this->record($user, $lead, $subject, $unit['body'], $result, $unit['suppliers'], $cc, $bcc, $unit['portal'], $respondBy);
+            $result = MailSender::send(array_merge(array_column($unit['suppliers'], 'email'), $unit['extra'] ?? []), $subject, $unit['body'], $cc, $bcc);
+            $mails[] = $this->record($user, $lead, $subject, $unit['body'], $result, $unit['suppliers'], $cc, $bcc, $unit['portal'], $respondBy, $unit['extra'] ?? []);
             $results[] = $result;
         }
 
@@ -101,10 +106,34 @@ class SupplierMailController extends Controller
         return array_merge($mails[0]->fresh('recipients')->toApi(), ['send_result' => $headline, 'mails_sent' => count($mails)]);
     }
 
-    /** Store one outgoing mail with its recipients and move each supplier's tracker row on. */
-    private function record($user, Lead $lead, string $subject, string $body, array $result, array $suppliers, array $cc, array $bcc, bool $portal, ?string $respondBy = null): MailHistory
+    /**
+     * Clean a list of typed addresses: split on commas / semicolons / spaces, lower-case, reject anything that is not an e-mail, drop repeats and those in $already.
+     *
+     * @param  list<string>  $already
+     * @return list<string>
+     */
+    private function addresses(array $raw, string $label, array $already = []): array
     {
-        return DB::transaction(function () use ($user, $lead, $subject, $body, $result, $suppliers, $cc, $bcc, $portal, $respondBy) {
+        $out = [];
+        foreach ($raw as $item) {
+            foreach (preg_split('/[\s,;]+/', (string) $item, -1, PREG_SPLIT_NO_EMPTY) as $e) {
+                $e = strtolower(trim($e, "<>\"'"));
+                if (! filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                    Fail::bad("$label: \"$e\" is not a valid e-mail address");
+                }
+                if (! in_array($e, $already, true) && ! in_array($e, $out, true)) {
+                    $out[] = $e;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /** Store one outgoing mail with its recipients and move each supplier's tracker row on. */
+    private function record($user, Lead $lead, string $subject, string $body, array $result, array $suppliers, array $cc, array $bcc, bool $portal, ?string $respondBy = null, array $extraTo = []): MailHistory
+    {
+        return DB::transaction(function () use ($user, $lead, $subject, $body, $result, $suppliers, $cc, $bcc, $portal, $respondBy, $extraTo) {
             $leadId = $lead->lead_id;
             $mail = MailHistory::create([
                 'lead_id' => $leadId, 'subject' => $subject, 'body' => $body,
@@ -119,6 +148,9 @@ class SupplierMailController extends Controller
             foreach ($suppliers as $s) {
                 MailRecipient::create(['mail_history_id' => $mail->id, 'type' => 'to',
                     'supplier_id' => $s['id'], 'name' => $s['name'], 'email' => $s['email']]);
+            }
+            foreach ($extraTo as $e) {
+                MailRecipient::create(['mail_history_id' => $mail->id, 'type' => 'to', 'email' => $e]);
             }
             foreach ($cc as $e) {
                 MailRecipient::create(['mail_history_id' => $mail->id, 'type' => 'cc', 'email' => $e]);

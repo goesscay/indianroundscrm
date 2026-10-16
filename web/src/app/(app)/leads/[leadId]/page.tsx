@@ -28,6 +28,9 @@ import ConvertLeadDialog from "@/components/crm/ConvertLeadDialog";
 
 const INR = (n: number | string | null | undefined) => "₹" + (Number(n) || 0).toLocaleString("en-IN");
 
+/** "a@x.com, b@y.com; c@z.com" -> ["a@x.com", "b@y.com", "c@z.com"] */
+const splitAddresses = (v: string) => v.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+
 export default function LeadDetail() {
   const { leadId } = useParams<{ leadId: string }>();
   const router = useRouter();
@@ -41,7 +44,9 @@ export default function LeadDetail() {
   const [mailOpen, setMailOpen] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [toExtra, setToExtra] = useState("");
   const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
   const [respondBy, setRespondBy] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -153,8 +158,9 @@ export default function LeadDetail() {
       const { data } = await api.post<{ send_result?: SupplierMailSendResult & { status?: string; message_id?: string; error?: string } }>("/supplier-mail/send", {
         lead_id: lead.lead_id,
         supplier_ids: ids,
-        cc: cc.split(",").map(s => s.trim()).filter(Boolean),
-        bcc: [],
+        to: splitAddresses(toExtra),
+        cc: splitAddresses(cc),
+        bcc: splitAddresses(bcc),
         subject, body,
         ...(respondBy ? { respond_by: respondBy } : {}),
       });
@@ -164,6 +170,7 @@ export default function LeadDetail() {
       else toast.info("Email simulated — the Microsoft 365 mailbox isn't connected yet, so nothing was sent.");
       setMailOpen(false);
       setRespondBy("");
+      setToExtra(""); setCc(""); setBcc("");
       load();
     } catch (e) { toast.error(formatApiError(e)); }
   };
@@ -592,9 +599,22 @@ export default function LeadDetail() {
                 ))}
               </div>
             </div>
-            <div>
-              <Label className="label-caps">CC (comma-separated)</Label>
-              <Input className="mt-1.5" value={cc} onChange={(e) => setCc(e.target.value)} data-testid="mail-cc" />
+            <div className="space-y-3">
+              <div>
+                <Label className="label-caps">To (the selected suppliers) — add more addresses</Label>
+                <Input className="mt-1.5" value={toExtra} onChange={(e) => setToExtra(e.target.value)} placeholder="Optional, separate with commas" data-testid="mail-to" />
+                {suppliers.some((x) => x.portal_enabled && selected[x.id]) && <div className="text-[11px] text-muted-foreground mt-1">Portal suppliers get their own private link mail; extra addresses receive the full enquiry instead.</div>}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="label-caps">CC</Label>
+                  <Input className="mt-1.5" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Everyone sees these" data-testid="mail-cc" />
+                </div>
+                <div>
+                  <Label className="label-caps">BCC</Label>
+                  <Input className="mt-1.5" value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Hidden from the suppliers" data-testid="mail-bcc" />
+                </div>
+              </div>
               {suppliers.some((x) => x.portal_enabled && selected[x.id]) && (
                 <div className="mt-3">
                   <Label className="label-caps">Portal suppliers: quote needed by</Label>
