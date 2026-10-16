@@ -872,7 +872,7 @@ export interface SupplierPaymentRow {
   amount: number; paid_date: string; mode: PayMode; reference: string | null; notes: string | null; cancel_reason: string | null;
 }
 export interface SupplierBill {
-  id: string; bill_no: string; supplier_ref: string | null; supplier: { id: string; name: string } | null; supplier_id: string;
+  id: string; bill_no: string; created_by?: string | null; supplier_ref: string | null; supplier: { id: string; name: string } | null; supplier_id: string;
   deal: { id: string; deal_no: string; name: string } | null; deal_id: string | null; bill_date: string; due_date: string | null;
   total: number; paid_total: number; balance: number; payment_status: BillStatus; status: "open" | "cancelled"; notes: string | null; cancel_reason: string | null;
   lines?: { description: string; amount: number; account_id: string; account: string | null; deal_id: string | null }[];

@@ -47,6 +47,7 @@ const NAV: NavItem[] = [
   { to: "/supplier-dashboard", label: "Supplier Dashboard", icon: Inbox, testId: "nav-supplier-dashboard", group: "Operations", perms: ["supplier_dashboard.view"] },
   { to: "/supplier-inbox", label: "Supplier Inbox", icon: MailOpen, testId: "nav-supplier-inbox", group: "Operations", perms: ["rsq.manage"] },
   { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers", group: "Operations", perms: ["suppliers.view"] },
+  { to: "/supplier-bills", label: "Supplier Bills", icon: ReceiptText, testId: "nav-supplier-bills", group: "Operations", perms: ["finance.bills"] },
   { to: "/accounts", label: "Accounts", icon: Landmark, testId: "nav-accounts", group: "Finance", perms: ["finance.view"] },
   { to: "/team-performance", label: "Team Performance", icon: BarChart3, testId: "nav-team-performance", group: "Administration", perms: [], superOnly: true },
   { to: "/users", label: "Users", icon: Users, testId: "nav-users", group: "Administration", perms: ["users.view"] },

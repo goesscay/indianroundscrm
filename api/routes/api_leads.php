@@ -246,10 +246,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/finance/journal/{id}/reverse', [JournalController::class, 'reverse'])->middleware('perm:finance.journal');
 
     // ---- Accounts (part B): supplier bills and payments, other money in/out, reports, statements
-    Route::get('/finance/bills', [PayablesController::class, 'bills'])->middleware('perm:finance.view');
-    Route::post('/finance/bills', [PayablesController::class, 'storeBill'])->middleware('perm:finance.payables');
-    Route::get('/finance/bills/{id}', [PayablesController::class, 'showBill'])->middleware('perm:finance.view');
-    Route::post('/finance/bills/{id}/cancel', [PayablesController::class, 'cancelBill'])->middleware('perm:finance.payables');
+    Route::get('/finance/bill-options', [PayablesController::class, 'billOptions'])->middleware('perm:finance.view,finance.bills');
+    Route::get('/finance/bills', [PayablesController::class, 'bills'])->middleware('perm:finance.view,finance.bills');
+    Route::post('/finance/bills', [PayablesController::class, 'storeBill'])->middleware('perm:finance.payables,finance.bills');
+    Route::get('/finance/bills/{id}', [PayablesController::class, 'showBill'])->middleware('perm:finance.view,finance.bills');
+    Route::post('/finance/bills/{id}/cancel', [PayablesController::class, 'cancelBill'])->middleware('perm:finance.payables,finance.bills');
     Route::post('/finance/bills/{id}/payments', [PayablesController::class, 'payBill'])->middleware('perm:finance.payables');
     Route::get('/finance/supplier-payments', [PayablesController::class, 'payments'])->middleware('perm:finance.view');
     Route::get('/finance/supplier-payments/{id}', [PayablesController::class, 'showPayment'])->middleware('perm:finance.view');

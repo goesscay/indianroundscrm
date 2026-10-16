@@ -138,12 +138,19 @@ class PayablesController extends Controller
 
         if (Paging::requested($request)) {
             $res = Paging::paginate($request, $q, fn (SupplierBill $b) => $b->toApi());
-            $res['outstanding'] = round((float) SupplierBill::where('status', 'open')->whereRaw('total - paid_total > 0')->sum(DB::raw('total - paid_total')), 2);
+            $res['outstanding'] = ! $request->user()->hasPermission('finance.view') ? null : round((float) SupplierBill::where('status', 'open')->whereRaw('total - paid_total > 0')->sum(DB::raw('total - paid_total')), 2);
 
             return $res;
         }
 
         return $q->limit(max(1, (int) $request->query('limit', 500)))->get()->map(fn (SupplierBill $b) => $b->toApi())->values();
+    }
+
+    /** The expense accounts a bill line can go to: what the bill form offers to people who do not see the whole chart of accounts. */
+    public function billOptions()
+    {
+        return ['accounts' => \App\Models\Account::where('type', 'expense')->where('active', true)->orderBy('code')->get(['id', 'code', 'name'])
+            ->map(fn ($a) => ['id' => (string) $a->id, 'code' => $a->code, 'name' => $a->name])->values()];
     }
 
     public function showBill(string $id)
@@ -224,6 +231,9 @@ class PayablesController extends Controller
         $user = $request->user();
         $b = $this->findBill($id);
         $d = Fail::validate(Fail::body($request), ['reason' => 'required|string|max:300']);
+        if (! $user->hasPermission('finance.payables') && (int) $b->created_by !== (int) $user->id) {
+            Fail::forbidden('You can cancel only the bills you entered yourself.');          // finance can cancel any
+        }
         if ($b->status !== 'open') {
             Fail::http(409, 'This bill is already cancelled.');
         }

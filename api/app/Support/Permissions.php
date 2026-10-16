@@ -102,6 +102,7 @@ class Permissions
             $g('finance', 'Accounts (finance)', [
                 'view' => ['View accounts', 'Open the Accounts module: dashboard, banking, chart of accounts, journal, ledger and trial balance.'],
                 'journal' => ['Post journal entries', 'Create manual journal entries and reverse them.'],
+                'bills' => ['Enter supplier bills', 'See supplier bills, enter new ones and cancel the ones they entered that have no payment. Paying suppliers and the rest of Accounts stay with finance.'],
                 'payables' => ['Record supplier bills and expenses', 'Enter supplier bills, pay suppliers, and record other money in and money out.'],
                 'manage' => ['Manage the books', 'Add and edit ledger and bank accounts and close the books up to a date.'],
             ]),
@@ -201,7 +202,7 @@ class Permissions
             'operations' => [
                 'dashboard.view', 'leads.view_all', 'leads.create', 'leads.edit', 'leads.edit_limited', 'leads.reassign',
                 'leads.notes', 'leads.contact_events', 'calendar.view', 'rsq.request', 'rsq.manage',
-                'supplier_mail.send', 'suppliers.view', 'suppliers.manage', 'supplier_dashboard.view',
+                'supplier_mail.send', 'suppliers.view', 'suppliers.manage', 'supplier_dashboard.view', 'finance.bills',
                 'ai.use', 'chat.use',
                 'activities.view', 'activities.view_all', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',

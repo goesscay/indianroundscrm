@@ -43,8 +43,8 @@ export default function BillDialog({ open, onOpenChange, deal, onSaved }: {
     if (!open) return;
     setSupplier(""); setRef(""); setBillDate(today()); setDue(""); setDealSel(deal ?? null); setQ(""); setResults([]); setNotes(""); setDup(""); setError(""); setSaving(false);
     api.get<Supplier[]>("/suppliers").then((r) => setSuppliers(r.data)).catch(() => setSuppliers([]));
-    api.get<{ items: LedgerAccount[] }>("/finance/accounts", { params: { type: "expense", active: "1" } }).then((r) => {
-      setAccounts(r.data.items); setRows([blank(r.data.items.find((a) => a.code === "5000")?.id ?? "")]);
+    api.get<{ accounts: LedgerAccount[] }>("/finance/bill-options").then((r) => {
+      setAccounts(r.data.accounts); setRows([blank(r.data.accounts.find((a) => a.code === "5000")?.id ?? "")]);
     }).catch(() => setAccounts([]));
   }, [open, deal]);
 

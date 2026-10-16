@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Banknote, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -21,7 +21,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function BillDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { can } = useCurrentUser();
+  const base = usePathname().startsWith("/supplier-bills") ? "/supplier-bills" : "/accounts/bills";
+  const { user, can } = useCurrentUser();
   const [b, setB] = useState<SupplierBill | null>(null);
   const [error, setError] = useState("");
   const [pay, setPay] = useState(false);
@@ -42,7 +43,7 @@ export default function BillDetail() {
     finally { setBusy(false); }
   };
 
-  if (error) return <div className="space-y-3"><Button variant="ghost" size="sm" onClick={() => router.push("/accounts/bills")}><ArrowLeft size={16} /> Bills</Button><div className="text-sm text-destructive">{error}</div></div>;
+  if (error) return <div className="space-y-3"><Button variant="ghost" size="sm" onClick={() => router.push(base)}><ArrowLeft size={16} /> Bills</Button><div className="text-sm text-destructive">{error}</div></div>;
   if (!b) return <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>;
   const hasPayments = (b.payments ?? []).some((p) => p.status === "valid");
 
@@ -50,7 +51,7 @@ export default function BillDetail() {
     <div className="space-y-6" data-testid="bill-detail">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Button variant="ghost" size="sm" onClick={() => router.push("/accounts/bills")} className="-ml-3 mb-2"><ArrowLeft size={16} /> Bills</Button>
+          <Button variant="ghost" size="sm" onClick={() => router.push(base)} className="-ml-3 mb-2"><ArrowLeft size={16} /> Bills</Button>
           <div className="label-caps">Supplier bill</div>
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h1 className="font-mono text-3xl font-black tracking-tight sm:text-4xl" data-testid="bill-no">{b.bill_no}</h1>
@@ -60,7 +61,7 @@ export default function BillDetail() {
         </div>
         <div className="flex flex-wrap gap-2">
           {b.status === "open" && b.balance > 0 && can("finance.payables") && <Button onClick={() => setPay(true)} data-testid="pay-bill"><Banknote size={16} /> Pay supplier</Button>}
-          {b.status === "open" && !hasPayments && can("finance.payables") && <Button variant="outline" disabled={busy} onClick={cancel} data-testid="cancel-bill"><XCircle size={16} /> Cancel bill</Button>}
+          {b.status === "open" && !hasPayments && (can("finance.payables") || (can("finance.bills") && String(b.created_by) === String(user.id))) && <Button variant="outline" disabled={busy} onClick={cancel} data-testid="cancel-bill"><XCircle size={16} /> Cancel bill</Button>}
         </div>
       </div>
       {b.status === "cancelled" && <Card className="rounded-lg p-4 text-sm">Cancelled{b.cancel_reason ? `: ${b.cancel_reason}` : ""}.</Card>}

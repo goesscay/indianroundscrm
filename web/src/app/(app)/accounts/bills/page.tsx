@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -20,10 +20,12 @@ function BillList() {
   const router = useRouter();
   const sp = useSearchParams();
   const { can } = useCurrentUser();
+  const base = usePathname().startsWith("/supplier-bills") ? "/supplier-bills" : "/accounts/bills";   // the same list lives under Accounts and under Operations
+  const canEnter = can("finance.payables", "finance.bills");
   const [q, setQ] = useState("");
   const [applied, setApplied] = useState("");
   const [status, setStatus] = useState(["unpaid", "overdue", "paid", "cancelled"].includes(sp.get("status") ?? "") ? sp.get("status")! : "all");
-  const [open, setOpen] = useState(sp.get("new") === "1" && can("finance.payables"));
+  const [open, setOpen] = useState(sp.get("new") === "1" && can("finance.payables", "finance.bills"));
   const [tick, setTick] = useState(0);
   const [outstanding, setOutstanding] = useState<number | null>(null);
   const dealParam = sp.get("deal");
@@ -43,7 +45,7 @@ function BillList() {
   const { rows, loading, loaded, error, paginationProps } = usePagedList<SupplierBill>("/finance/bills", params, tick);
   useEffect(() => { const t = setTimeout(() => setApplied(q), 300); return () => clearTimeout(t); }, [q]);
   useEffect(() => {
-    api.get<{ outstanding: number }>("/finance/bills", { params: { page: 1, per_page: 1 } }).then((r) => setOutstanding(r.data.outstanding)).catch(() => setOutstanding(null));
+    api.get<{ outstanding: number | null }>("/finance/bills", { params: { page: 1, per_page: 1 } }).then((r) => setOutstanding(r.data.outstanding)).catch(() => setOutstanding(null));
   }, [tick, rows.length]);
   const active = (q.trim() ? 1 : 0) + (status !== "all" ? 1 : 0);
 
@@ -56,7 +58,7 @@ function BillList() {
         </div>
         <div className="flex items-center gap-4">
           {outstanding !== null && <div className="text-right" data-testid="bills-outstanding"><div className="label-caps">You owe</div><div className="font-display text-2xl font-black">{INR2(outstanding)}</div></div>}
-          {can("finance.payables") && <Button onClick={() => setOpen(true)} data-testid="new-bill-btn">+ New bill</Button>}
+          {canEnter && <Button onClick={() => setOpen(true)} data-testid="new-bill-btn">+ New bill</Button>}
         </div>
       </div>
 
@@ -80,7 +82,7 @@ function BillList() {
               {loading && !loaded && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Loading…</TableCell></TableRow>}
               {loaded && rows.length === 0 && <TableRow><TableCell colSpan={7} className="py-12 text-center text-muted-foreground">{active ? "No bills match these filters." : "No bills yet."}</TableCell></TableRow>}
               {rows.map((b) => (
-                <TableRow key={b.id} className="cursor-pointer hover:bg-secondary/50" onClick={() => router.push(`/accounts/bills/${b.id}`)} data-testid={`bill-row-${b.id}`}>
+                <TableRow key={b.id} className="cursor-pointer hover:bg-secondary/50" onClick={() => router.push(`${base}/${b.id}`)} data-testid={`bill-row-${b.id}`}>
                   <TableCell><div className="font-mono font-medium">{b.bill_no}</div>{b.supplier_ref && <div className="text-xs text-muted-foreground">{b.supplier_ref}</div>}</TableCell>
                   <TableCell className="text-sm">{b.supplier?.name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{b.deal?.deal_no ?? "—"}</TableCell>
@@ -96,7 +98,7 @@ function BillList() {
         <Pagination {...paginationProps} />
       </Card>
       {error && <div className="text-sm text-destructive">{error}</div>}
-      <BillDialog open={open} onOpenChange={setOpen} deal={deal} onSaved={(b) => { setTick((t) => t + 1); router.push(`/accounts/bills/${b.id}`); }} />
+      <BillDialog open={open} onOpenChange={setOpen} deal={deal} onSaved={(b) => { setTick((t) => t + 1); router.push(`${base}/${b.id}`); }} />
     </div>
   );
 }
