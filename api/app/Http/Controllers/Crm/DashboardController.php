@@ -63,7 +63,7 @@ class DashboardController extends Controller
             'today_leads' => $leads->filter(fn ($l) => $created($l) === $today)->count(),
             'month_leads' => $leads->filter(fn ($l) => str_starts_with($created($l), $monthPrefix))->count(),
             'booked' => $booked->count(),
-            'cancelled' => $leads->where('lead_status', 'Cancelled')->count(),
+            'cancelled' => $leads->where('lead_status', 'Lost')->count(),
             'quote_pending' => $leads->filter(fn ($l) => $l->mail_status === 'Sent' && ! $l->quote_received)->count(),
             'revenue' => $booked->sum(fn ($l) => (float) $l->selling_amount),
             'profit' => $booked->sum($profitOf),

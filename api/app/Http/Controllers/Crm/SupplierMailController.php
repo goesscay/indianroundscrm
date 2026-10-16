@@ -104,7 +104,7 @@ class SupplierMailController extends Controller
         $names = implode(', ', array_column($suppliers, 'name'));
         $lead->fill([
             'mail_status' => 'Sent', 'supplier_mail_date' => now(), 'supplier_name' => $names !== '' ? $names : $lead->supplier_name,
-            'lead_status' => $lead->lead_status === 'New Lead' ? 'Supplier Mail Sent' : $lead->lead_status,
+            'lead_status' => $lead->lead_status === 'New Lead' ? 'In Progress' : $lead->lead_status,
             'updated_by' => $user->email,
         ])->save();
         ActivityLogger::log($user, 'send_supplier_mail', 'lead', $leadId, null,

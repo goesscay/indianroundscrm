@@ -22,3 +22,6 @@ Schedule::command("portal:remind")->dailyAt("11:00")->timezone("Asia/Kolkata")->
 
 // Brings the tours of the public website in as packages, 03:30 IST daily. Paused with CRM_WEBSITE_SYNC=false.
 Schedule::command("packages:sync-website")->dailyAt("03:30")->timezone("Asia/Kolkata")->withoutOverlapping(30);
+
+// Booked leads whose trip date has passed become Completed. 02:00 IST daily.
+Schedule::command("leads:complete-trips")->dailyAt("02:00")->timezone("Asia/Kolkata")->withoutOverlapping(30);

@@ -207,7 +207,7 @@ class LeadsApiTest extends TestCase
         $send->assertJsonPath('send_result.status', 'simulated_sent')->assertJsonPath('to_suppliers.0.name', 'Wanderlust')
             ->assertJsonPath('cc.0', 'cc@example.com');
         $this->getJson("/api/leads/{$id}")->assertJsonPath('rsq_status', 'pending_reply')
-            ->assertJsonPath('lead_status', 'Supplier Mail Sent')->assertJsonPath('mail_status', 'Sent');
+            ->assertJsonPath('lead_status', 'In Progress')->assertJsonPath('mail_status', 'Sent');
         $this->assertCount(1, $this->getJson('/api/rsq-requests')->json('pending_reply'));
         $this->getJson("/api/supplier-mail/{$id}")->assertJsonCount(1);
 
@@ -233,14 +233,13 @@ class LeadsApiTest extends TestCase
     {
         $this->as('sales', ['consultant_code' => 'AA']);
         $id = $this->postJson('/api/leads', $this->leadPayload(['phone' => '9000000001']))->json('lead_id');
-        $this->patchJson("/api/leads/{$id}", ['booking_status' => 'Booked'])->assertOk();
-        \App\Models\Lead::where('lead_id', $id)->update(['selling_amount' => 10000]);                  // priced by Operations
+        \App\Models\Lead::where('lead_id', $id)->update(['lead_status' => 'Booked', 'booking_status' => 'Booked', 'selling_amount' => 10000]);   // booked and priced by Operations
         $this->postJson('/api/leads', $this->leadPayload(['phone' => '9000000002', 'destination' => 'Dubai']))->assertOk();
 
         $s = $this->getJson('/api/dashboard/stats')->assertOk();
         $s->assertJsonPath('total_leads', 2)->assertJsonPath('today_leads', 2)->assertJsonPath('month_leads', 2)
             ->assertJsonPath('booked', 1)->assertJsonPath('revenue', 10000)->assertJsonPath('profit', 10000)
-            ->assertJsonPath('pending_payments', 1)->assertJsonPath('status_counts.New Lead', 2)
+            ->assertJsonPath('pending_payments', 1)->assertJsonPath('status_counts.New Lead', 1)->assertJsonPath('status_counts.Booked', 1)
             ->assertJsonCount(2, 'top_destinations')->assertJsonCount(1, 'monthly');
         $this->getJson('/api/dashboard/leaderboard')->assertStatus(403);
         $this->getJson('/api/activity')->assertStatus(403);

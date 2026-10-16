@@ -41,6 +41,24 @@ class Deal extends Model
         return $this->belongsTo(User::class, 'owner_id');
     }
 
+    protected static function booted(): void
+    {
+        // the lead behind a deal follows it: quote sent -> Quote Sent, won -> Booked, lost -> Lost, trip done -> Completed
+        static::saved(function (Deal $d) {
+            if ($d->wasChanged('stage')) {
+                match ($d->stage) {
+                    'quoted' => \App\Services\LeadStatusFlow::advance($d, 'Quote Sent to Customer', ['New Lead', 'In Progress'], 'quote sent'),
+                    'won' => \App\Services\LeadStatusFlow::advance($d, 'Booked', \App\Services\LeadStatusFlow::OPEN, 'deal won'),
+                    'lost' => \App\Services\LeadStatusFlow::advance($d, 'Lost', \App\Services\LeadStatusFlow::OPEN, 'deal lost', $d->lost_reason ?: null),
+                    default => null,
+                };
+            }
+            if ($d->wasChanged('trip_status') && $d->trip_status === 'completed') {
+                \App\Services\LeadStatusFlow::advance($d, 'Completed', ['Booked'], 'trip completed');
+            }
+        });
+    }
+
     public function isOpen(): bool
     {
         return ! in_array($this->stage, ['won', 'lost'], true);

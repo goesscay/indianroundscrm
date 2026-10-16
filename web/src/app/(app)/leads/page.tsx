@@ -10,14 +10,15 @@ import { Pagination } from "@/components/ui/pagination";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import StatusPill from "@/components/app/StatusPill";
 import LeadDateFilter, { NO_DATES, type DateFilter } from "@/components/app/LeadDateFilter";
-import { STAGES, stageByKey } from "@/lib/leadStages";
+import { STAGES, stageByKey, statusChoices } from "@/lib/leadStages";
+import LostReasonDialog from "@/components/app/LostReasonDialog";
 import { myDestinations } from "@/lib/places";
-import { Search, Download, Phone, MessageCircle, X, ListPlus, Archive, ArchiveRestore } from "lucide-react";
+import { Search, Download, Phone, MessageCircle, X, ListPlus, Archive, ArchiveRestore, Repeat } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import BulkLeadsDialog from "@/components/app/BulkLeadsDialog";
 import { logContact } from "@/components/app/ContactTimeline";
@@ -69,6 +70,8 @@ function LeadList() {
   const [exportErr, setExportErr] = useState("");
   const { can } = useCurrentUser();
   const canMove = can("leads.edit", "leads.edit_limited");
+  const canSetAny = can("leads.edit");
+  const [lostFor, setLostFor] = useState<{ id: string; name: string } | null>(null);   // the lead being marked Lost, waiting for a reason
 
   const setStage = useCallback((key: string) => {
     const next = new URLSearchParams(window.location.search);
@@ -137,9 +140,9 @@ function LeadList() {
     router.push(`/leads/${leadId}`);
   };
 
-  const moveLead = async (leadId: string, to: string) => {
+  const moveLead = async (leadId: string, to: string, lostReason?: string) => {
     try {
-      await api.patch(`/leads/${leadId}`, { lead_status: to });
+      await api.patch(`/leads/${leadId}`, { lead_status: to, ...(lostReason ? { lost_reason: lostReason } : {}) });
       toast.success(`${leadId} moved to ${to}`);
       setRefreshTick((t) => t + 1);
     } catch (e) { toast.error(formatApiError(e)); }
@@ -326,7 +329,7 @@ function LeadList() {
                   </TableCell>
                   <TableCell className="px-3 py-1.5">
                     {canMove ? (
-                      <Select value={l.lead_status} onValueChange={(v) => { if (v !== l.lead_status) void moveLead(l.lead_id, v); }}>
+                      <Select value={l.lead_status} onValueChange={(v) => { if (v === l.lead_status) return; if (v === "Lost") setLostFor({ id: l.lead_id, name: l.customer_name }); else void moveLead(l.lead_id, v); }}>
                         <SelectTrigger
                           className="h-auto w-auto gap-1 rounded border-0 bg-transparent p-0 shadow-none focus:ring-1 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:opacity-50"
                           aria-label={`Change stage of ${l.lead_id}`} data-testid={`stage-select-${l.lead_id}`}
@@ -334,15 +337,20 @@ function LeadList() {
                           <StatusPill status={l.lead_status} />
                         </SelectTrigger>
                         <SelectContent>
-                          {STAGES.map((st) => (
-                            <SelectGroup key={st.key}>
-                              <SelectLabel>{st.label}</SelectLabel>
-                              {st.statuses.map((s) => <SelectItem key={s} value={s} data-testid={`stage-opt-${s.toLowerCase().replace(/\s+/g, "-")}`}>{s}</SelectItem>)}
-                            </SelectGroup>
-                          ))}
+                          {statusChoices(canSetAny, l.lead_status).map((st) => <SelectItem key={st} value={st} data-testid={`stage-opt-${st.toLowerCase().replace(/\s+/g, "-")}`}>{st}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     ) : <StatusPill status={l.lead_status} />}
+                    {l.next_follow_up && !["Lost", "Completed"].includes(l.lead_status) && (() => {
+                      const when = new Date(l.next_follow_up as string);
+                      const late = when.getTime() < Date.now();
+                      return (
+                        <div className={cn("mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-px text-[10px] font-semibold", late ? "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300" : "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200")}
+                             title={`Next follow-up ${when.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}${late ? " (overdue)" : ""}`} data-testid={`followup-${l.lead_id}`}>
+                          <Repeat size={10} /> Follow-up · {when.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="px-3 py-1.5 text-xs text-muted-foreground whitespace-nowrap">{l.staff_name}</TableCell>
                   {canMove && (
@@ -367,6 +375,8 @@ function LeadList() {
         <Pagination {...paginationProps} />
       </Card>
       {err && <div className="text-sm text-destructive">{err}</div>}
+      <LostReasonDialog open={!!lostFor} onOpenChange={(o) => { if (!o) setLostFor(null); }} leadLabel={lostFor ? `${lostFor.name} · ${lostFor.id}` : ""}
+                        onConfirm={async (reason) => { if (lostFor) await moveLead(lostFor.id, "Lost", reason); }} />
       {can("leads.create") && <BulkLeadsDialog open={bulkOpen} onOpenChange={setBulkOpen} onDone={() => setRefreshTick((t) => t + 1)} />}
     </div>
   );

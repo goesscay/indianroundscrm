@@ -82,6 +82,9 @@ export interface Lead extends Partial<LeadCreate> {
   deal_id?: string | null;
   converted_at?: string | null;
   archived_at?: string | null;
+  /** The soonest open Follow-up activity of the lead (an ISO time), if it has one. */
+  next_follow_up?: string | null;
+  lost_reason?: string | null;
   lead_id: string;
   customer_name: string;
   phone: string;

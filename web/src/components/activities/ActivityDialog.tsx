@@ -33,7 +33,7 @@ export default function ActivityDialog({ open, onOpenChange, activity, defaults,
   const canManage = can("activities.manage");
   const editing = !!activity;
 
-  const [type, setType] = useState<ActivityType>("task");
+  const [type, setType] = useState<ActivityType>("follow_up");
   const [priority, setPriority] = useState<ActivityPriority>("medium");
   const [title, setTitle] = useState("");
   const [due, setDue] = useState("");
@@ -62,7 +62,7 @@ export default function ActivityDialog({ open, onOpenChange, activity, defaults,
       setDue(toLocalInput(activity.due_at)); setAssignee(activity.assigned_to?.id ?? NOBODY);
       setLead(activity.lead); setDetails(activity.details ?? ""); setDone(activity.done);
     } else {
-      setType("task"); setPriority("medium"); setTitle(""); setDue(defaults?.due_local ?? "");
+      setType("follow_up"); setPriority("medium"); setTitle(""); setDue(defaults?.due_local ?? "");
       setAssignee(myId || NOBODY); setLead(defaults?.lead ?? null); setDetails(""); setDone(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

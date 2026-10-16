@@ -29,9 +29,9 @@ class LeadConvertController extends Controller
     private function stageFor(Lead $l): string
     {
         return match (true) {
-            in_array($l->lead_status, ['Booked', 'Payment Pending', 'Payment Received', 'Travel Completed'], true) => 'won',
-            in_array($l->lead_status, ['Cancelled'], true) => 'lost',
-            in_array($l->lead_status, ['Quote Sent to Customer', 'Follow-up'], true) => 'quoted',
+            in_array($l->lead_status, ['Booked', 'Completed'], true) => 'won',
+            in_array($l->lead_status, ['Lost'], true) => 'lost',
+            in_array($l->lead_status, ['Quote Sent to Customer'], true) => 'quoted',
             default => 'enquiry',
         };
     }

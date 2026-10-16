@@ -25,14 +25,14 @@ class LeadController extends Controller
         'hotel_category', 'meal_plan', 'package_type', 'budget',
         'adults', 'children', 'child_ages', 'rooms', 'room_type',
         'departure_from', 'special_requests', 'lead_status',
-        'remarks', 'follow_up_date', 'booking_status',
+        'remarks', 'lost_reason',
         'quote_type', 'package_selected',
         'quote_sent_to_customer', 'quote_sent_date',
         'stay_cities', 'passport_available', 'passport_reason',
     ];
 
     private const COMPLETED_STATUSES = [
-        'Quote Sent to Customer', 'Booked', 'Payment Received', 'Travel Completed', 'Closed', 'Cancelled',
+        'Quote Sent to Customer', 'Booked', 'Completed', 'Lost',
     ];
 
     // ------------------------------------------------------------------ helpers
@@ -175,7 +175,7 @@ class LeadController extends Controller
         $month = (string) $request->query('month', '');
         $from = (string) $request->query('from', '');
         $to = (string) $request->query('to', '');
-        $leads = self::scopeForUser(Lead::query(), $request->user())->where('lead_status', '<>', 'Cancelled')->whereNotNull('travel_date')->limit(5000)->get();
+        $leads = self::scopeForUser(Lead::query(), $request->user())->where('lead_status', '<>', 'Lost')->whereNotNull('travel_date')->limit(5000)->get();
         $events = [];
         foreach ($leads as $l) {
             $d = substr((string) ($l->travel_date ?? ''), 0, 10);
@@ -221,7 +221,9 @@ class LeadController extends Controller
 
     public function index(Request $request)
     {
-        $q = $this->filtered($request, $request->user())->with('stayCities');
+        // next_follow_up: the soonest open Follow-up activity of each lead, so the list can show it without a query per row
+        $q = $this->filtered($request, $request->user())->with('stayCities')->select('leads.*')->addSelect(['next_follow_up' => \App\Models\Activity::query()
+            ->selectRaw('min(due_at)')->whereColumn('activities.lead_id', 'leads.lead_id')->where('type', 'follow_up')->whereNull('completed_at')]);
         if (($v = (string) $request->query('status', '')) !== '') {
             $q->where('lead_status', $v);
         }
@@ -515,7 +517,7 @@ class LeadController extends Controller
             'booking_status' => 'nullable|string', 'booking_amount_received' => 'nullable|numeric',
             'follow_up_date' => 'nullable|string', 'payment_status' => 'nullable|string',
             'quote_type' => 'nullable|string', 'package_selected' => 'nullable|string',
-            'rsq_status' => 'nullable|string', 'lead_source' => 'nullable|string',
+            'rsq_status' => 'nullable|string', 'lead_source' => 'nullable|string', 'lost_reason' => 'nullable|string|max:120',
         ]);
 
         // exclude_unset + drop None
@@ -529,9 +531,38 @@ class LeadController extends Controller
                 }
             }
         }
+        // status: only the six real ones; salespeople set In Progress / Quote Sent / Lost by hand, the rest follows the deal and the trip
+        if (array_key_exists('lead_status', $updates)) {
+            $to = \App\Support\LeadStages::normalize($updates['lead_status']);
+            if (! in_array($to, \App\Support\LeadStages::all(), true)) {
+                Fail::bad('Unknown status');
+            }
+            if ($to === $lead->lead_status) {
+                unset($updates['lead_status']);
+            } else {
+                if (! in_array($to, \App\Support\LeadStages::manualFor($user), true)) {
+                    Fail::http(403, "$to is set automatically (when the deal is won or the trip is done), or by Operations.");
+                }
+                $updates['lead_status'] = $to;
+                if ($to === 'Lost') {
+                    $reason = trim((string) ($updates['lost_reason'] ?? $lead->lost_reason));
+                    if ($reason === '') {
+                        Fail::bad('Say why the lead was lost');
+                    }
+                    $updates['lost_reason'] = $reason;
+                }
+                $follows = \App\Services\LeadStatusFlow::sideEffects($to, $lead->booking_status, $lead->lead_status);
+                if ($to !== 'Lost' && $lead->lead_status !== 'Lost') {
+                    unset($updates['lost_reason']);
+                }
+            }
+        } else {
+            unset($updates['lost_reason']);          // a reason only goes with moving a lead to Lost
+        }
         if (! $user->hasPermission('leads.edit')) {
             $updates = array_intersect_key($updates, array_flip(self::SALES_ALLOWED));
         }
+        $updates = array_merge($updates, $follows ?? []);   // fields that follow the status (booking_status, lost_reason cleared)
         if (array_key_exists('stay_cities', $updates)) {
             $updates['stay_cities'] = $this->cleanCities($updates['stay_cities']);
         }

@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
 class HomeController extends Controller
 {
     private const TZ = 'Asia/Kolkata';
-    private const CLOSED_LEADS = ['Booked', 'Payment Received', 'Travel Completed', 'Closed', 'Cancelled'];
+    private const CLOSED_LEADS = ['Booked', 'Completed', 'Lost'];
 
     public function overview(Request $request)
     {

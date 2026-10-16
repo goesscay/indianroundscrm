@@ -262,7 +262,7 @@ class DemoLoad extends Command
             // pipeline state
             $selling = (int) round((60000 + ($i % 7) * 27000 + $adults * 9000 + $children * 5000) / 500) * 500;
             $supp = (int) round($selling * (0.76 + ($i % 4) * 0.02) / 500) * 500;
-            $u = ['lead_status' => $status, 'remarks' => ['Customer prefers morning flights', 'Waiting on passport copies', 'Comparing with another agent', 'Wants a discount on the villa', 'Very keen, call after 6 pm', 'Needs visa assistance'][$i % 6]];
+            $u = ['lead_status' => \App\Support\LeadStages::normalize($status), 'remarks' => ['Customer prefers morning flights', 'Waiting on passport copies', 'Comparing with another agent', 'Wants a discount on the villa', 'Very keen, call after 6 pm', 'Needs visa assistance'][$i % 6]];
             $order = ['New Lead' => 0, 'Supplier Mail Sent' => 1, 'Quotation Awaiting' => 2, 'Quote Received' => 3, 'Quote Sent to Customer' => 4, 'Follow-up' => 4, 'Booked' => 5, 'Payment Pending' => 5, 'Payment Received' => 6, 'Travel Completed' => 7, 'Closed' => 7, 'Cancelled' => 3][$status];
             if ($order >= 1) {
                 $u += ['mail_status' => 'Sent', 'supplier_mail_date' => now()->subDays(rand(8, 40)), 'quote_type' => 'rsq', 'rsq_status' => $order >= 3 ? 'completed' : 'pending_reply'];

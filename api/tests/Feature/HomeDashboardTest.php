@@ -99,7 +99,7 @@ class HomeDashboardTest extends TestCase
         $this->loginAs($u, 's');
         // an old lead-level follow-up date no longer feeds the dashboard (it could not be marked done)
         Lead::create(['lead_id' => 'IR1', 'customer_name' => 'Cust IR1', 'phone' => '9'.random_int(100000000, 999999999), 'destination' => 'Goa', 'staff_id' => $u->id,
-            'staff_name' => $u->name, 'lead_status' => 'Follow-up', 'follow_up_date' => '2026-10-14T10:00:00+05:30', 'lead_date' => '2026-10-01']);
+            'staff_name' => $u->name, 'lead_status' => 'In Progress', 'follow_up_date' => '2026-10-14T10:00:00+05:30', 'lead_date' => '2026-10-01']);
         $r = $this->api('GET', '/api/dashboard/overview', [], 's')->assertOk();
         $this->assertSame([], $r->json('focus.items'));
         $this->assertEquals(0, collect($r->json('kpis'))->firstWhere('key', 'followups')['value']);

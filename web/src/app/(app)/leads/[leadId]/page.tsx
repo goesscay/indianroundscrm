@@ -14,7 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import SupplierPicker, { resolvePicks, type Picks } from "@/components/crm/SupplierPicker";
 import { cn } from "@/lib/utils";
-import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
+import StatusPill from "@/components/app/StatusPill";
+import LostReasonDialog from "@/components/app/LostReasonDialog";
+import { statusChoices } from "@/lib/leadStages";
 import SupplierTracker from "@/components/app/SupplierTracker";
 import SupplierReplies, { useLeadReplies } from "@/components/app/SupplierReplies";
 import LeadNotes from "@/components/app/LeadNotes";
@@ -52,6 +54,7 @@ export default function LeadDetail() {
   const [design, setDesign] = useState<"classic" | "modern" | "plain">("classic");    // how the mail looks when it goes out
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
+  const [lostOpen, setLostOpen] = useState(false);
   const [recipOpen, setRecipOpen] = useState(false);       // the To / CC / BCC section, collapsed until needed
   const [toExtra, setToExtra] = useState("");
   const [cc, setCc] = useState("");
@@ -380,10 +383,12 @@ export default function LeadDetail() {
           <div className="grid grid-cols-2 gap-x-2.5 gap-y-2">
             <div className="col-span-2">
               <Label className="label-caps">Status</Label>
-              <Select value={lead.lead_status} onValueChange={(v) => update({ lead_status: v })}>
+              <Select value={lead.lead_status} onValueChange={(v) => { if (v === lead.lead_status) return; if (v === "Lost") setLostOpen(true); else void update({ lead_status: v }); }}>
                 <SelectTrigger className="mt-1 h-9" data-testid="update-status"><SelectValue /></SelectTrigger>
-                <SelectContent>{LEAD_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{statusChoices(can("leads.edit"), lead.lead_status).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
+              {lead.lead_status === "Lost" && lead.lost_reason && <div className="mt-1 text-xs text-muted-foreground" data-testid="lost-reason">Lost: {lead.lost_reason}</div>}
+              <div className="mt-1 text-[11px] text-muted-foreground">Booked and Completed follow the deal and the trip. Set a follow-up under Activities.</div>
             </div>
           </div>
 
@@ -705,6 +710,7 @@ export default function LeadDetail() {
           </div>
         </SheetContent>
       </Sheet>
+      <LostReasonDialog open={lostOpen} onOpenChange={setLostOpen} leadLabel={`${lead.customer_name} · ${lead.lead_id}`} onConfirm={async (reason) => { await update({ lead_status: "Lost", lost_reason: reason }); }} />
       <ConvertLeadDialog leadId={leadId} open={convertOpen} onOpenChange={setConvertOpen} onConverted={() => void load()} />
     </div>
   );
