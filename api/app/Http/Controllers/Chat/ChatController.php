@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Chat;
 
 use App\Http\Controllers\Controller;
 use App\Events\Chat\ConversationUpdated;
+use App\Events\Chat\ConversationRead;
 use App\Events\Chat\MessageDeleted;
+use App\Events\Chat\MessageReacted;
 use App\Events\Chat\MessageSent;
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\ChatParticipant;
+use App\Models\ChatReaction;
 use App\Models\User;
 use App\Support\ActivityLogger;
 use App\Support\Ids;
@@ -92,7 +95,8 @@ class ChatController extends Controller
         return $q->pluck('c', 'cid')->map(fn ($v) => (int) $v)->all();
     }
 
-    private function messageRow(ChatMessage $m, ?string $senderName): array
+    /** @param list<array{emoji:string,user_ids:list<string>}> $reactions */
+    private function messageRow(ChatMessage $m, ?string $senderName, array $reactions = []): array
     {
         $deleted = $m->deleted_at !== null;
 
@@ -104,7 +108,47 @@ class ChatController extends Controller
             'body' => $deleted ? '' : $m->body,
             'created_at' => $m->created_at?->toIso8601String(),
             'deleted' => $deleted,
+            'kind' => $m->kind ?? 'text',
+            'mentions' => $deleted ? [] : array_map('strval', $m->mentions ?? []),
+            'reactions' => $deleted ? [] : $reactions,
         ];
+    }
+
+    /** Reactions of the given messages, grouped by emoji: [messageId => [{emoji, user_ids}]]. */
+    private function reactionsFor(iterable $messageIds): array
+    {
+        $ids = collect($messageIds)->map(fn ($i) => (int) $i)->all();
+        if (! $ids) {
+            return [];
+        }
+        $out = [];
+        foreach (ChatReaction::whereIn('message_id', $ids)->orderBy('id')->get() as $r) {
+            $out[(int) $r->message_id][$r->emoji][] = (string) $r->user_id;
+        }
+
+        return collect($out)->map(fn ($byEmoji) => collect($byEmoji)->map(fn ($u, $e) => ['emoji' => (string) $e, 'user_ids' => $u])->values()->all())->all();
+    }
+
+    /** Last-read message id per participant of a conversation: [userId => messageId|null]. */
+    private function readsFor(int $conversationId): array
+    {
+        return ChatParticipant::where('conversation_id', $conversationId)->get(['user_id', 'last_read_message_id'])
+            ->mapWithKeys(fn ($p) => [(string) $p->user_id => $p->last_read_message_id === null ? null : (string) $p->last_read_message_id])->all();
+    }
+
+    /** Unread messages that tag this user, per conversation. */
+    private function unreadMentions(int $userId): array
+    {
+        return DB::table('chat_participants as p')
+            ->join('chat_messages as m', 'm.conversation_id', '=', 'p.conversation_id')
+            ->where('p.user_id', $userId)
+            ->whereRaw('m.id > COALESCE(p.last_read_message_id, 0)')
+            ->whereRaw('m.sender_id IS DISTINCT FROM p.user_id')
+            ->whereNull('m.deleted_at')
+            ->whereRaw('m.mentions @> ?::jsonb', ['['.$userId.']'])
+            ->groupBy('p.conversation_id')
+            ->selectRaw('p.conversation_id as cid, COUNT(m.id) as c')
+            ->pluck('c', 'cid')->map(fn ($v) => (int) $v)->all();
     }
 
     /**
@@ -128,8 +172,9 @@ class ChatController extends Controller
         $senders = User::query()->whereIn('id', $lastMsgs->pluck('sender_id')->filter()->unique())->pluck('name', 'id');
 
         $unread = $this->unreadByConversation($me->id);
+        $mentioned = $this->unreadMentions((int) $me->id);
 
-        return $convs->map(function (ChatConversation $c) use ($me, $membersBy, $users, $lastMsgs, $senders, $unread) {
+        return $convs->map(function (ChatConversation $c) use ($me, $membersBy, $users, $lastMsgs, $senders, $unread, $mentioned) {
             $parts = $membersBy->get($c->id, collect());
             $isMember = $parts->contains(fn ($p) => (int) $p->user_id === (int) $me->id);
             $members = $parts->map(fn ($p) => $users->get($p->user_id))->filter()->map(fn ($u) => $this->userRow($u))->values()->all();
@@ -143,7 +188,8 @@ class ChatController extends Controller
             if ($last) {
                 $lm = [
                     'id' => (string) $last->id,
-                    'body' => $last->deleted_at ? '' : $last->body,
+                    'body' => $last->deleted_at ? '' : (($last->kind ?? 'text') === 'sticker' ? 'Sticker' : $last->body),
+                    'kind' => $last->kind ?? 'text',
                     'sender_id' => $last->sender_id === null ? null : (string) $last->sender_id,
                     'sender_name' => $last->sender_id ? ($senders[$last->sender_id] ?? null) : null,
                     'created_at' => $last->created_at?->toIso8601String(),
@@ -158,6 +204,7 @@ class ChatController extends Controller
                 'members' => $members,
                 'last_message' => $lm,
                 'unread_count' => $isMember ? ($unread[$c->id] ?? 0) : 0,
+                'unread_mentions' => $isMember ? ($mentioned[$c->id] ?? 0) : 0,
                 'updated_at' => ($c->last_message_at ?? $c->updated_at)?->toIso8601String(),
             ];
         })->values()->all();
@@ -364,9 +411,11 @@ class ChatController extends Controller
         }
 
         $names = User::query()->whereIn('id', $rows->pluck('sender_id')->filter()->unique())->pluck('name', 'id');
-        $out = $rows->map(fn ($m) => $this->messageRow($m, $m->sender_id ? ($names[$m->sender_id] ?? null) : null))->values();
+        $reactions = $this->reactionsFor($rows->pluck('id'));
+        $out = $rows->map(fn ($m) => $this->messageRow($m, $m->sender_id ? ($names[$m->sender_id] ?? null) : null, $reactions[(int) $m->id] ?? []))->values();
 
-        return response()->json(['messages' => $out, 'has_more' => $hasMore]);
+        // reads: how far each person has read, so the sender's ticks stay right even when the live connection is down
+        return response()->json(['messages' => $out, 'has_more' => $hasMore, 'reads' => $this->readsFor((int) $conv->id)]);
     }
 
     public function send(Request $r, string $id): JsonResponse
@@ -374,8 +423,17 @@ class ChatController extends Controller
         $me = $this->me($r);
         $conv = $this->memberConversation($r, $id);
         $body = trim((string) $r->input('body', ''));
+        $kind = $r->input('kind') === 'sticker' ? 'sticker' : 'text';
         abort_if($body === '', 422, 'Message body is required');
         abort_if(mb_strlen($body) > 4000, 422, 'Message is too long (max 4000 characters)');
+        abort_if($kind === 'sticker' && ! preg_match('/^[a-z0-9-]{1,40}$/', $body), 422, 'Unknown sticker');
+
+        // @mentions: only people in this conversation, never yourself
+        $mentions = [];
+        if ($kind === 'text') {
+            $asked = $this->idList($r->input('mentions'));
+            $mentions = array_values(array_intersect($asked, array_diff($this->participantIds((int) $conv->id), [(int) $me->id])));
+        }
 
         if ($conv->type === 'direct') {
             $otherActive = DB::table('chat_participants as p')->join('users as u', 'u.id', '=', 'p.user_id')
@@ -383,8 +441,9 @@ class ChatController extends Controller
             abort_if(! $otherActive, 403, 'This user is inactive and cannot receive messages');
         }
 
-        $msg = DB::transaction(function () use ($conv, $me, $body) {
-            $msg = ChatMessage::create(['conversation_id' => $conv->id, 'sender_id' => $me->id, 'body' => $body, 'created_at' => now()]);
+        $msg = DB::transaction(function () use ($conv, $me, $body, $kind, $mentions) {
+            $msg = ChatMessage::create(['conversation_id' => $conv->id, 'sender_id' => $me->id, 'body' => $body, 'kind' => $kind,
+                'mentions' => $mentions ?: null, 'created_at' => now()]);
             $conv->forceFill(['last_message_at' => $msg->created_at])->save();
             ChatParticipant::where('conversation_id', $conv->id)->where('user_id', $me->id)->update(['last_read_message_id' => $msg->id]);
 
@@ -414,6 +473,30 @@ class ChatController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** POST /chat/messages/{id}/reactions {emoji}: add your reaction, or take it back if you already gave that one. */
+    public function react(Request $r, string $id): JsonResponse
+    {
+        $me = $this->me($r);
+        $msg = ChatMessage::find(Ids::parse($id));
+        abort_if(! $msg, 404, 'Not found');
+        $conv = $this->memberConversation($r, (string) $msg->conversation_id);
+        abort_if($msg->deleted_at !== null, 422, 'This message was deleted');
+        $emoji = trim((string) $r->input('emoji', ''));
+        abort_if($emoji === '' || mb_strlen($emoji) > 8 || preg_match('/[\p{L}\p{N}]/u', $emoji), 422, 'Pick an emoji');
+
+        $mine = ChatReaction::where('message_id', $msg->id)->where('user_id', $me->id)->where('emoji', $emoji);
+        if ($mine->exists()) {
+            $mine->delete();
+        } else {
+            abort_if(ChatReaction::where('message_id', $msg->id)->where('user_id', $me->id)->count() >= 6, 422, 'You can add up to 6 reactions to a message');
+            ChatReaction::create(['message_id' => $msg->id, 'user_id' => $me->id, 'emoji' => $emoji, 'created_at' => now()]);
+        }
+        $reactions = $this->reactionsFor([$msg->id])[(int) $msg->id] ?? [];
+        $this->broadcastSafely(fn () => MessageReacted::dispatch($this->participantIds($conv->id), (string) $conv->id, (string) $msg->id, $reactions));
+
+        return response()->json(['message_id' => (string) $msg->id, 'reactions' => $reactions]);
+    }
+
     public function markRead(Request $r, string $id): JsonResponse
     {
         $me = $this->me($r);
@@ -426,8 +509,12 @@ class ChatController extends Controller
             abort_if(! ChatMessage::where('conversation_id', $conv->id)->whereKey($target)->exists(), 404, 'Not found');
         }
         if ($target > 0) {
+            $before = (int) ChatParticipant::where('conversation_id', $conv->id)->where('user_id', $me->id)->value('last_read_message_id');
             ChatParticipant::where('conversation_id', $conv->id)->where('user_id', $me->id)
                 ->update(['last_read_message_id' => DB::raw('GREATEST(COALESCE(last_read_message_id, 0), '.$target.')')]);
+            if ($target > $before) {   // tell the others, so the ticks on their messages turn blue at once
+                $this->broadcastSafely(fn () => ConversationRead::dispatch($this->participantIds($conv->id), (string) $conv->id, (string) $me->id, (string) $target));
+            }
         }
         $unread = $this->unreadByConversation($me->id, $conv->id)[$conv->id] ?? 0;
 

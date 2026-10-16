@@ -71,7 +71,7 @@ class ChatBroadcastTest extends TestCase
                 fn ($n) => str_replace('private-', 'private-', $n), $this->channels($e)));
             $this->assertSame('message.sent', $e->broadcastAs());
             $this->assertSame(['conversation_id' => $cid, 'message' => $rest], $e->broadcastWith());
-            $this->assertSame(['id', 'conversation_id', 'sender_id', 'sender_name', 'body', 'created_at', 'deleted'], array_keys($e->broadcastWith()['message']));
+            $this->assertSame(['id', 'conversation_id', 'sender_id', 'sender_name', 'body', 'created_at', 'deleted', 'kind', 'mentions', 'reactions'], array_keys($e->broadcastWith()['message']));
 
             return true;
         });

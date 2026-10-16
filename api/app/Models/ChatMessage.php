@@ -11,11 +11,11 @@ class ChatMessage extends Model
 
     public const UPDATED_AT = null;
 
-    protected $fillable = ['conversation_id', 'sender_id', 'body', 'deleted_at'];
+    protected $fillable = ['conversation_id', 'sender_id', 'body', 'kind', 'mentions', 'deleted_at'];
 
     protected function casts(): array
     {
-        return ['conversation_id' => 'string', 'sender_id' => 'string', 'deleted_at' => 'datetime'];
+        return ['conversation_id' => 'string', 'sender_id' => 'string', 'deleted_at' => 'datetime', 'mentions' => 'array'];
     }
 
     public function sender()

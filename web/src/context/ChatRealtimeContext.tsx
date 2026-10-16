@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { destroyEcho, getEcho, realtimeEnabled } from "@/lib/echo";
-import type { ChatConversationUpdatedEvent, ChatMessageDeletedEvent, ChatMessageSentEvent, SupplierReplyEvent } from "@/types";
+import type { ChatConversationReadEvent, ChatConversationUpdatedEvent, ChatMessageDeletedEvent, ChatMessageReactedEvent, ChatMessageSentEvent, SupplierReplyEvent } from "@/types";
 
 type Unsub = () => void;
 
@@ -15,6 +15,9 @@ interface ChatRealtimeValue {
   onMessage: (h: (e: ChatMessageSentEvent) => void) => Unsub;
   onDeleted: (h: (e: ChatMessageDeletedEvent) => void) => Unsub;
   onConversationUpdated: (h: (e: ChatConversationUpdatedEvent) => void) => Unsub;
+  onReacted: (h: (e: ChatMessageReactedEvent) => void) => Unsub;
+  /** Someone read a conversation up to a message (drives the read ticks). */
+  onRead: (h: (e: ChatConversationReadEvent) => void) => Unsub;
   /** Fires on every (re)connect: consumers do a catch-up refetch. */
   onReconnect: (h: () => void) => Unsub;
   /** Locally feed an event (e.g. the POST response) to all handlers; handlers dedupe by id. */
@@ -37,6 +40,8 @@ const ChatRealtimeContext = createContext<ChatRealtimeValue>({
   onMessage: () => noopUnsub,
   onDeleted: () => noopUnsub,
   onConversationUpdated: () => noopUnsub,
+  onReacted: () => noopUnsub,
+  onRead: () => noopUnsub,
   onReconnect: () => noopUnsub,
   emitMessage: () => {},
   emitDeleted: () => {},
@@ -73,6 +78,8 @@ export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
   const [msgRef, onMessage] = useRegistry<(e: ChatMessageSentEvent) => void>();
   const [delRef, onDeleted] = useRegistry<(e: ChatMessageDeletedEvent) => void>();
   const [updRef, onConversationUpdated] = useRegistry<(e: ChatConversationUpdatedEvent) => void>();
+  const [reactRef, onReacted] = useRegistry<(e: ChatMessageReactedEvent) => void>();
+  const [readRef, onRead] = useRegistry<(e: ChatConversationReadEvent) => void>();
   const [recRef, onReconnect] = useRegistry<() => void>();
   const [supRef, onSupplierReply] = useRegistry<(e: SupplierReplyEvent) => void>();
   const [nrecRef, onNotifReconnect] = useRegistry<() => void>();
@@ -118,7 +125,9 @@ export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
         channel
           .listen(".message.sent", (e: ChatMessageSentEvent) => emitMessage(e))
           .listen(".message.deleted", (e: ChatMessageDeletedEvent) => emitDeleted(e))
-          .listen(".conversation.updated", (e: ChatConversationUpdatedEvent) => updRef.current.forEach((h) => h(e)));
+          .listen(".conversation.updated", (e: ChatConversationUpdatedEvent) => updRef.current.forEach((h) => h(e)))
+          .listen(".message.reacted", (e: ChatMessageReactedEvent) => reactRef.current.forEach((h) => h(e)))
+          .listen(".conversation.read", (e: ChatConversationReadEvent) => readRef.current.forEach((h) => h(e)));
         channel.subscribed(() => {
           if (cancelled) return;
           backoff = 5_000;
@@ -172,7 +181,7 @@ export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
       setConnected(false);
       setNotifConnected(false);
     };
-  }, [wsOn, enabled, userId, emitMessage, emitDeleted, updRef, recRef, supRef, nrecRef]);
+  }, [wsOn, enabled, userId, emitMessage, emitDeleted, updRef, reactRef, readRef, recRef, supRef, nrecRef]);
 
   const value = useMemo<ChatRealtimeValue>(
     () => ({
@@ -181,6 +190,8 @@ export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
       onMessage,
       onDeleted,
       onConversationUpdated,
+      onReacted,
+      onRead,
       onReconnect,
       emitMessage,
       emitDeleted,
@@ -190,7 +201,7 @@ export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
       onSupplierReply,
       onNotifReconnect,
     }),
-    [enabled, connected, onMessage, onDeleted, onConversationUpdated, onReconnect, emitMessage, emitDeleted, registerViewing, isViewing, wsOn, notifConnected, onSupplierReply, onNotifReconnect]
+    [enabled, connected, onMessage, onDeleted, onConversationUpdated, onReacted, onRead, onReconnect, emitMessage, emitDeleted, registerViewing, isViewing, wsOn, notifConnected, onSupplierReply, onNotifReconnect]
   );
   return <ChatRealtimeContext.Provider value={value}>{children}</ChatRealtimeContext.Provider>;
 }

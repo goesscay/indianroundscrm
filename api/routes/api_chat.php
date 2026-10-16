@@ -12,6 +12,7 @@ Route::middleware(['auth:sanctum', 'perm:chat.use'])->prefix('chat')->group(func
     Route::post('/conversations/{id}/messages', [ChatController::class, 'send'])->middleware('throttle:chat-send');
     Route::post('/conversations/{id}/read', [ChatController::class, 'markRead']);
     Route::delete('/messages/{id}', [ChatController::class, 'deleteMessage']);
+    Route::post('/messages/{id}/reactions', [ChatController::class, 'react']);
 
     Route::middleware('perm:chat.create_groups')->group(function () {
         Route::post('/groups', [ChatController::class, 'createGroup']);

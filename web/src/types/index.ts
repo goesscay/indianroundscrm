@@ -389,6 +389,7 @@ export interface ChatLastMessage {
   sender_name: string;
   created_at: string;
   deleted: boolean;
+  kind?: "text" | "sticker";
 }
 
 export interface Conversation {
@@ -398,7 +399,14 @@ export interface Conversation {
   members: ChatUser[];
   last_message: ChatLastMessage | null;
   unread_count: number;
+  /** Unread messages that tag you with @. */
+  unread_mentions?: number;
   updated_at: string;
+}
+
+export interface ChatReaction {
+  emoji: string;
+  user_ids: string[];
 }
 
 export interface ChatMessage {
@@ -409,6 +417,11 @@ export interface ChatMessage {
   body: string;
   created_at: string;
   deleted: boolean;
+  /** "sticker": body is the sticker's id. */
+  kind?: "text" | "sticker";
+  /** Ids of the people tagged with @. */
+  mentions?: string[];
+  reactions?: ChatReaction[];
   /** Client-only state for optimistic sends. */
   pending?: boolean;
   failed?: boolean;
@@ -417,6 +430,8 @@ export interface ChatMessage {
 export interface ChatMessagesResponse {
   messages: ChatMessage[];
   has_more: boolean;
+  /** How far each person has read: userId -> last read message id. */
+  reads?: Record<string, string | null>;
 }
 
 // ---- Roles & permissions ----
@@ -467,6 +482,16 @@ export interface ChatMessageDeletedEvent {
 }
 export interface ChatConversationUpdatedEvent {
   conversation_id: string;
+}
+export interface ChatMessageReactedEvent {
+  conversation_id: string;
+  message_id: string;
+  reactions: ChatReaction[];
+}
+export interface ChatConversationReadEvent {
+  conversation_id: string;
+  user_id: string;
+  message_id: string;
 }
 
 // ---- Activities (tasks, calls, meetings) ----

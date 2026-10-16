@@ -45,6 +45,9 @@ const ConvRow = memo(function ConvRow({ c, meId, active, onSelect }: { c: Conver
         </span>
         <span className="flex items-center justify-between gap-2 mt-0.5">
           <span className={cn("text-xs truncate", unread ? "text-neutral-800 dark:text-neutral-200" : "text-neutral-500 dark:text-neutral-400")}>{preview}</span>
+          {unread && (c.unread_mentions ?? 0) > 0 && (
+            <span data-testid="chat-unread-mention" title="You were tagged" className="shrink-0 h-[18px] min-w-[18px] px-1 rounded-sm bg-amber-400 text-amber-950 text-[10px] font-bold flex items-center justify-center">@</span>
+          )}
           {unread && (
             <span data-testid="chat-unread" className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-sm bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-[10px] font-bold flex items-center justify-center">
               {c.unread_count > 99 ? "99+" : c.unread_count}
