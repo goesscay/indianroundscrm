@@ -6,6 +6,7 @@ use App\Http\Controllers\Crm\ForecastController;
 use App\Models\Deal;
 use App\Models\Invoice;
 use App\Models\Receipt;
+use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Support\ActivityLogger;
 use App\Support\Numbers;
@@ -56,6 +57,102 @@ class Billing
         $deal->selling_amount = $inv->total;
         $deal->save();
         ActivityLogger::log($user, 'update_deal', 'deal', $deal->id, $before, ['stage' => 'won', 'selling_amount' => $deal->selling_amount, 'via_invoice' => $inv->invoice_no]);
+    }
+
+    /**
+     * Split an advance in two: it keeps $keep, and the rest becomes a new advance of its own. The books stay square: the original
+     * entry is reversed and posted again for the smaller amount, and the remainder gets its own entry.
+     */
+    public static function splitAdvance(Receipt $r, float $keep, User $user): Receipt
+    {
+        $keep = round($keep, 2);
+        $rest = round($r->amount - $keep, 2);
+
+        return DB::transaction(function () use ($r, $keep, $rest, $user) {
+            Posting::receiptResized($r, $keep, $user);
+            $new = Receipt::create([
+                'receipt_no' => self::nextNumber('RCT', Carbon::parse($r->received_date->format('Y-m-d'), 'Asia/Kolkata')), 'kind' => 'receipt', 'status' => 'valid',
+                'customer_id' => $r->customer_id, 'invoice_id' => null, 'deal_id' => null, 'amount' => $rest, 'received_date' => $r->received_date->format('Y-m-d'),
+                'mode' => $r->mode, 'reference' => $r->reference, 'bank_account_id' => $r->bank_account_id, 'deposited_to' => $r->deposited_to,
+                'notes' => mb_substr("Balance of {$r->receipt_no}, left over after part of it was applied to an invoice.", 0, 1000), 'created_by' => $user->id,
+            ]);
+            Posting::receipt($new, null, $user);
+            ActivityLogger::log($user, 'split_advance', 'receipt', $r->id, ['amount' => $keep + $rest], ['amount' => $keep, 'remainder_receipt' => $new->receipt_no, 'remainder' => $rest]);
+
+            return $new;
+        });
+    }
+
+    /** Apply an advance to an issued invoice of the same customer. If it is more than the invoice balance, only what fits is applied and the rest stays an advance. */
+    public static function applyAdvance(Receipt $r, Invoice $inv, User $user): Receipt
+    {
+        $inv->refresh();
+        $balance = round(max(0.0, $inv->balance()), 2);
+        if ($r->amount > $balance + 0.005) {
+            self::splitAdvance($r, $balance, $user);
+            $r->refresh();
+        }
+        DB::transaction(function () use ($r, $inv, $user) {
+            $r->invoice_id = $inv->id;
+            $r->deal_id = $inv->deal_id;
+            $r->save();
+            self::settle($inv);
+            self::dealBooked($inv, $user);
+            Posting::advanceApplied($r, $inv, $user);
+            ActivityLogger::log($user, 'apply_advance', 'receipt', $r->id, null, ['receipt_no' => $r->receipt_no, 'invoice_id' => $inv->id]);
+        });
+        if ($inv->deal_id && ($deal = Deal::find($inv->deal_id))) {
+            TripPlan::autoConfirm($deal, $user);
+        }
+
+        return $r->fresh();
+    }
+
+    /**
+     * When an invoice is issued, the customer's unapplied advances go onto it, oldest first. Only when it is clear which invoice they are for:
+     * if the customer has another open invoice, the advances are left for someone to apply by hand.
+     *
+     * @return array{count:int,amount:float}
+     */
+    public static function applyAdvancesAtIssue(Invoice $inv, User $user): array
+    {
+        $out = ['count' => 0, 'amount' => 0.0];
+        $others = Invoice::where('customer_id', $inv->customer_id)->where('status', 'issued')->where('id', '<>', $inv->id)->get()->filter(fn (Invoice $i) => $i->balance() > 0.005);
+        if ($others->isNotEmpty()) {
+            return $out;
+        }
+        $advances = Receipt::where('customer_id', $inv->customer_id)->where('kind', 'receipt')->where('status', 'valid')->whereNull('invoice_id')
+            ->where(fn ($w) => $w->whereNull('deal_id')->orWhere('deal_id', $inv->deal_id))->orderBy('received_date')->orderBy('id')->get();
+        foreach ($advances as $r) {
+            $inv->refresh();
+            if ($inv->balance() <= 0.005) {
+                break;
+            }
+            $applied = self::applyAdvance($r, $inv, $user);
+            $out['count']++;
+            $out['amount'] = round($out['amount'] + (float) $applied->amount, 2);
+        }
+
+        return $out;
+    }
+
+    /** A payment of the same amount and mode for the same customer in the last 24 hours: probably entered twice. */
+    public static function possibleDuplicate(int $customerId, float $amount, string $mode): ?Receipt
+    {
+        return Receipt::where('customer_id', $customerId)->where('kind', 'receipt')->where('status', 'valid')
+            ->where('amount', round($amount, 2))->where('mode', $mode)->where('created_at', '>=', now()->subDay())->orderByDesc('id')->first();
+    }
+
+    /** Stops a payment that looks like a repeat, unless the person confirms it really is another one. */
+    public static function refuseDuplicate(int $customerId, array $d, bool $confirmed): void
+    {
+        if ($confirmed) {
+            return;
+        }
+        $dup = self::possibleDuplicate($customerId, (float) $d['amount'], $d['mode'] ?? 'bank_transfer');
+        if ($dup) {
+            \App\Crm\Fail::http(409, ['code' => 'possible_duplicate', 'receipt_no' => $dup->receipt_no, 'message' => sprintf('This looks like %s: the same amount (₹%s) by the same mode for this customer, recorded %s. Is it really another payment?', $dup->receipt_no, number_format($dup->amount, 2), $dup->created_at->diffForHumans())]);
+        }
     }
 
     public static function record(User $user, int $customerId, ?Invoice $inv, string $kind, array $d): Receipt

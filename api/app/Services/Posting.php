@@ -85,6 +85,17 @@ class Posting
         }
     }
 
+    /** The amount of an unapplied advance changes (it was split): reverse its entry and post it again for the new amount. */
+    public static function receiptResized(Receipt $r, float $newAmount, ?User $user): void
+    {
+        if ($e = self::live('receipt', $r->id)) {
+            Ledger::reverse($e, $user, null, "Split of {$r->receipt_no}");
+        }
+        $r->amount = round($newAmount, 2);
+        $r->save();
+        self::receipt($r, null, $user);
+    }
+
     /** An advance gets applied to an invoice: move it from Customer advances to Accounts receivable. */
     public static function advanceApplied(Receipt $r, Invoice $inv, ?User $user): ?JournalEntry
     {

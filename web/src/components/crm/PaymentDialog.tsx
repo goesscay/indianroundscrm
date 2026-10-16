@@ -52,10 +52,11 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, date
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [dup, setDup] = useState("");          // "looks like a repeat" warning, waiting for a yes
 
   useEffect(() => {
     if (!open) return;
-    setAmount(suggested ? String(suggested) : ""); setDate(today()); setMode("upi"); setReference(""); setDeposited(""); setBank("auto"); setNotes(""); setError(""); setSaving(false);
+    setAmount(suggested ? String(suggested) : ""); setDate(today()); setMode("upi"); setReference(""); setDeposited(""); setBank("auto"); setNotes(""); setError(""); setDup(""); setSaving(false);
   }, [open, suggested]);
 
   useEffect(() => {
@@ -69,11 +70,15 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, date
     if (!(n > 0)) { setError("Enter the amount."); return; }
     setSaving(true); setError("");
     try {
-      const { data } = await api.post<{ receipt?: Receipt; payment?: Receipt } & Receipt>(endpoint, { amount: n, [dateField]: date, mode, reference, notes, ...(banks.length ? (bank !== "auto" ? { bank_account_id: bank } : {}) : { deposited_to: deposited }) });
+      const { data } = await api.post<{ receipt?: Receipt; payment?: Receipt } & Receipt>(endpoint, { amount: n, [dateField]: date, mode, reference, notes, ...(dup ? { confirm_duplicate: true } : {}), ...(banks.length ? (bank !== "auto" ? { bank_account_id: bank } : {}) : { deposited_to: deposited }) });
       const rec = (data.receipt ?? data.payment ?? data) as Receipt;
       toast.success(`${rec.receipt_no ?? (rec as unknown as { payment_no: string }).payment_no} recorded`);
       onSaved(rec); onOpenChange(false);
-    } catch (err) { setError(formatApiError(err)); }
+    } catch (err) {
+      const r = (err as { response?: { status?: number; data?: { detail?: { code?: string; message?: string } } } }).response;
+      if (r?.status === 409 && r.data?.detail?.code === "possible_duplicate") setDup(r.data.detail.message ?? "This looks like a payment that was already recorded.");
+      else setError(formatApiError(err));
+    }
     finally { setSaving(false); }
   };
 
@@ -117,10 +122,17 @@ export default function PaymentDialog({ open, onOpenChange, endpoint, kind, date
             <div><Label htmlFor="pay-dep">{kind === "refund" ? "Paid from" : "Deposited to"}</Label><Input id="pay-dep" className="mt-1.5 h-10" value={deposited} onChange={(e) => setDeposited(e.target.value)} placeholder="Bank or cash account (optional)" /></div>
           )}
           <div><Label htmlFor="pay-notes">Notes</Label><Textarea id="pay-notes" rows={2} className="mt-1.5" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+          {dup && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" role="alert" data-testid="payment-duplicate">
+              <div className="font-semibold">Possible duplicate</div>
+              <div className="mt-0.5 text-xs">{dup}</div>
+              <div className="mt-1 text-xs">If it is the same payment, cancel here and do not record it again.</div>
+            </div>
+          )}
           {error && <div className="text-sm text-destructive" role="alert">{error}</div>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-            <Button type="submit" disabled={saving} data-testid="payment-save">{saving && <Loader2 size={14} className="animate-spin" />} {c.btn}</Button>
+            <Button type="submit" disabled={saving} variant={dup ? "destructive" : "default"} data-testid="payment-save">{saving && <Loader2 size={14} className="animate-spin" />} {dup ? "Record anyway, it is another payment" : c.btn}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

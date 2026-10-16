@@ -51,10 +51,16 @@ export default function InvoiceDetail() {
     } catch (e) { toast.error(formatApiError(e)); }
   };
 
+  const applyAdvance = async (receiptId: string) => {
+    setBusy(true);
+    try { await api.post(`/receipts/${receiptId}/apply`, { invoice_id: id }); toast.success("Advance applied to this invoice"); await load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+    finally { setBusy(false); }
+  };
   const issue = async () => {
     if (!x || !window.confirm("Issue this invoice? It gets its invoice number and can no longer be edited. Corrections are made with a credit note.")) return;
     setBusy(true);
-    try { const { data } = await api.post<Invoice>(`/invoices/${id}/issue`, {}); setX(data); toast.success(`Issued as ${data.invoice_no}`); }
+    try { const { data } = await api.post<Invoice>(`/invoices/${id}/issue`, {}); setX(data); toast.success(`Issued as ${data.invoice_no}`); if (data.advances_applied?.count) toast.success(`${INR2(data.advances_applied.amount)} already paid by the customer was applied to this invoice.`); }
     catch (e) { toast.error(formatApiError(e)); }
     finally { setBusy(false); }
   };
@@ -106,6 +112,22 @@ export default function InvoiceDetail() {
         </div>
       </div>
 
+      {issued && x.balance > 0 && (x.unapplied_advances?.length ?? 0) > 0 && can("receipts.record") && (
+        <Card className="rounded-lg border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950/30" data-testid="unapplied-advances">
+          <div className="font-semibold text-amber-900 dark:text-amber-200">The customer has paid in advance, but it is not on this invoice yet</div>
+          <ul className="mt-2 space-y-1.5">
+            {x.unapplied_advances?.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span><Link href={`/receipts/${a.id}`} className="font-mono underline">{a.receipt_no}</Link> · {INR2(a.amount)} · {fmtDate(a.received_date)}</span>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => void applyAdvance(a.id)} data-testid={`apply-advance-${a.id}`}>
+                  Apply{a.amount > x.balance ? ` ${INR2(x.balance)}` : ""} to this invoice
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-amber-900/80 dark:text-amber-200/80">Apply it only if it was paid for this trip. If it was entered twice by mistake, open the receipt and cancel the extra one instead.</p>
+        </Card>
+      )}
       {x.status === "cancelled" && <Card className="rounded-lg p-4 text-sm">Cancelled{x.cancel_reason ? `: ${x.cancel_reason}` : ""}. The number {x.invoice_no} stays on record.</Card>}
       {x.payment_status === "overdue" && <Card className="rounded-lg border-red-300 p-4 text-sm text-red-800 dark:border-red-900 dark:text-red-300" data-testid="invoice-overdue">A payment is overdue{x.overdue_days ? ` by ${x.overdue_days} day${x.overdue_days === 1 ? "" : "s"}` : ""}: {INR2(x.balance)} is still owed.{" "}
         {x.reminders && x.reminders.length > 0 ? `Reminded ${x.reminders.length}× — last on ${fmtDate(x.reminders[0].created_at)} (${x.reminders[0].trigger === "auto" ? "automatic" : `by ${x.reminders[0].sent_by ?? "a colleague"}`}).` : "No reminder has been sent yet."}</Card>}

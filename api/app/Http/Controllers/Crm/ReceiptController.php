@@ -137,6 +137,7 @@ class ReceiptController extends Controller
         if ($d['received_date'] > $this->today()) {
             Fail::unprocessable(['received_date' => 'The payment date cannot be in the future']);
         }
+        Billing::refuseDuplicate((int) $customer->id, $d + ['mode' => $d['mode'] ?? 'bank_transfer'], ! empty(Fail::body($request)['confirm_duplicate']));
         $r = DB::transaction(fn () => Billing::record($user, $customer->id, null, 'receipt', $d));
 
         return $this->find((string) $r->id, $user)->toApi();
@@ -155,20 +156,13 @@ class ReceiptController extends Controller
         if (! $inv || (int) $inv->customer_id !== (int) $r->customer_id || $inv->status !== 'issued') {
             Fail::unprocessable(['invoice_id' => 'Choose an issued invoice of the same customer']);
         }
-        if ($r->amount > $inv->balance() + 0.005) {
-            Fail::unprocessable(['invoice_id' => sprintf('This advance (₹%s) is more than the invoice balance (₹%s).', number_format($r->amount, 2), number_format($inv->balance(), 2))]);
+        if ($inv->balance() <= 0.005) {
+            Fail::unprocessable(['invoice_id' => 'This invoice has nothing left to pay.']);
         }
-        DB::transaction(function () use ($r, $inv, $user) {
-            $r->invoice_id = $inv->id;
-            $r->deal_id = $inv->deal_id;
-            $r->save();
-            Billing::settle($inv);
-            Billing::dealBooked($inv, $user);
-            Posting::advanceApplied($r, $inv, $user);
-            ActivityLogger::log($user, 'apply_advance', 'receipt', $r->id, null, ['receipt_no' => $r->receipt_no, 'invoice_id' => $inv->id]);
-        });
+        // more than the balance: only what fits is applied and the rest stays an advance on the customer
+        $applied = Billing::applyAdvance($r, $inv, $user);
 
-        return $this->find($id, $user)->toApi();
+        return $this->find((string) $applied->id, $user)->toApi();
     }
 
     public function cancel(Request $request, string $id)

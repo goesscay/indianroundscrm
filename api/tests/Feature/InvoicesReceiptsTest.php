@@ -215,12 +215,11 @@ class InvoicesReceiptsTest extends TestCase
 
         // cancelling a receipt re-opens the balance
         $rid = $r2->json('receipt.id');
-        $this->api('POST', "/api/receipts/$rid/cancel", ['reason' => 'Cheque bounced'], 'o')->assertStatus(403); // operations cannot cancel
-        $this->as('admin', 'a');
-        $c2 = $this->api('POST', "/api/receipts/$rid/cancel", ['reason' => 'Cheque bounced'], 'a')->assertOk();
+        $this->api('POST', "/api/receipts/$rid/cancel", [], 'o')->assertStatus(422);                                   // a reason is always needed
+        $c2 = $this->api('POST', "/api/receipts/$rid/cancel", ['reason' => 'Cheque bounced'], 'o')->assertOk();        // operations can cancel too
         $this->assertSame('cancelled', $c2->json('status'));
-        $this->assertSame(21000.0, (float) $this->api('GET', "/api/invoices/$id", [], 'a')->json('balance'));
-        $this->api('POST', "/api/receipts/$rid/cancel", ['reason' => 'again'], 'a')->assertStatus(409);
+        $this->assertSame(21000.0, (float) $this->api('GET', "/api/invoices/$id", [], 'o')->json('balance'));
+        $this->api('POST', "/api/receipts/$rid/cancel", ['reason' => 'again'], 'o')->assertStatus(409);
     }
 
     public function test_overdue_uses_first_in_first_out_allocation(): void
@@ -287,7 +286,7 @@ class InvoicesReceiptsTest extends TestCase
 
     // ---------------------------------------------------------------- advances
 
-    public function test_advance_receipts_and_applying_them(): void
+    public function test_advances_paid_before_the_invoice_go_onto_it_when_it_is_issued(): void
     {
         $u = $this->as('operations', 'o');
         $c = $this->customer($u);
@@ -298,18 +297,67 @@ class InvoicesReceiptsTest extends TestCase
         $this->assertSame(15000.0, (float) $this->api('GET', "/api/customers/{$c->id}", [], 'o')->json('advances'));
         $this->assertCount(1, $this->api('GET', '/api/receipts?advances=1', [], 'o')->json());
 
-        $i = $this->issued($c);
-        $big = $this->api('POST', "/api/customers/{$c->id}/advances", ['amount' => 90000], 'o')->assertOk()->json('id');
-        $this->api('POST', "/api/receipts/$big/apply", ['invoice_id' => $i['id']], 'o')->assertStatus(422); // exceeds the balance
+        $i = $this->issued($c);                                                                        // total 42,000
+        $this->assertEquals(['count' => 1, 'amount' => 15000.0], $i['advances_applied']);
+        $this->assertSame(27000.0, (float) $i['balance']);                                              // right from the start
+        $this->assertSame(0.0, (float) $this->api('GET', "/api/customers/{$c->id}", [], 'o')->json('advances'));
+        $this->assertSame($i['id'], $this->api('GET', "/api/receipts/{$adv->json('id')}", [], 'o')->json('invoice_id'));
+        $this->api('POST', "/api/receipts/{$adv->json('id')}/apply", ['invoice_id' => $i['id']], 'o')->assertStatus(409);   // already applied
 
-        $ok = $this->api('POST', "/api/receipts/{$adv->json('id')}/apply", ['invoice_id' => $i['id']], 'o')->assertOk();
-        $this->assertSame($i['id'], $ok->json('invoice_id'));
-        $this->assertSame(27000.0, (float) $this->api('GET', "/api/invoices/{$i['id']}", [], 'o')->json('balance'));
-        $this->assertSame(90000.0, (float) $this->api('GET', "/api/customers/{$c->id}", [], 'o')->json('advances')); // only the big one is left
-        $this->api('POST', "/api/receipts/{$adv->json('id')}/apply", ['invoice_id' => $i['id']], 'o')->assertStatus(409); // already applied
+        // a bigger advance, applied by hand: what fits goes onto the invoice, the rest stays an advance
+        $big = $this->api('POST', "/api/customers/{$c->id}/advances", ['amount' => 90000], 'o')->assertOk()->json('id');
+        $inv = $this->api('GET', "/api/invoices/{$i['id']}", [], 'o')->assertOk()->json();
+        $this->assertSame([$big], array_column($inv['unapplied_advances'], 'id'));
+        $this->assertSame(90000.0, (float) $inv['unapplied_advances'][0]['amount']);
+        $applied = $this->api('POST', "/api/receipts/$big/apply", ['invoice_id' => $i['id']], 'o')->assertOk();
+        $this->assertSame(27000.0, (float) $applied->json('amount'));
+        $this->assertSame(0.0, (float) $this->api('GET', "/api/invoices/{$i['id']}", [], 'o')->json('balance'));
+        $this->assertSame(63000.0, (float) $this->api('GET', "/api/customers/{$c->id}", [], 'o')->json('advances'));   // the remainder is still held
+        $rest = collect($this->api('GET', '/api/receipts?advances=1', [], 'o')->json())->first();
+        $this->assertSame(63000.0, (float) $rest['amount']);
+        $this->assertStringContainsString('RCT/26-27/0002', (string) $rest['notes']);
+        $this->api('POST', "/api/receipts/{$rest['id']}/apply", ['invoice_id' => $i['id']], 'o')->assertStatus(422);       // nothing left to pay
 
         $j = $this->issued($other);
-        $this->api('POST', "/api/receipts/$big/apply", ['invoice_id' => $j['id']], 'o')->assertStatus(422); // other customer
+        $this->api('POST', "/api/receipts/{$rest['id']}/apply", ['invoice_id' => $j['id']], 'o')->assertStatus(422);        // another customer
+
+        // the books stay square through the split: debits equal credits, and the advances account holds exactly what is left
+        $this->assertEqualsWithDelta((float) \Illuminate\Support\Facades\DB::table('journal_lines')->sum('debit'), (float) \Illuminate\Support\Facades\DB::table('journal_lines')->sum('credit'), 0.005);
+        $adv = \Illuminate\Support\Facades\DB::table('journal_lines')->join('accounts', 'accounts.id', '=', 'journal_lines.account_id')->where('accounts.code', '2100')->selectRaw('sum(credit) - sum(debit) as net')->value('net');
+        $this->assertEqualsWithDelta(63000.0, (float) $adv, 0.005);
+    }
+
+    public function test_advances_are_not_guessed_when_the_customer_has_two_open_invoices(): void
+    {
+        $u = $this->as('operations', 'o');
+        $c = $this->customer($u);
+        $this->issued($c);                                                                             // first open invoice
+        $this->api('POST', "/api/customers/{$c->id}/advances", ['amount' => 5000], 'o')->assertOk();
+        $second = $this->issued($c);                                                                   // second one: which trip is the 5,000 for?
+        $this->assertEquals(['count' => 0, 'amount' => 0.0], $second['advances_applied']);
+        $this->assertSame(5000.0, (float) $this->api('GET', "/api/customers/{$c->id}", [], 'o')->json('advances'));
+        $this->assertCount(1, $this->api('GET', "/api/invoices/{$second['id']}", [], 'o')->json('unapplied_advances'));    // offered on the invoice page instead
+    }
+
+    public function test_a_payment_that_looks_like_a_repeat_asks_for_confirmation(): void
+    {
+        $u = $this->as('operations', 'o');
+        $c = $this->customer($u);
+        $this->api('POST', "/api/customers/{$c->id}/advances", ['amount' => 5000, 'mode' => 'upi'], 'o')->assertOk();
+
+        $dup = $this->api('POST', "/api/customers/{$c->id}/advances", ['amount' => 5000, 'mode' => 'upi'], 'o')->assertStatus(409);
+        $this->assertSame('possible_duplicate', $dup->json('detail.code'));
+        $this->assertSame('RCT/26-27/0001', $dup->json('detail.receipt_no'));
+        $this->assertCount(1, $this->api('GET', '/api/receipts?advances=1', [], 'o')->json());
+
+        $this->api('POST', "/api/customers/{$c->id}/advances", ['amount' => 5000, 'mode' => 'cash'], 'o')->assertOk();                  // another mode: fine
+        $this->api('POST', "/api/customers/{$c->id}/advances", ['amount' => 5000, 'mode' => 'upi', 'confirm_duplicate' => true], 'o')->assertOk();   // yes, it really is another
+        $this->assertCount(3, $this->api('GET', '/api/receipts?advances=1', [], 'o')->json());
+
+        $i = $this->issued($c);                                                                        // the same check on an invoice
+        $rid = $this->api('POST', "/api/invoices/{$i['id']}/receipts", ['amount' => 1000, 'mode' => 'upi'], 'o')->assertOk()->json('receipt.id');
+        $this->api('POST', "/api/invoices/{$i['id']}/receipts", ['amount' => 1000, 'mode' => 'upi'], 'o')->assertStatus(409);
+        $this->api('POST', "/api/receipts/$rid/cancel", ['reason' => 'duplicate'], 'o')->assertOk();                                      // and it can be undone by operations
     }
 
     // ---------------------------------------------------------------- documents and mail

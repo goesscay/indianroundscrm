@@ -207,7 +207,7 @@ class Permissions
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',
                 'deals.view', 'deals.view_all', 'deals.create', 'deals.edit', 'forecasts.view', 'forecasts.view_all', 'trips.view', 'trips.manage', 'trips.confirm', 'trips.revert', 'trip_docs.view', 'trip_docs.upload', 'trip_docs.download', 'trip_docs.manage',
                 'packages.view', 'packages.manage', 'packages.view_all', 'quotes.view', 'quotes.view_all', 'quotes.create', 'quotes.send',
-                'invoices.view', 'invoices.view_all', 'invoices.create', 'invoices.issue', 'receipts.view', 'receipts.record',
+                'invoices.view', 'invoices.view_all', 'invoices.create', 'invoices.issue', 'receipts.view', 'receipts.record', 'receipts.cancel',
             ],
             'accountant' => [
                 'dashboard.view', 'chat.use', 'activities.view', 'activities.create',

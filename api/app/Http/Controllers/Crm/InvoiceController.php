@@ -459,8 +459,10 @@ class InvoiceController extends Controller
             Posting::invoiceIssued($inv->fresh(), $user); // books the sale; refused when the date is in a closed period
         });
         ActivityLogger::log($user, 'issue_invoice', 'invoice', $inv->id, null, $this->snap($inv->fresh()));
+        // advances the customer already paid go onto the new invoice, so its balance is right from the start
+        $advances = Billing::applyAdvancesAtIssue($inv->fresh(), $user);
 
-        return self::find($id, $user)->toApi(true);
+        return array_merge(self::find($id, $user)->toApi(true), ['advances_applied' => $advances]);
     }
 
     public function cancel(Request $request, string $id)
@@ -586,6 +588,7 @@ class InvoiceController extends Controller
         if ($d['amount'] > $inv->balance() + 0.005) {
             Fail::unprocessable(['amount' => sprintf('This is more than the balance of ₹%s. Record the extra as an advance on the customer.', number_format($inv->balance(), 2))]);
         }
+        Billing::refuseDuplicate((int) $inv->customer_id, $d, ! empty(Fail::body($request)['confirm_duplicate']));
         $r = DB::transaction(fn () => Billing::record($user, $inv->customer_id, $inv, 'receipt', $d));
 
         return ['receipt' => $r->toApi(), 'invoice' => self::find($id, $user)->toApi(true)];

@@ -126,6 +126,11 @@ class Invoice extends Model
             $a['installments'] = $this->scheduleStatus();
             $a['receipts'] = $this->receipts->map(fn ($r) => $r->toApi())->values()->all();
             $a['credit_notes'] = $this->creditNotes->map(fn ($c) => $c->toApi())->values()->all();
+            // money the customer paid before this invoice that nobody has applied to it yet
+            $a['unapplied_advances'] = $this->status === 'issued' && $this->balance() > 0.005
+                ? Receipt::where('customer_id', $this->customer_id)->where('kind', 'receipt')->where('status', 'valid')->whereNull('invoice_id')->orderBy('received_date')->orderBy('id')
+                    ->get(['id', 'receipt_no', 'amount', 'received_date', 'mode'])->map(fn ($r) => ['id' => (string) $r->id, 'receipt_no' => $r->receipt_no, 'amount' => (float) $r->amount, 'received_date' => $r->received_date->format('Y-m-d'), 'mode' => $r->mode])->values()->all()
+                : [];
         }
 
         return $a;

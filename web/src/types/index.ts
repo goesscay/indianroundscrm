@@ -825,6 +825,10 @@ export interface Invoice {
   reminders?: { created_at: string; to_list: string; status: string; trigger: "manual" | "auto"; sent_by: string | null }[];
   notes: string | null; terms: string | null; cancel_reason: string | null; owner: { id: string; name: string } | null;
   lines?: QuoteLine[]; installments?: Installment[]; receipts?: Receipt[]; credit_notes?: CreditNote[];
+  /** Money the customer paid before this invoice that has not been applied to it yet. */
+  unapplied_advances?: { id: string; receipt_no: string; amount: number; received_date: string; mode: string }[];
+  /** Set on the response to issuing: the advances that went onto the new invoice. */
+  advances_applied?: { count: number; amount: number };
   created_at: string; updated_at: string;
 }
 
