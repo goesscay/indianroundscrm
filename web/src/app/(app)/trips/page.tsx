@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AlertTriangle, Search } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { Card } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Pagination, usePagination } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { INR, fmtDate } from "@/components/crm/shared";
 import { PaymentChip, ProgressBar, daysLabel, type TripSummary } from "@/components/crm/tripShared";
@@ -14,6 +17,7 @@ const SCOPES = [{ v: "upcoming", l: "Upcoming" }, { v: "completed", l: "Complete
 
 /** Operations board: every confirmed trip, soonest departure first, with payment and checklist progress. */
 export default function TripsBoard() {
+  const router = useRouter();
   const [scope, setScope] = useState("upcoming");
   const [q, setQ] = useState("");
   const [applied, setApplied] = useState("");
@@ -22,6 +26,7 @@ export default function TripsBoard() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
 
+  const pg = usePagination(rows, { resetKey: `${scope}|${applied}` });
   useEffect(() => { const t = setTimeout(() => setApplied(q), 300); return () => clearTimeout(t); }, [q]);
   useEffect(() => {
     let live = true;
@@ -56,43 +61,68 @@ export default function TripsBoard() {
       {error && <div className="text-sm text-destructive">{error}</div>}
       {loaded && rows.length === 0 && !error && <Card className="rounded-lg p-8 text-center text-sm text-muted-foreground">No trips here yet. A trip appears once a deal is confirmed (advance received, or confirmed by hand on the deal).</Card>}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {rows.map((r) => {
-          const late = r.progress.overdue > 0 || r.payment.overdue;
-          return (
-            <Link key={r.deal.id} href={`/deals/${r.deal.id}`} data-testid={`trip-card-${r.deal.id}`}>
-              <Card className={cn("h-full rounded-lg p-4 transition-colors hover:bg-secondary/40", late && "border-red-300 dark:border-red-900")}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold">{r.customer?.name ?? r.deal.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{r.deal.destination ?? "—"} · {r.deal.deal_no}</div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-sm font-semibold">{r.deal.travel_date ? fmtDate(r.deal.travel_date) : "No date"}</div>
-                    <div className={cn("text-xs", r.days_left !== null && r.days_left <= 7 && r.days_left >= 0 ? "font-semibold text-red-600 dark:text-red-400" : "text-muted-foreground")}>{daysLabel(r.days_left)}</div>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="mb-1 flex items-center justify-between text-xs"><span>Checklist {r.progress.done}/{r.progress.total}</span>
-                    {r.progress.overdue > 0 && <span className="inline-flex items-center gap-1 font-semibold text-red-600 dark:text-red-400"><AlertTriangle size={11} />{r.progress.overdue} overdue</span>}</div>
-                  <ProgressBar percent={r.progress.percent} tone={r.progress.overdue > 0 ? "warn" : "default"} />
-                  {r.progress.next && <div className="mt-1 truncate text-xs text-muted-foreground">Next: {r.progress.next.title}{r.progress.next.due_date ? ` · ${fmtDate(r.progress.next.due_date)}` : ""}</div>}
-                </div>
-                <div className={cn("mt-2 text-xs font-semibold", r.readiness.ready ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")} data-testid={`trip-ready-${r.deal.id}`}>
-                  {r.readiness.ready ? "Ready to travel" : `Not ready: ${r.readiness.blockers[0]}${r.readiness.blockers.length > 1 ? ` (+${r.readiness.blockers.length - 1})` : ""}`}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground" data-testid={`trip-docs-${r.deal.id}`}>
-                  {r.documents.travellers === 0 ? "Documents: travellers not chosen yet" : `Documents ${r.documents.received}/${r.documents.required} received${r.documents.verified === r.documents.required && r.documents.required > 0 ? " · all verified" : r.documents.missing > 0 ? ` · ${r.documents.missing} missing` : ""}`}
-                </div>
-                <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-xs">
-                  <PaymentChip p={r.payment} />
-                  <span className={cn(r.payment.balance > 0 && "font-semibold", r.payment.overdue && "text-red-600 dark:text-red-400")}>{r.payment.balance > 0 ? `${INR(r.payment.balance)} balance${r.payment.overdue ? " · overdue" : ""}` : "Settled"}</span>
-                </div>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
+      {rows.length > 0 && (
+        <Card className="overflow-hidden rounded-lg">
+          <div className="overflow-x-auto">
+            <Table className="text-[13px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="h-9 px-3 text-xs">Customer</TableHead>
+                  <TableHead className="h-9 px-3 text-xs">Departure</TableHead>
+                  <TableHead className="h-9 px-3 text-xs">Checklist</TableHead>
+                  <TableHead className="h-9 px-3 text-xs">Ready to travel</TableHead>
+                  <TableHead className="h-9 px-3 text-xs">Documents</TableHead>
+                  <TableHead className="h-9 px-3 text-right text-xs">Payment</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pg.pageItems.map((r) => {
+                  const late = r.progress.overdue > 0 || r.payment.overdue;
+                  const soon = r.days_left !== null && r.days_left <= 7 && r.days_left >= 0;
+                  const docs = r.documents.travellers === 0 ? "Travellers not chosen"
+                    : `${r.documents.received}/${r.documents.required} received`;
+                  const docsNote = r.documents.travellers === 0 ? "" : r.documents.verified === r.documents.required && r.documents.required > 0 ? "all verified" : r.documents.missing > 0 ? `${r.documents.missing} missing` : "";
+                  return (
+                    <TableRow key={r.deal.id} className={cn("cursor-pointer hover:bg-secondary/50", late && "bg-red-50/60 dark:bg-red-950/20")}
+                              onClick={(e) => { if ((e.target as HTMLElement).closest("a,button")) return; if (e.ctrlKey || e.metaKey || e.shiftKey) return; router.push(`/deals/${r.deal.id}`); }}
+                              data-testid={`trip-card-${r.deal.id}`}>
+                      <TableCell className="px-3 py-2">
+                        <Link href={`/deals/${r.deal.id}`} className="block max-w-[220px] truncate font-medium leading-tight hover:underline">{r.customer?.name ?? r.deal.name}</Link>
+                        <div className="max-w-[220px] truncate text-[11px] text-muted-foreground">{r.deal.destination ?? "—"} · <span className="font-mono">{r.deal.deal_no}</span></div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap px-3 py-2">
+                        <div className="text-xs font-semibold">{r.deal.travel_date ? fmtDate(r.deal.travel_date) : "No date"}</div>
+                        <div className={cn("text-[11px]", soon ? "font-semibold text-red-600 dark:text-red-400" : "text-muted-foreground")}>{daysLabel(r.days_left)}</div>
+                      </TableCell>
+                      <TableCell className="min-w-[170px] px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 shrink-0"><ProgressBar percent={r.progress.percent} tone={r.progress.overdue > 0 ? "warn" : "default"} /></div>
+                          <span className="whitespace-nowrap text-xs">{r.progress.done}/{r.progress.total}</span>
+                          {r.progress.overdue > 0 && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-[11px] font-semibold text-red-600 dark:text-red-400"><AlertTriangle size={11} />{r.progress.overdue}</span>}
+                        </div>
+                        {r.progress.next && <div className="mt-0.5 max-w-[200px] truncate text-[11px] text-muted-foreground" title={r.progress.next.title}>Next: {r.progress.next.title}{r.progress.next.due_date ? ` · ${fmtDate(r.progress.next.due_date)}` : ""}</div>}
+                      </TableCell>
+                      <TableCell className="px-3 py-2" data-testid={`trip-ready-${r.deal.id}`}>
+                        <div className={cn("text-xs font-semibold", r.readiness.ready ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{r.readiness.ready ? "Ready" : "Not ready"}</div>
+                        {!r.readiness.ready && <div className="max-w-[190px] truncate text-[11px] text-muted-foreground" title={r.readiness.blockers.join("; ")}>{r.readiness.blockers[0]}{r.readiness.blockers.length > 1 ? ` (+${r.readiness.blockers.length - 1})` : ""}</div>}
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-xs" data-testid={`trip-docs-${r.deal.id}`}>
+                        <div>{docs}</div>
+                        {docsNote && <div className="text-[11px] text-muted-foreground">{docsNote}</div>}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap px-3 py-2 text-right">
+                        <PaymentChip p={r.payment} />
+                        <div className={cn("mt-0.5 text-[11px]", r.payment.balance > 0 ? "font-semibold" : "text-muted-foreground", r.payment.overdue && "text-red-600 dark:text-red-400")}>{r.payment.balance > 0 ? `${INR(r.payment.balance)} balance${r.payment.overdue ? " · overdue" : ""}` : "Settled"}</div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <Pagination {...pg.paginationProps} />
+        </Card>
+      )}
     </div>
   );
 }
