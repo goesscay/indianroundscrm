@@ -26,7 +26,7 @@ class SupplierMailController extends Controller
         $user = $request->user();
         $b = Fail::validate(Fail::body($request), [
             'lead_id' => 'required|string',
-            'supplier_ids' => 'present|array',
+            'supplier_ids' => 'nullable|array',
             'supplier_ids.*' => 'required',
             'template' => 'nullable|string|in:plain,classic,modern',
             'cc_supplier_ids' => 'nullable|array', 'cc_supplier_ids.*' => 'required',
@@ -45,14 +45,11 @@ class SupplierMailController extends Controller
         }
 
         $suppliers = [];
-        foreach ($b['supplier_ids'] as $sid) {
+        foreach ($b['supplier_ids'] ?? [] as $sid) {
             $s = Supplier::find(Ids::parse((string) $sid));
             if ($s) {
                 $suppliers[] = ['id' => (int) $s->id, 'name' => $s->name, 'email' => $s->email];
             }
-        }
-        if (! $suppliers) {
-            Fail::bad('No valid suppliers selected');
         }
 
         $subject = $b['subject'];
@@ -68,6 +65,10 @@ class SupplierMailController extends Controller
         $bccSuppliers = $this->supplierEmails($b['bcc_supplier_ids'] ?? []);
         $cc = $this->addresses(array_merge($ccSuppliers, $b['cc'] ?? []), 'CC', array_merge($supplierEmails, $extraTo));
         $bcc = $this->addresses(array_merge($bccSuppliers, $b['bcc'] ?? []), 'BCC', array_merge($supplierEmails, $extraTo, $cc));
+        // a mail may go out with only To, only CC or only BCC; it just needs someone to receive it
+        if (! $suppliers && ! $extraTo && ! $cc && ! $bcc) {
+            Fail::bad('Pick at least one recipient: a supplier or group for To, CC or BCC, or type an address');
+        }
 
         // Portal suppliers each get their own short mail with a link; everyone else gets the full enquiry together, as before.
         $respondBy = ! empty($b['respond_by']) ? \Illuminate\Support\Carbon::parse($b['respond_by'])->toDateString()
@@ -82,7 +83,7 @@ class SupplierMailController extends Controller
                 $plain[] = $s;
             }
         }
-        if ($plain || $extraTo) {
+        if ($plain || $extraTo || ! $units) {
             // the full enquiry also goes to the extra To addresses; portal suppliers keep their private link mail to themselves
             $units[] = ['suppliers' => $plain, 'body' => $fullBody, 'portal' => false, 'extra' => $extraTo];
         }
@@ -102,7 +103,7 @@ class SupplierMailController extends Controller
 
         $names = implode(', ', array_column($suppliers, 'name'));
         $lead->fill([
-            'mail_status' => 'Sent', 'supplier_mail_date' => now(), 'supplier_name' => $names,
+            'mail_status' => 'Sent', 'supplier_mail_date' => now(), 'supplier_name' => $names !== '' ? $names : $lead->supplier_name,
             'lead_status' => $lead->lead_status === 'New Lead' ? 'Supplier Mail Sent' : $lead->lead_status,
             'updated_by' => $user->email,
         ])->save();

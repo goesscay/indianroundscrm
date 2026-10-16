@@ -85,4 +85,25 @@ class SupplierGroupsTest extends TestCase
         $this->assertSame(1, \App\Models\LeadSupplier::where('lead_id', 'IRMH10023')->count());   // only the To supplier is tracked
         $this->assertSame(['bcc1@s.test', 'bcc2@s.test'], MailHistory::first()->toApi()['bcc']);
     }
+
+    public function test_a_mail_can_go_out_with_only_cc_or_only_bcc_but_not_with_nobody(): void
+    {
+        $fake = new FakeMailTransport;
+        $this->app->instance(MailTransport::class, $fake);
+        $ops = User::factory()->operations()->create();
+        Lead::create(['lead_id' => 'IRMH10023', 'customer_name' => 'Asha', 'phone' => '9876501234', 'destination' => 'Vietnam']);
+        $a = Supplier::create(['name' => 'Alpha', 'email' => 'a@s.test']);
+        $b = Supplier::create(['name' => 'Beta', 'email' => 'b@s.test']);
+        $this->as($ops);
+        $base = ['lead_id' => 'IRMH10023', 'subject' => 'Enquiry', 'body' => 'Please quote', 'template' => 'plain'];
+
+        $this->postJson('/api/supplier-mail/send', $base + ['supplier_ids' => [], 'bcc_supplier_ids' => [(string) $a->id]])->assertOk();   // BCC only
+        $this->postJson('/api/supplier-mail/send', $base + ['supplier_ids' => [], 'cc_supplier_ids' => [(string) $b->id]])->assertOk();    // CC only
+        $this->assertSame([[], ['a@s.test']], [$fake->sent[0]->to, $fake->sent[0]->bcc]);
+        $this->assertSame([[], ['b@s.test']], [$fake->sent[1]->to, $fake->sent[1]->cc]);
+        $this->assertSame(0, \App\Models\LeadSupplier::count());                                  // nobody was asked for a quote, so nobody is tracked
+
+        $this->postJson('/api/supplier-mail/send', $base + ['supplier_ids' => []])->assertStatus(400);
+        $this->assertCount(2, $fake->sent);
+    }
 }

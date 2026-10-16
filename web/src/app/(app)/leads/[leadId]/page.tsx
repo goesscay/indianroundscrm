@@ -176,7 +176,10 @@ export default function LeadDetail() {
 
   const send = async () => {
     const ids = resolved.to;
-    if (ids.length === 0) { toast.error("Pick at least one supplier or group for To"); return; }
+    // any one of To, CC or BCC is enough, whether picked from the list or typed
+    if (ids.length + resolved.cc.length + resolved.bcc.length + splitAddresses(toExtra).length + splitAddresses(cc).length + splitAddresses(bcc).length === 0) {
+      toast.error("Pick a supplier or group (To, CC or BCC), or type an address"); return;
+    }
     try {
       const { data } = await api.post<{ send_result?: SupplierMailSendResult & { status?: string; message_id?: string; error?: string } }>("/supplier-mail/send", {
         lead_id: lead.lead_id,
