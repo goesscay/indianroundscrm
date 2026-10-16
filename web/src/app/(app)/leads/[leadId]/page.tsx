@@ -212,7 +212,7 @@ export default function LeadDetail() {
   const openReassign = async () => {
     try {
       const { data } = await api.get<User[]>("/users");
-      setConsultants(data.filter(u => u.active !== false && (!!u.consultant_code || u.role === "sales" || u.role === "admin")));
+      setConsultants(data.filter(u => u.active !== false && (!!u.consultant_code || u.role === "sales" || u.role === "admin" || u.role === "super_admin")));
     } catch { /* ignore */ }
     setAssignTo(""); setReassignReason("");
     setReassignOpen(true);

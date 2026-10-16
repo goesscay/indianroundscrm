@@ -27,6 +27,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function Users() {
   const { user, can } = useCurrentUser();
+  // only a Super Admin can hand out (or change) the Super Admin role
+  const roleChoices = (current?: string) => roles.filter((r) => r.slug !== "super_admin" || user.role === "super_admin" || r.slug === current);
   const canManage = can("users.manage");
   const canAlloc = can("allocations.manage");
   const [roles, setRoles] = useState<RoleDef[]>([]);
@@ -174,7 +176,7 @@ export default function Users() {
                   <Select value={f.role} onValueChange={(v) => setF({ ...f, role: v })}>
                     <SelectTrigger className="mt-1.5" data-testid="u-role"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {roles.map(r => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}
+                      {roleChoices().map(r => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -221,7 +223,7 @@ export default function Users() {
                   <Label className="label-caps">Role</Label>
                   <Select value={ef.role} onValueChange={(v) => setEf({ ...ef, role: v })} disabled={editing?.id === user.id}>
                     <SelectTrigger className="mt-1.5" data-testid="eu-role"><SelectValue /></SelectTrigger>
-                    <SelectContent>{roles.map((r) => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}</SelectContent>
+                    <SelectContent>{roleChoices(ef.role).map((r) => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div><Label className="label-caps">Staff code</Label><Input className="mt-1.5" value={ef.staff_code} onChange={(e) => setEf({ ...ef, staff_code: e.target.value })} data-testid="eu-code" /></div>
@@ -354,7 +356,7 @@ export default function Users() {
             <Select value={allocForm.consultant_id || undefined} onValueChange={(v) => setAllocForm({ ...allocForm, consultant_id: v })}>
               <SelectTrigger className="mt-1.5" data-testid="a-consultant"><SelectValue placeholder="Choose sales consultant" /></SelectTrigger>
               <SelectContent>
-                {users.filter(u => u.active !== false && (!!u.consultant_code || u.role === "sales" || u.role === "admin")).map(u =>
+                {users.filter(u => u.active !== false && (!!u.consultant_code || u.role === "sales" || u.role === "admin" || u.role === "super_admin")).map(u =>
                   <SelectItem key={u.id} value={u.id}>{u.name} · {u.consultant_code || "??"}</SelectItem>
                 )}
               </SelectContent>

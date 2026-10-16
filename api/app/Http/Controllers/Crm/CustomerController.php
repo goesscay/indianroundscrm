@@ -270,7 +270,7 @@ class CustomerController extends Controller
     {
         $user = $request->user();
         $owners = User::query()->where('active', true)->orderBy('name')->get(['id', 'name', 'role'])
-            ->filter(fn (User $u) => $u->hasPermission('leads.assignable') || $u->role === 'admin' || (int) $u->id === (int) $user->id)
+            ->filter(fn (User $u) => $u->hasPermission('leads.assignable') || $u->isAdmin() || (int) $u->id === (int) $user->id)
             ->map(fn ($u) => ['id' => (string) $u->id, 'name' => $u->name])->values();
 
         return [

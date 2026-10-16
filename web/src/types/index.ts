@@ -1,6 +1,6 @@
 // TypeScript models mirroring the Pydantic models / JSON shapes of the API contract (backend/server.py).
 
-/** Role slug. The three built-in roles are "admin" | "sales" | "operations"; admins can create more. */
+/** Role slug. The built-in roles are "super_admin" (top-most) | "admin" | "sales" | "operations"; admins can create more. */
 export type Role = string;
 
 export type AccountStatus = "active" | "inactive" | "locked" | "suspended" | "password_reset_required";

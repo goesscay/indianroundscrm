@@ -188,7 +188,7 @@ class Permissions
     public static function defaults(string $slug): array
     {
         return match ($slug) {
-            'admin' => self::keys(),
+            'admin', 'super_admin' => self::keys(),
             'sales' => [
                 'dashboard.view', 'leads.create', 'leads.edit_limited', 'leads.assignable', 'leads.notes',
                 'leads.contact_events', 'calendar.view', 'rsq.request',
@@ -251,7 +251,7 @@ class Permissions
     /** Effective permission keys of a role slug (admin => every key; unknown role => none). Unknown stored keys are ignored. */
     public static function forRole(?string $slug): array
     {
-        if ($slug === 'admin') {
+        if ($slug === 'admin' || $slug === 'super_admin') {
             return self::keys();
         }
         self::load();

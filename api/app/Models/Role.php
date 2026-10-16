@@ -15,9 +15,10 @@ class Role extends Model
         return ['is_system' => 'boolean'];
     }
 
+    /** Admin and Super Admin have every permission and cannot be edited. */
     public function isAdmin(): bool
     {
-        return $this->slug === 'admin';
+        return in_array($this->slug, ['admin', 'super_admin'], true);
     }
 
     /** @return list<string> */

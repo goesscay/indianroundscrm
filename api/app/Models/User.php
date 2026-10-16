@@ -14,7 +14,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, StringId;
 
-    public const ROLES = ['admin', 'sales', 'operations']; // system role slugs; custom roles live in the `roles` table
+    public const ROLES = ['super_admin', 'admin', 'sales', 'operations']; // system role slugs; custom roles live in the `roles` table
     public const STATUSES = ['active', 'inactive', 'suspended', 'locked', 'password_reset_required'];
 
     protected $fillable = [
@@ -55,14 +55,24 @@ class User extends Authenticatable
         ];
     }
 
+    /** Admin and Super Admin both have every permission. */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    /** The top-most role: the only one that may create, change or remove Super Admins. */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
     }
 
     public function hasRole(string ...$roles): bool
     {
         $roles = array_map(fn ($r) => $r === 'ops' ? 'operations' : $r, $roles);
+        if ($this->role === 'super_admin' && in_array('admin', $roles, true)) {
+            return true;                                          // a Super Admin is an Admin, and more
+        }
 
         return in_array($this->role, $roles, true);
     }
@@ -73,7 +83,7 @@ class User extends Authenticatable
         if (! Permissions::isValid($key)) {
             return false;
         }
-        if ($this->role === 'admin') {
+        if ($this->isAdmin()) {
             return true;
         }
         // full edit implies limited edit

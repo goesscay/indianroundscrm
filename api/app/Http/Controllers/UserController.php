@@ -54,6 +54,7 @@ class UserController extends Controller
         if (! Permissions::roleExists($data['role'])) {
             abort(400, 'Invalid role');
         }
+        $this->assertMayAssign($request, $data['role']);
         PasswordPolicy::validate($data['password']);
 
         $user = User::create([
@@ -119,14 +120,18 @@ class UserController extends Controller
             }
         }
 
+        $this->assertMayTouch($request, $user);
+        if (isset($updates['role'])) {
+            $this->assertMayAssign($request, $updates['role']);
+        }
         $oldRole = $user->role;
         $roleChanged = isset($updates['role']) && $updates['role'] !== $oldRole;
         if ($roleChanged) {
             if ((int) $user->id === (int) $request->user()->id) {
                 abort(403, 'You cannot change your own role');
             }
-            if ($oldRole === 'admin') {
-                $this->assertNotLastAdmin($user, 'demote');
+            if (in_array($oldRole, ['admin', 'super_admin'], true)) {
+                $this->assertNotLastAdmin($user, 'demote', $updates['role']);
             }
         }
         if (array_key_exists('active', $updates) && ! $updates['active']) {
@@ -160,6 +165,7 @@ class UserController extends Controller
         if (! $user) {
             abort(404, 'User not found');
         }
+        $this->assertMayTouch($request, $user);
         $this->assertNotLastAdmin($user, 'delete');
         $user->delete();
         ActivityLogger::log($request->user(), 'delete_user', 'user', $id);
@@ -169,7 +175,7 @@ class UserController extends Controller
 
     public function forceReset(Request $request, string $uid)
     {
-        $user = $this->target($uid);
+        $user = $this->target($request, $uid);
         $reason = (string) $request->input('reason', '');
         $user->account_status = 'password_reset_required';
         $user->failed_login_attempts = 0;
@@ -184,7 +190,7 @@ class UserController extends Controller
 
     public function unlock(Request $request, string $uid)
     {
-        $user = $this->target($uid);
+        $user = $this->target($request, $uid);
         $user->failed_login_attempts = 0;
         $user->locked_until = null;
         if ($user->account_status === 'locked') {
@@ -203,7 +209,7 @@ class UserController extends Controller
             $list = implode(', ', User::STATUSES);
             abort(400, "Invalid status. Must be one of: {$list}");
         }
-        $user = $this->target($uid);
+        $user = $this->target($request, $uid);
         if ((int) $user->id === (int) $request->user()->id && $data['account_status'] !== 'active') {
             abort(400, 'You cannot deactivate/suspend yourself.');
         }
@@ -228,7 +234,7 @@ class UserController extends Controller
 
     public function logoutUser(Request $request, string $uid)
     {
-        $user = $this->target($uid);
+        $user = $this->target($request, $uid);
         $user->last_logout_at = now();
         $user->invalidateSessions('admin_kick_all');
         $user->save();
@@ -256,25 +262,49 @@ class UserController extends Controller
         return $q->limit($limit)->get();
     }
 
-    /** Refuse to remove (delete/demote/disable) the only remaining active admin. */
-    private function assertNotLastAdmin(User $user, string $what): void
+    /**
+     * Refuse to remove (delete/demote/disable) the only remaining active Super Admin, or the last active admin of any kind.
+     * Moving an admin up to Super Admin ($newRole) does not remove an admin.
+     */
+    private function assertNotLastAdmin(User $user, string $what, ?string $newRole = null): void
     {
-        if ($user->role !== 'admin') {
+        if (! in_array($user->role, ['admin', 'super_admin'], true)) {
             return;
         }
-        $others = User::where('role', 'admin')->where('id', '!=', $user->id)
+        if ($user->role === 'admin' && $newRole === 'super_admin') {
+            return;
+        }
+        $pool = $user->role === 'super_admin' ? ['super_admin'] : ['admin', 'super_admin'];
+        $others = User::whereIn('role', $pool)->where('id', '!=', $user->id)
             ->where('active', true)->whereIn('account_status', ['active', 'password_reset_required'])->count();
         if ($others === 0) {
-            abort(409, "Cannot {$what} the last active admin");
+            abort(409, $user->role === 'super_admin' ? "Cannot {$what} the last active Super Admin" : "Cannot {$what} the last active admin");
         }
     }
 
-    private function target(string $uid): User
+    /** Super Admins can only be changed, reset, disabled or removed by a Super Admin. */
+    private function assertMayTouch(Request $request, User $target): void
+    {
+        if ($target->role === 'super_admin' && ! $request->user()->isSuperAdmin()) {
+            abort(403, 'Only a Super Admin can change a Super Admin.');
+        }
+    }
+
+    /** Only a Super Admin can give someone the Super Admin role. */
+    private function assertMayAssign(Request $request, string $role): void
+    {
+        if ($role === 'super_admin' && ! $request->user()->isSuperAdmin()) {
+            abort(403, 'Only a Super Admin can make someone a Super Admin.');
+        }
+    }
+
+    private function target(Request $request, string $uid): User
     {
         $user = User::find(Ids::parse($uid));
         if (! $user) {
             abort(404, 'User not found');
         }
+        $this->assertMayTouch($request, $user);
 
         return $user;
     }

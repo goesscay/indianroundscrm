@@ -22,7 +22,7 @@ class RoleController extends Controller
     {
         $counts = User::query()->selectRaw('role, count(*) as c')->groupBy('role')->pluck('c', 'role');
 
-        return Role::orderByDesc('is_system')->orderBy('name')->get()
+        return Role::orderByRaw("case slug when 'super_admin' then 0 when 'admin' then 1 else 2 end")->orderByDesc('is_system')->orderBy('name')->get()
             ->map(fn (Role $r) => $this->present($r, (int) ($counts[$r->slug] ?? 0)))->values();
     }
 

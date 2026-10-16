@@ -231,7 +231,7 @@ class ForecastController extends Controller
             'undated' => ['count' => $undated['count'], 'value' => round($undated['value'], 2), 'weighted' => round($undated['weighted'], 2)],
             'owners' => $owners,
             'consultants' => $all ? User::query()->where('active', true)->orderBy('name')->get(['id', 'name'])
-                ->filter(fn (User $u) => $u->hasPermission('leads.assignable') || $u->role === 'admin')->map(fn ($u) => ['id' => (string) $u->id, 'name' => $u->name])->values() : [],
+                ->filter(fn (User $u) => $u->hasPermission('leads.assignable') || $u->isAdmin())->map(fn ($u) => ['id' => (string) $u->id, 'name' => $u->name])->values() : [],
         ];
     }
 
