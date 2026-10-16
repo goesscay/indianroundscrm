@@ -136,6 +136,14 @@ export interface Supplier {
   destination?: string;
   country?: string;
   portal_enabled?: boolean;
+  group_ids?: string[];
+}
+
+export interface SupplierGroup {
+  id: string;
+  name: string;
+  destination?: string;
+  supplier_ids: string[];
 }
 
 export interface SupplierCreate {
@@ -145,6 +153,7 @@ export interface SupplierCreate {
   destination: string;
   country: string;
   portal_enabled?: boolean;
+  group_ids?: string[];
 }
 
 export interface PortalUser {

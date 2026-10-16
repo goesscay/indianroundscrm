@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil } from "lucide-react";
+import { Trash2, Plus, Pencil, Users } from "lucide-react";
 import { useCurrentUser } from "@/context/AuthContext";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { PortalUser, Supplier, SupplierCreate } from "@/types";
+import SupplierGroupsDialog from "@/components/crm/SupplierGroupsDialog";
+import type { PortalUser, Supplier, SupplierCreate, SupplierGroup } from "@/types";
 
 /** Who at the supplier may sign in to the supplier portal (only meaningful once the supplier exists). */
 function PortalUsers({ supplierId }: { supplierId: string }) {
@@ -77,7 +78,9 @@ export default function Suppliers() {
   const { can } = useCurrentUser();
   const canEdit = can("suppliers.manage");
   const [rows, setRows] = useState<Supplier[]>([]);
-  const EMPTY: SupplierCreate = { name: "", email: "", phone: "", destination: "", country: "", portal_enabled: false };
+  const EMPTY: SupplierCreate = { name: "", email: "", phone: "", destination: "", country: "", portal_enabled: false, group_ids: [] };
+  const [groups, setGroups] = useState<SupplierGroup[]>([]);
+  const [groupsOpen, setGroupsOpen] = useState(false);
   const [f, setF] = useState<SupplierCreate>(EMPTY);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null); // null = adding
@@ -105,15 +108,17 @@ export default function Suppliers() {
   };
 
   const load = async () => {
-    try { const { data } = await api.get<Supplier[]>("/suppliers"); setRows(data); }
-    catch (e) { toast.error(formatApiError(e)); }
+    try {
+      const [s, g] = await Promise.all([api.get<Supplier[]>("/suppliers"), api.get<SupplierGroup[]>("/supplier-groups")]);
+      setRows(s.data); setGroups(g.data);
+    } catch (e) { toast.error(formatApiError(e)); }
   };
   useEffect(() => { load(); }, []);
 
   const openAdd = () => { setEditId(null); setF(EMPTY); setOpen(true); };
   const openEdit = (s: Supplier) => {
     setEditId(s.id);
-    setF({ name: s.name ?? "", email: s.email ?? "", phone: s.phone ?? "", destination: s.destination ?? "", country: s.country ?? "", portal_enabled: !!s.portal_enabled });
+    setF({ name: s.name ?? "", email: s.email ?? "", phone: s.phone ?? "", destination: s.destination ?? "", country: s.country ?? "", portal_enabled: !!s.portal_enabled, group_ids: s.group_ids ?? [] });
     setOpen(true);
   };
 
@@ -146,11 +151,15 @@ export default function Suppliers() {
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">Suppliers</h1>
         </div>
         {canEdit && (
-          <Button onClick={openAdd} data-testid="s-add-btn">
-            <Plus size={15} /> Add supplier
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setGroupsOpen(true)} data-testid="s-groups-btn"><Users size={15} /> Groups{groups.length ? ` (${groups.length})` : ""}</Button>
+            <Button onClick={openAdd} data-testid="s-add-btn">
+              <Plus size={15} /> Add supplier
+            </Button>
+          </div>
         )}
       </div>
+      {canEdit && <SupplierGroupsDialog open={groupsOpen} onOpenChange={setGroupsOpen} suppliers={rows} groups={groups} onChanged={load} />}
 
       {canEdit && (
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setF(EMPTY); setEditId(null); } }}>
@@ -167,6 +176,20 @@ export default function Suppliers() {
                 <div><Label className="label-caps">Destination</Label><Input className="mt-1.5" value={f.destination} onChange={e => setF({ ...f, destination: e.target.value })} data-testid="s-destination" /></div>
                 <div className="sm:col-span-2"><Label className="label-caps">Country</Label><Input className="mt-1.5" value={f.country} onChange={e => setF({ ...f, country: e.target.value })} data-testid="s-country" /></div>
               </div>
+              {groups.length > 0 && (
+                <div className="rounded-md border border-border p-3" data-testid="s-groups">
+                  <div className="label-caps">Groups</div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                    {groups.map((g) => (
+                      <label key={g.id} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                        <Checkbox checked={(f.group_ids ?? []).includes(g.id)} data-testid={`s-group-${g.id}`}
+                                  onCheckedChange={(v) => setF({ ...f, group_ids: v === true ? [...(f.group_ids ?? []), g.id] : (f.group_ids ?? []).filter((x) => x !== g.id) })} />
+                        {g.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-3 text-sm" data-testid="s-portal-label">
                 <Checkbox checked={!!f.portal_enabled} onCheckedChange={(v) => setF({ ...f, portal_enabled: v === true })} data-testid="s-portal" />
                 <span>
@@ -201,11 +224,11 @@ export default function Suppliers() {
                 {canEdit && <TableHead className="w-8"><Checkbox checked={allOnPage} onCheckedChange={togglePage} aria-label="Select all on this page" data-testid="s-select-page" /></TableHead>}
                 <TableHead>Name</TableHead><TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead><TableHead>Destination</TableHead>
-                <TableHead>Country</TableHead><TableHead></TableHead>
+                <TableHead>Country</TableHead><TableHead>Groups</TableHead><TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No suppliers yet</TableCell></TableRow>}
+              {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No suppliers yet</TableCell></TableRow>}
               {pg.pageItems.map(s => (
                 <TableRow key={s.id}>
                   {canEdit && <TableCell><Checkbox checked={sel.has(s.id)} onCheckedChange={() => toggleOne(s.id)} aria-label={`Select ${s.name}`} data-testid={`s-select-${s.id}`} /></TableCell>}
@@ -214,6 +237,9 @@ export default function Suppliers() {
                   <TableCell>{s.phone}</TableCell>
                   <TableCell>{s.destination}</TableCell>
                   <TableCell>{s.country}</TableCell>
+                  <TableCell className="text-xs" data-testid={`s-groups-${s.id}`}>
+                    {(s.group_ids ?? []).map((id) => groups.find((g) => g.id === id)?.name).filter(Boolean).join(", ") || <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className="text-right">
                     {canEdit && <Button size="sm" variant="ghost" onClick={() => openEdit(s)} aria-label={`Edit ${s.name}`} title="Edit" data-testid={`s-edit-${s.id}`}><Pencil size={14} /></Button>}
                     {canEdit && <Button size="sm" variant="ghost" onClick={() => remove(s.id)} aria-label={`Delete ${s.name}`} title="Delete"><Trash2 size={14} className="text-destructive" /></Button>}

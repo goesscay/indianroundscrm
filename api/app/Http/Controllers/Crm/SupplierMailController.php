@@ -29,6 +29,8 @@ class SupplierMailController extends Controller
             'supplier_ids' => 'present|array',
             'supplier_ids.*' => 'required',
             'template' => 'nullable|string|in:plain,classic,modern',
+            'cc_supplier_ids' => 'nullable|array', 'cc_supplier_ids.*' => 'required',
+            'bcc_supplier_ids' => 'nullable|array', 'bcc_supplier_ids.*' => 'required',
             'to' => 'nullable|array', 'to.*' => 'string',
             'cc' => 'nullable|array', 'cc.*' => 'string',
             'bcc' => 'nullable|array', 'bcc.*' => 'string',
@@ -61,8 +63,11 @@ class SupplierMailController extends Controller
         // extra To / CC / BCC addresses typed on the form: tidy, check and drop repeats (an address already in an earlier line is not repeated in a later one)
         $supplierEmails = array_map('strtolower', array_filter(array_column($suppliers, 'email')));
         $extraTo = $this->addresses($b['to'] ?? [], 'To', $supplierEmails);
-        $cc = $this->addresses($b['cc'] ?? [], 'CC', array_merge($supplierEmails, $extraTo));
-        $bcc = $this->addresses($b['bcc'] ?? [], 'BCC', array_merge($supplierEmails, $extraTo, $cc));
+        // suppliers picked for CC / BCC (singly or as a group) are just copied in: they get no tracker row and no portal link
+        $ccSuppliers = $this->supplierEmails($b['cc_supplier_ids'] ?? []);
+        $bccSuppliers = $this->supplierEmails($b['bcc_supplier_ids'] ?? []);
+        $cc = $this->addresses(array_merge($ccSuppliers, $b['cc'] ?? []), 'CC', array_merge($supplierEmails, $extraTo));
+        $bcc = $this->addresses(array_merge($bccSuppliers, $b['bcc'] ?? []), 'BCC', array_merge($supplierEmails, $extraTo, $cc));
 
         // Portal suppliers each get their own short mail with a link; everyone else gets the full enquiry together, as before.
         $respondBy = ! empty($b['respond_by']) ? \Illuminate\Support\Carbon::parse($b['respond_by'])->toDateString()
@@ -111,6 +116,14 @@ class SupplierMailController extends Controller
         $headline = collect($results)->first(fn ($r) => ($r['status'] ?? '') === 'failed') ?? $results[0];
 
         return array_merge($mails[0]->fresh('recipients')->toApi(), ['send_result' => $headline, 'mails_sent' => count($mails)]);
+    }
+
+    /** @return list<string> the e-mail addresses of these supplier ids (unknown ids are ignored) */
+    private function supplierEmails(array $ids): array
+    {
+        $ids = collect($ids)->map(fn ($i) => Ids::parse((string) $i))->filter()->all();
+
+        return $ids ? Supplier::whereIn('id', $ids)->orderBy('name')->pluck('email')->filter()->values()->all() : [];
     }
 
     /**

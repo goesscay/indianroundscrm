@@ -2,7 +2,7 @@
 
 import { LoadMore, useLoadMore } from "@/components/ui/pagination";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import SupplierPicker, { resolvePicks, type Picks } from "@/components/crm/SupplierPicker";
 import { cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
 import StatusPill, { LEAD_STATUSES } from "@/components/app/StatusPill";
 import SupplierTracker from "@/components/app/SupplierTracker";
 import SupplierReplies, { useLeadReplies } from "@/components/app/SupplierReplies";
@@ -23,7 +23,7 @@ import LeadActivities from "@/components/activities/LeadActivities";
 import ContactTimeline, { logContact } from "@/components/app/ContactTimeline";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
-import type { Lead, LeadUpdate, Supplier, SupplierMailHistory, SupplierMailPreview, SupplierMailSendResult, User } from "@/types";
+import type { Lead, LeadUpdate, Supplier, SupplierGroup, SupplierMailHistory, SupplierMailPreview, SupplierMailSendResult, User } from "@/types";
 import { Mail, MessageCircle, ArrowLeft, Phone, Copy, UserCog, ArrowRightLeft, Pencil, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import ConvertLeadDialog from "@/components/crm/ConvertLeadDialog";
@@ -45,7 +45,10 @@ export default function LeadDetail() {
   const historyLm = useLoadMore(history, 10);
   const [mailOpen, setMailOpen] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [groups, setGroups] = useState<SupplierGroup[]>([]);
+  const [picks, setPicks] = useState<Picks>({});                       // groups / suppliers ticked, each as To, CC or BCC
+  const resolved = useMemo(() => resolvePicks(picks, groups), [picks, groups]);
+  const selected = useMemo(() => Object.fromEntries(resolved.to.map((id) => [id, true])) as Record<string, boolean>, [resolved]);
   const [design, setDesign] = useState<"classic" | "modern" | "plain">("classic");    // how the mail looks when it goes out
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
@@ -54,7 +57,7 @@ export default function LeadDetail() {
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
   const [respondBy, setRespondBy] = useState("");
-  const pickedSuppliers = Object.values(selected).filter(Boolean).length;
+  const pickedSuppliers = resolved.to.length;
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [mailPreviewText, setMailPreviewText] = useState("");
@@ -116,8 +119,9 @@ export default function LeadDetail() {
     }
     const { data } = await api.get<Supplier[]>("/suppliers");
     setSuppliers(data);
+    api.get<SupplierGroup[]>("/supplier-groups").then((r) => setGroups(r.data)).catch(() => setGroups([]));
     setSubject(`Trip Enquiry - ${lead.lead_id} - ${lead.destination}`);
-    setSelected({});
+    setPicks({});
     try {
       const p = await api.get<SupplierMailPreview & { text?: string }>(`/supplier-mail/preview/${lead.lead_id}`);
       const txt = p.data.text || "";
@@ -171,12 +175,14 @@ export default function LeadDetail() {
   };
 
   const send = async () => {
-    const ids = Object.keys(selected).filter(k => selected[k]);
-    if (ids.length === 0) { toast.error("Select at least one supplier"); return; }
+    const ids = resolved.to;
+    if (ids.length === 0) { toast.error("Pick at least one supplier or group for To"); return; }
     try {
       const { data } = await api.post<{ send_result?: SupplierMailSendResult & { status?: string; message_id?: string; error?: string } }>("/supplier-mail/send", {
         lead_id: lead.lead_id,
         supplier_ids: ids,
+        cc_supplier_ids: resolved.cc,
+        bcc_supplier_ids: resolved.bcc,
         template: design,
         to: splitAddresses(toExtra),
         cc: splitAddresses(cc),
@@ -604,18 +610,9 @@ export default function LeadDetail() {
         <SheetContent title={`Send Supplier Enquiry — ${lead.lead_id}`} data-testid="mail-dialog">
           <div className="flex-1 min-h-0 space-y-3 overflow-y-auto px-4 py-3">
             <div>
-              <Label className="label-caps">Suppliers{pickedSuppliers > 0 ? ` · ${pickedSuppliers} selected` : ""}</Label>
-              <div className="mt-1.5 max-h-36 space-y-1.5 overflow-y-auto rounded-md border border-border p-2">
-                {suppliers.length === 0 && <div className="text-sm text-muted-foreground">No suppliers. Add some in Suppliers page.</div>}
-                {suppliers.map(s => (
-                  <label key={s.id} className="flex cursor-pointer items-start gap-2 text-sm" data-testid={`supplier-${s.id}`}>
-                    <Checkbox className="mt-0.5" checked={!!selected[s.id]} onCheckedChange={(v) => setSelected(p => ({ ...p, [s.id]: v === true }))} />
-                    <div className="min-w-0">
-                      <div className="truncate font-medium leading-tight">{s.name}{s.portal_enabled && <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/60 dark:text-sky-300" title="Gets a short link e-mail and quotes in the portal">Portal</span>}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">{s.email} · {s.destination}</div>
-                    </div>
-                  </label>
-                ))}
+              <Label className="label-caps">Send to — pick a group or a supplier, then To, CC or BCC</Label>
+              <div className="mt-1.5">
+                <SupplierPicker suppliers={suppliers} groups={groups} picks={picks} onChange={setPicks} destination={lead.destination} />
               </div>
             </div>
 
@@ -626,22 +623,22 @@ export default function LeadDetail() {
                 <ChevronDown size={15} className={cn("shrink-0 transition-transform", recipOpen ? "" : "-rotate-90")} />
                 <span className="label-caps">To · CC · BCC</span>
                 <span className="ml-auto truncate text-xs text-muted-foreground" data-testid="mail-recipients-summary">
-                  {pickedSuppliers + splitAddresses(toExtra).length} to · {splitAddresses(cc).length} cc · {splitAddresses(bcc).length} bcc
+                  {pickedSuppliers + splitAddresses(toExtra).length} to · {resolved.cc.length + splitAddresses(cc).length} cc · {resolved.bcc.length + splitAddresses(bcc).length} bcc
                 </span>
               </button>
               {recipOpen && (
                 <div className="space-y-2.5 border-t border-border px-3 py-2.5">
                   <div>
-                    <Label className="text-[11px] font-semibold text-muted-foreground">To — the selected suppliers, plus more addresses</Label>
+                    <Label className="text-[11px] font-semibold text-muted-foreground">To — more addresses besides the suppliers picked above</Label>
                     <Input className="mt-1 h-8 text-[13px]" value={toExtra} onChange={(e) => setToExtra(e.target.value)} placeholder="Optional, separate with commas" data-testid="mail-to" />
                     {suppliers.some((x) => x.portal_enabled && selected[x.id]) && <div className="mt-1 text-[11px] text-muted-foreground">Portal suppliers get their own private link mail; extra addresses receive the full enquiry instead.</div>}
                   </div>
                   <div>
-                    <Label className="text-[11px] font-semibold text-muted-foreground">CC — everyone sees these</Label>
+                    <Label className="text-[11px] font-semibold text-muted-foreground">CC — more addresses; everyone sees these</Label>
                     <Input className="mt-1 h-8 text-[13px]" value={cc} onChange={(e) => setCc(e.target.value)} data-testid="mail-cc" />
                   </div>
                   <div>
-                    <Label className="text-[11px] font-semibold text-muted-foreground">BCC — hidden from the suppliers</Label>
+                    <Label className="text-[11px] font-semibold text-muted-foreground">BCC — more addresses; hidden from the others</Label>
                     <Input className="mt-1 h-8 text-[13px]" value={bcc} onChange={(e) => setBcc(e.target.value)} data-testid="mail-bcc" />
                   </div>
                 </div>

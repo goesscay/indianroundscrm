@@ -139,7 +139,20 @@ class MasterDataController extends Controller
     // ---------- /suppliers ----------
     public function suppliersIndex()
     {
-        return Supplier::orderBy('name')->get();
+        $groups = \Illuminate\Support\Facades\DB::table('supplier_group_members')->get(['supplier_id', 'supplier_group_id'])
+            ->groupBy('supplier_id')->map(fn ($r) => $r->pluck('supplier_group_id')->map(fn ($i) => (string) $i)->values()->all());
+
+        return Supplier::orderBy('name')->get()->map(fn ($s) => array_merge($s->toArray(), ['group_ids' => $groups[$s->id] ?? []]))->values();
+    }
+
+    /** Put a supplier in exactly these groups (ids that do not exist are ignored). */
+    private function syncGroups(Supplier $s, array $ids): void
+    {
+        $valid = \App\Models\SupplierGroup::whereIn('id', collect($ids)->map(fn ($i) => Ids::parse((string) $i))->filter()->all())->pluck('id')->all();
+        \Illuminate\Support\Facades\DB::table('supplier_group_members')->where('supplier_id', $s->id)->delete();
+        foreach ($valid as $gid) {
+            \Illuminate\Support\Facades\DB::table('supplier_group_members')->insert(['supplier_group_id' => $gid, 'supplier_id' => $s->id]);
+        }
     }
 
     public function suppliersStore(Request $request)
@@ -151,6 +164,7 @@ class MasterDataController extends Controller
             'destination' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
             'portal_enabled' => ['sometimes', 'boolean'],
+            'group_ids' => ['sometimes', 'nullable', 'array'],
         ]);
         $data['email'] = strtolower($data['email']);
         if (Supplier::where('email', $data['email'])->exists()) {
@@ -163,6 +177,9 @@ class MasterDataController extends Controller
         ]);
         if ($s->portal_enabled) {
             \App\Services\SupplierPortal\PortalMail::ensureUser($s);
+        }
+        if (array_key_exists('group_ids', $data)) {
+            $this->syncGroups($s, (array) $data['group_ids']);
         }
         ActivityLogger::log($request->user(), 'create_supplier', 'supplier', $s->id, null, ['name' => $s->name]);
 
@@ -182,6 +199,7 @@ class MasterDataController extends Controller
             'destination' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
             'portal_enabled' => ['sometimes', 'boolean'],
+            'group_ids' => ['sometimes', 'nullable', 'array'],
         ]);
         if (isset($data['email'])) {
             $data['email'] = strtolower($data['email']);
@@ -195,7 +213,12 @@ class MasterDataController extends Controller
                 $data[$k] = (string) ($data[$k] ?? '');
             }
         }
+        $groupIds = $data['group_ids'] ?? null;
+        unset($data['group_ids']);
         $s->fill($data)->save();
+        if ($groupIds !== null || $request->has('group_ids')) {
+            $this->syncGroups($s, (array) $groupIds);
+        }
         if ($s->portal_enabled) {
             \App\Services\SupplierPortal\PortalMail::ensureUser($s);
         } elseif (! $s->portal_enabled) {
