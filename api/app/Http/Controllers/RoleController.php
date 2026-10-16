@@ -18,11 +18,13 @@ class RoleController extends Controller
         return Permissions::catalog();
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $counts = User::query()->selectRaw('role, count(*) as c')->groupBy('role')->pluck('c', 'role');
+        $mine = $request->user()->isSuperAdmin();
 
         return Role::orderByRaw("case slug when 'super_admin' then 0 when 'admin' then 1 else 2 end")->orderByDesc('is_system')->orderBy('name')->get()
+            ->reject(fn (Role $r) => $r->slug === 'super_admin' && ! $mine)          // the Super Admin role is invisible to everyone else
             ->map(fn (Role $r) => $this->present($r, (int) ($counts[$r->slug] ?? 0)))->values();
     }
 
@@ -116,9 +118,9 @@ class RoleController extends Controller
         return ['ok' => true];
     }
 
-    public function users(string $id)
+    public function users(Request $request, string $id)
     {
-        $role = $this->find($id);
+        $role = $this->find($id, $request);
 
         return User::where('role', $role->slug)->orderBy('name')->get(['id', 'name', 'email', 'active'])
             ->map(fn (User $u) => ['id' => (string) $u->id, 'name' => $u->name, 'email' => $u->email, 'active' => (bool) $u->active])
@@ -127,10 +129,11 @@ class RoleController extends Controller
 
     // ------------------------------------------------------------------ helpers
 
-    private function find(string $id): Role
+    private function find(string $id, ?Request $request = null): Role
     {
+        $request ??= request();
         $role = Role::find(Ids::parse($id));
-        if (! $role) {
+        if (! $role || ($role->slug === 'super_admin' && ! $request->user()?->isSuperAdmin())) {
             abort(404, 'Role not found');
         }
 

@@ -27,9 +27,14 @@ class UserController extends Controller
         return array_slice($out, 0, 30);
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        return User::orderBy('id')->get()->each(
+        $users = User::orderBy('id')->get();
+        if (! $request->user()->isSuperAdmin()) {
+            $users = $users->reject(fn (User $u) => $u->role === 'super_admin')->values();      // Super Admins are invisible to everyone else
+        }
+
+        return $users->each(
             fn (User $u) => $u->setAttribute('assignable', $u->hasPermission('leads.assignable'))
         );
     }
@@ -286,7 +291,7 @@ class UserController extends Controller
     private function assertMayTouch(Request $request, User $target): void
     {
         if ($target->role === 'super_admin' && ! $request->user()->isSuperAdmin()) {
-            abort(403, 'Only a Super Admin can change a Super Admin.');
+            abort(404, 'User not found');                  // not even visible to them
         }
     }
 

@@ -38,6 +38,7 @@ class SuperAdminTest extends TestCase
         $this->assertTrue($sa->hasRole('admin'));
 
         $this->as($sa);
+        $this->assertContains($sa->name, array_column($this->getJson('/api/users')->assertOk()->json(), 'name'));      // a Super Admin sees Super Admins
         $roles = $this->getJson('/api/roles')->assertOk()->json();
         $this->assertSame(['super_admin', 'admin'], array_slice(array_column($roles, 'slug'), 0, 2));      // listed first
         $this->assertTrue($roles[0]['all_permissions']);
@@ -56,15 +57,25 @@ class SuperAdminTest extends TestCase
         $this->patchJson("/api/users/{$sales->id}", ['role' => 'super_admin'])->assertStatus(403);
         $this->assertSame('sales', $sales->fresh()->role);
 
-        $this->patchJson("/api/users/{$sa->id}", ['name' => 'Hacked'])->assertStatus(403);
-        $this->patchJson("/api/users/{$sa->id}", ['role' => 'sales'])->assertStatus(403);
-        $this->postJson("/api/users/{$sa->id}/status", ['account_status' => 'inactive'])->assertStatus(403);
-        $this->postJson("/api/users/{$sa->id}/force-reset", [])->assertStatus(403);
-        $this->postJson("/api/users/{$sa->id}/unlock", [])->assertStatus(403);
-        $this->postJson("/api/users/{$sa->id}/logout", [])->assertStatus(403);
-        $this->deleteJson("/api/users/{$sa->id}")->assertStatus(403);
+        $this->patchJson("/api/users/{$sa->id}", ['name' => 'Hacked'])->assertStatus(404);
+        $this->patchJson("/api/users/{$sa->id}", ['role' => 'sales'])->assertStatus(404);
+        $this->postJson("/api/users/{$sa->id}/status", ['account_status' => 'inactive'])->assertStatus(404);
+        $this->postJson("/api/users/{$sa->id}/force-reset", [])->assertStatus(404);
+        $this->postJson("/api/users/{$sa->id}/unlock", [])->assertStatus(404);
+        $this->postJson("/api/users/{$sa->id}/logout", [])->assertStatus(404);
+        $this->deleteJson("/api/users/{$sa->id}")->assertStatus(404);
         $this->assertSame('Gopi', $sa->fresh()->name);
         $this->assertSame('super_admin', $sa->fresh()->role);
+
+        // ... and they cannot even see them
+        $roles = $this->getJson('/api/roles')->assertOk()->json();
+        $this->assertNotContains('super_admin', array_column($roles, 'slug'));
+        $this->assertContains('admin', array_column($roles, 'slug'));
+        $superRoleId = (string) Role::where('slug', 'super_admin')->value('id');
+        $this->getJson("/api/roles/$superRoleId/users")->assertStatus(404);
+        $this->patchJson("/api/roles/$superRoleId", ['permissions' => []])->assertStatus(404);
+        $names = array_column($this->getJson('/api/users')->assertOk()->json(), 'name');
+        $this->assertNotContains('Gopi', $names);
 
         // everything else an admin did before still works
         $this->patchJson("/api/users/{$sales->id}", ['name' => 'Renamed'])->assertOk();
