@@ -10,6 +10,7 @@ use App\Http\Controllers\Crm\HotelController;
 use App\Http\Controllers\Crm\MediaController;
 use App\Http\Controllers\Crm\ProposalController;
 use App\Http\Controllers\Crm\QuoteContentController;
+use App\Http\Controllers\Crm\QuoteTemplateController;
 use App\Http\Controllers\Crm\TeamReportController;
 use App\Http\Controllers\Crm\TripController;
 use App\Http\Controllers\Crm\TripDocumentController;
@@ -155,6 +156,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---- the premium quotation builder (anyone who can create quotes)
     Route::post('/quote-proposals/compute', [ProposalController::class, 'compute'])->middleware('perm:quotes.create');
+    Route::get('/quote-templates', [QuoteTemplateController::class, 'index'])->middleware('perm:quotes.create');
+    Route::post('/quote-templates', [QuoteTemplateController::class, 'store'])->middleware('perm:hotels.manage');
+    Route::delete('/quote-templates/{id}', [QuoteTemplateController::class, 'destroy'])->middleware('perm:hotels.manage');
     Route::get('/quote-proposals/seed', [ProposalController::class, 'seed'])->middleware('perm:quotes.create');
     Route::post('/quote-proposals', [ProposalController::class, 'store'])->middleware('perm:quotes.create');
     Route::get('/quote-proposals/{id}', [ProposalController::class, 'show'])->middleware('perm:quotes.view');

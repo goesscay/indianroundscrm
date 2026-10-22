@@ -968,7 +968,8 @@ export interface QuoteBlock {
 export interface QuoteSettings { margin_default: { type: "percent" | "amount"; value: number }; margin_destinations: Record<string, { type: "percent" | "amount"; value: number }> }
 
 // ---- premium quotation builder
-export interface ProposalStay { hotel_id: number | string | null; room_id: number | string | null; meal_plan: MealPlan; start_offset: number; nights: number }
+export interface ProposalStay { hotel_id: number | string | null; room_id: number | string | null; meal_plan: MealPlan; start_offset: number; nights: number; stars?: number | null }
+export interface QuoteTemplateBrief { id: string; name: string; destination: string; tagline: string | null; nights: number; days: number; options: string[]; cover_url: string | null }
 export interface ProposalDay { title: string; stay: string; bullets: string[]; media_id: number | string | null }
 export interface ProposalData {
   trip: { destination: string; start_date: string | null; nights: number; adults: number; children_bed: number; children_no_bed: number; group_sizes: number[] };

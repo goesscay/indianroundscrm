@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Deal;
 use App\Models\Quote;
 use App\Models\QuoteContentBlock;
+use App\Models\QuoteTemplate;
 use App\Models\TravelPackage;
 use App\Services\ProposalPricing;
 use Illuminate\Http\Request;
@@ -40,7 +41,9 @@ class ProposalController extends Controller
         $user = $request->user();
         $deal = ($v = (string) $request->query('deal_id', '')) !== '' && ctype_digit($v) ? DealController::scopeForUser(Deal::query(), $user)->where('deals.id', (int) $v)->first() : null;
         $pkg = ($v = (string) $request->query('package_id', '')) !== '' && ctype_digit($v) ? TravelPackage::visibleTo($user)->where('packages.id', (int) $v)->first() : null;
-        $destination = trim((string) ($request->query('destination') ?: ($pkg?->destination ?: ($deal?->destination ?: ''))));
+        $tplId = (string) $request->query('template_id', '');
+        $tpl = $tplId !== '' && ctype_digit($tplId) ? QuoteTemplate::where('active', true)->find((int) $tplId) : null;
+        $destination = trim((string) ($tpl?->destination ?: ($request->query('destination') ?: ($pkg?->destination ?: ($deal?->destination ?: '')))));
         $nights = $pkg?->nights ?: ($deal?->duration_days ? max(0, (int) $deal->duration_days - 1) : 0);
 
         $days = [];
@@ -66,7 +69,53 @@ class ProposalController extends Controller
             'content' => $content, 'cover_media_id' => null,
         ];
 
-        return ['proposal' => ProposalPricing::clean($p), 'title' => $destination !== '' ? "$destination trip" : 'Trip proposal', 'customer_id' => $deal ? (string) $deal->customer_id : null, 'deal_id' => $deal ? (string) $deal->id : null];
+        $title = $destination !== '' ? "$destination trip" : 'Trip proposal';
+        $slots = null;
+        if ($tpl) {
+            [$p, $slots] = $this->applyTemplate($p, $tpl);
+            $title = $tpl->name;
+        }
+
+        return ['proposal' => ProposalPricing::clean($p), 'slots' => $slots, 'title' => $title, 'customer_id' => $deal ? (string) $deal->customer_id : null, 'deal_id' => $deal ? (string) $deal->id : null];
+    }
+
+    /**
+     * The template itinerary, pictures, land package and text over the starting point (the dates and travellers of the deal stay).
+     * Hotel stays come back as empty slots (nights, meal plan, a star hint) for the salesperson to fill, because a proposal cannot hold a stay without a hotel.
+     * @return array{0:array<string,mixed>,1:list<array<string,mixed>>}
+     */
+    private function applyTemplate(array $p, QuoteTemplate $tpl): array
+    {
+        $t = (array) $tpl->payload;
+        $p['trip']['destination'] = $tpl->destination;
+        $p['trip']['nights'] = (int) ($t['trip']['nights'] ?? $p['trip']['nights']);
+        $p['trip']['group_sizes'] = $t['trip']['group_sizes'] ?? [2, 4, 6];
+        foreach (['days', 'land', 'cover_media_id', 'gst_rate'] as $k) {
+            if (isset($t[$k])) {
+                $p[$k] = $t[$k];
+            }
+        }
+        $own = (array) ($t['content'] ?? []);
+        $merge = fn (string $k, array $defaults) => array_values(array_unique(array_merge((array) ($own[$k] ?? []), $defaults)));
+        $p['content']['inclusions'] = $merge('inclusions', []);
+        $p['content']['exclusions'] = $merge('exclusions', $p['content']['exclusions']);
+        $p['content']['notes'] = $merge('notes', $p['content']['notes']);
+        $p['content']['terms'] = $merge('terms', $p['content']['terms']);
+        if (! empty($own['cancellation']['tiers'])) {
+            $p['content']['cancellation'] = (array) $own['cancellation'];
+        }
+        $slots = [];
+        foreach (array_slice((array) ($t['options'] ?? []), 0, 4) as $i => $o) {
+            $stays = [];
+            foreach ((array) ($o['stays'] ?? []) as $s) {
+                $stays[] = ['hotel_id' => null, 'room_id' => null, 'meal_plan' => in_array($s['meal_plan'] ?? '', ['EP', 'CP', 'MAP', 'AP'], true) ? $s['meal_plan'] : 'CP',
+                    'start_offset' => max(0, (int) ($s['start_offset'] ?? 0)), 'nights' => max(1, (int) ($s['nights'] ?? 1)), 'stars' => isset($s['stars']) ? (int) $s['stars'] : null];
+            }
+            $slots[] = ['name' => mb_substr((string) ($o['name'] ?? 'Option '.($i + 1)), 0, 80), 'stays' => $stays];
+        }
+        $p['options'] = array_map(fn ($o) => ['name' => $o['name'], 'stays' => []], $slots ?: [['name' => 'Option 1']]);
+
+        return [$p, $slots];
     }
 
     /** The ordinary quote fields (and lines) a proposal turns into. */

@@ -220,4 +220,46 @@ class ProposalTest extends TestCase
         $this->assertGreaterThan(20000, strlen($pdf));
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/media/test'));
     }
+
+    public function test_sales_start_from_a_template_and_only_pick_the_hotels(): void
+    {
+        [$h, $r] = $this->hotel();
+        $cover = $this->photo('Manali', null, 30, 60, 120);
+        $tpl = \App\Models\QuoteTemplate::create(['name' => 'Manali Snow Escape', 'destination' => 'Manali', 'tagline' => 'Volvo and snow', 'payload' => [
+            'trip' => ['destination' => 'Manali', 'nights' => 4, 'group_sizes' => [2, 4]], 'gst_rate' => 5, 'cover_media_id' => $cover->id,
+            'days' => [['title' => 'Delhi to Manali', 'stay' => 'Journey', 'bullets' => ['Overnight Volvo'], 'media_id' => null]],
+            'options' => [['name' => '3 Star', 'stays' => [['meal_plan' => 'MAP', 'start_offset' => 1, 'nights' => 3, 'stars' => 3]]], ['name' => '4 Star', 'stays' => [['meal_plan' => 'MAP', 'start_offset' => 1, 'nights' => 3, 'stars' => 4]]]],
+            'land' => ['label' => 'Volvo and cab', 'rows' => [['pax' => 2, 'cost_pp' => 3000]]], 'content' => ['inclusions' => ['3 nights stay'], 'exclusions' => ['Lunch']],
+        ]]);
+        $this->as(User::factory()->sales()->create());
+
+        $list = $this->getJson('/api/quote-templates?destination=Manali')->assertOk()->json();
+        $this->assertSame(['Manali Snow Escape', 4, 1, ['3 Star', '4 Star']], [$list[0]['name'], $list[0]['nights'], $list[0]['days'], $list[0]['options']]);
+        $this->assertNotNull($list[0]['cover_url']);
+
+        $seed = $this->getJson("/api/quote-proposals/seed?template_id={$tpl->id}")->assertOk()->json();
+        $this->assertSame('Manali Snow Escape', $seed['title']);
+        $this->assertSame([2, 4], $seed['proposal']['trip']['group_sizes']);
+        $this->assertSame(4, $seed['proposal']['trip']['nights']);
+        $this->assertSame('Delhi to Manali', $seed['proposal']['days'][0]['title']);
+        $this->assertContains('3 nights stay', $seed['proposal']['content']['inclusions']);
+        $this->assertContains('Lunch', $seed['proposal']['content']['exclusions']);
+        $this->assertContains('Room heater.', $seed['proposal']['content']['exclusions']);        // the standard text still joins in
+        $this->assertCount(2, $seed['slots']);
+        $this->assertSame([null, 'MAP', 1, 3, 4], [$seed['slots'][1]['stays'][0]['hotel_id'], $seed['slots'][1]['stays'][0]['meal_plan'], $seed['slots'][1]['stays'][0]['start_offset'], $seed['slots'][1]['stays'][0]['nights'], $seed['slots'][1]['stays'][0]['stars']]);
+        $this->assertEquals(3000, $seed['proposal']['land']['rows'][0]['cost_pp']);
+
+        // sales cannot add or remove templates; Operations can
+        $this->postJson('/api/quote-templates', ['name' => 'x', 'proposal' => $seed['proposal']])->assertStatus(403);
+        $this->deleteJson("/api/quote-templates/{$tpl->id}")->assertStatus(403);
+        $this->as(User::factory()->operations()->create());
+        $p = $this->proposal($h, $r);
+        $made = $this->postJson('/api/quote-templates', ['name' => 'My Manali', 'proposal' => $p])->assertOk()->json();
+        $this->assertSame(['My Manali', 'Manali', 2], [$made['name'], $made['destination'], $made['nights']]);
+        $saved = \App\Models\QuoteTemplate::find($made['id']);
+        $this->assertNull($saved->payload['options'][0]['stays'][0]['hotel_id'] ?? null);          // hotels are not kept in a template
+        $this->deleteJson("/api/quote-templates/{$tpl->id}")->assertOk();
+        $this->assertSame(1, \App\Models\QuoteTemplate::count());
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/media/test'));
+    }
 }

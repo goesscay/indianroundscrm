@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ImageIcon, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, ImageIcon, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -15,12 +15,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { INR } from "@/components/crm/shared";
-import type { CustomerBrief, Customer, Hotel, MealPlan, MediaItem, ProposalComputed, ProposalData, ProposalDay, ProposalStay, Quote } from "@/types";
+import type { CustomerBrief, Customer, Hotel, MealPlan, MediaItem, ProposalComputed, ProposalData, ProposalDay, ProposalStay, Quote, QuoteTemplateBrief } from "@/types";
 
 const MEAL_LABEL: Record<MealPlan, string> = { EP: "Room only", CP: "Breakfast", MAP: "Breakfast and dinner", AP: "All meals" };
 const NONE = "none";
 
 const lines = (v: string) => v.split("\n");
+
+interface SeedResult { proposal: ProposalData; slots: { name: string; stays: ProposalStay[] }[] | null; title: string; customer_id: string | null; deal_id: string | null }
+/** a template brings its hotel stays as empty slots (nights, meal plan, a star hint) for the salesperson to fill */
+const withSlots = (d: SeedResult): ProposalData => (d.slots && d.slots.length ? { ...d.proposal, options: d.slots, selected_option: 0 } : d.proposal);
 
 function Section({ title, hint, children, right }: { title: string; hint?: string; children: React.ReactNode; right?: React.ReactNode }) {
   return (
@@ -123,6 +127,9 @@ export default function ProposalEditor() {
   const [media, setMedia] = useState<Record<string, MediaItem>>({});
   const [picker, setPicker] = useState<null | { kind: "cover" } | { kind: "day"; index: number }>(null);
   const [sizes, setSizes] = useState("2, 4, 6");
+  const [templates, setTemplates] = useState<QuoteTemplateBrief[]>([]);
+  const [templateId, setTemplateId] = useState<string | null>(sp.get("template"));
+  const [applying, setApplying] = useState(false);
 
   const dest = p?.trip.destination ?? "";
 
@@ -150,9 +157,11 @@ export default function ProposalEditor() {
           const params: Record<string, string> = {};
           if (sp.get("deal")) params.deal_id = sp.get("deal")!;
           if (sp.get("package")) params.package_id = sp.get("package")!;
-          const { data } = await api.get<{ proposal: ProposalData; title: string; customer_id: string | null; deal_id: string | null }>("/quote-proposals/seed", { params });
+          if (sp.get("template")) params.template_id = sp.get("template")!;
+          const { data } = await api.get<SeedResult>("/quote-proposals/seed", { params });
           if (!live) return;
-          setP(data.proposal); setTitle(data.title); setDealId(data.deal_id); setSizes(data.proposal.trip.group_sizes.join(", "));
+          void loadMedia([data.proposal.cover_media_id, ...data.proposal.days.map((d) => d.media_id)]);
+          setP(withSlots(data)); setTitle(data.title); setDealId(data.deal_id); setSizes(data.proposal.trip.group_sizes.join(", "));
           const cid = data.customer_id ?? sp.get("customer");
           if (cid) {
             const { data: c } = await api.get<Customer>(`/customers/${cid}`);
@@ -164,6 +173,38 @@ export default function ProposalEditor() {
     })();
     return () => { live = false; };
   }, [id, editing, sp, loadMedia]);
+
+  // ready-made templates to start from
+  useEffect(() => {
+    if (editing) return;
+    api.get<QuoteTemplateBrief[]>("/quote-templates").then((r) => setTemplates(r.data)).catch(() => setTemplates([]));
+  }, [editing]);
+
+  const applyTemplate = async (tid: string | null) => {
+    setApplying(true); setError("");
+    try {
+      const params: Record<string, string> = {};
+      if (dealId) params.deal_id = dealId;
+      if (sp.get("package")) params.package_id = sp.get("package")!;
+      if (tid) params.template_id = tid;
+      const { data } = await api.get<SeedResult>("/quote-proposals/seed", { params });
+      const next = withSlots(data);
+      setP((cur) => (cur ? { ...next, trip: { ...next.trip, start_date: cur.trip.start_date ?? next.trip.start_date, adults: cur.trip.adults, children_bed: cur.trip.children_bed, children_no_bed: cur.trip.children_no_bed } } : next));
+      setTitle(data.title); setSizes(data.proposal.trip.group_sizes.join(", ")); setTemplateId(tid);
+      void loadMedia([data.proposal.cover_media_id, ...data.proposal.days.map((d) => d.media_id)]);
+    } catch (e) { setError(formatApiError(e)); }
+    finally { setApplying(false); }
+  };
+
+  const saveAsTemplate = async () => {
+    if (!p) return;
+    const name = window.prompt("Name for this template (the itinerary, pictures, land package and text are kept; hotels are not)", title);
+    if (!name?.trim()) return;
+    try {
+      await api.post("/quote-templates", { name: name.trim(), proposal: p });
+      toast.success("Template saved. Sales can start from it now.");
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
 
   // customer search
   useEffect(() => {
@@ -236,9 +277,35 @@ export default function ProposalEditor() {
           <div className="label-caps mt-2">Premium quotation</div>
           <h1 className="font-display text-3xl font-black tracking-tight">{editing ? "Edit quotation" : "New quotation"}</h1>
         </div>
-        <Button onClick={save} disabled={saving} data-testid="proposal-save">{saving && <Loader2 size={16} className="animate-spin" />} Save quotation</Button>
+        <div className="flex gap-2">
+          {manager && <Button type="button" variant="outline" onClick={saveAsTemplate} data-testid="proposal-save-template"><BookmarkPlus size={16} /> Save as template</Button>}
+          <Button onClick={save} disabled={saving} data-testid="proposal-save">{saving && <Loader2 size={16} className="animate-spin" />} Save quotation</Button>
+        </div>
       </div>
       {error && <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+
+      {!editing && templates.length > 0 && (
+        <Section title="Start from a template" hint="Pick a ready-made itinerary with pictures, land package and text. You only add the customer, dates, travellers and hotels.">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="proposal-templates">
+            {templates.map((t) => (
+              <button key={t.id} type="button" disabled={applying} onClick={() => applyTemplate(t.id)} data-testid={`proposal-template-${t.id}`}
+                className={`overflow-hidden rounded-lg border text-left transition hover:ring-2 hover:ring-primary ${templateId === t.id ? "ring-2 ring-primary" : ""}`}>
+                {t.cover_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={t.cover_url} alt="" className="aspect-[16/9] w-full object-cover" loading="lazy" />
+                ) : <div className="aspect-[16/9] w-full bg-muted" />}
+                <div className="p-3">
+                  <div className="font-display text-base font-black leading-snug">{t.name}</div>
+                  {t.tagline && <div className="mt-1 text-xs text-muted-foreground">{t.tagline}</div>}
+                  <div className="mt-2 text-xs text-muted-foreground">{t.nights} nights, {t.days} days · {t.options.join(", ")}</div>
+                  {templateId === t.id && <div className="mt-1 text-xs font-bold text-primary">Selected</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+          {templateId && <button type="button" className="mt-3 text-sm text-muted-foreground underline" onClick={() => applyTemplate(null)}>Start from blank instead</button>}
+        </Section>
+      )}
 
       <Section title="Customer and trip">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -320,10 +387,10 @@ export default function ProposalEditor() {
                   return (
                     <div key={si} className="grid gap-2 rounded-md bg-muted/40 p-2 sm:grid-cols-[1.4fr_1.2fr_1fr_90px_90px_auto]" data-testid={`proposal-stay-${oi}-${si}`}>
                       <Select value={s.hotel_id != null ? String(s.hotel_id) : NONE} onValueChange={(v) => set((d) => { const st = d.options[oi].stays[si]; st.hotel_id = v === NONE ? null : v; st.room_id = null; })}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="Hotel" /></SelectTrigger>
+                        <SelectTrigger className="h-9"><SelectValue placeholder={s.stars ? `Choose a ${s.stars} star hotel` : "Hotel"} /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={NONE}>Choose hotel</SelectItem>
-                          {hotels.map((x) => <SelectItem key={x.id} value={String(x.id)}>{x.name}{x.stars ? ` · ${x.stars}★` : ""}</SelectItem>)}
+                          <SelectItem value={NONE}>{s.stars ? `Choose a ${s.stars} star hotel` : "Choose hotel"}</SelectItem>
+                          {[...hotels].sort((a, b) => Number(b.stars === s.stars) - Number(a.stars === s.stars)).map((x) => <SelectItem key={x.id} value={String(x.id)}>{x.name}{x.stars ? ` · ${x.stars}★` : ""}</SelectItem>)}
                           {h && !hotels.some((x) => x.id === h.id) && <SelectItem value={String(h.id)}>{h.name}</SelectItem>}
                         </SelectContent>
                       </Select>
