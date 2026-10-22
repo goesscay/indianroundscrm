@@ -8,6 +8,7 @@ use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
 use App\Http\Controllers\Crm\HotelController;
 use App\Http\Controllers\Crm\MediaController;
+use App\Http\Controllers\Crm\ProposalController;
 use App\Http\Controllers\Crm\QuoteContentController;
 use App\Http\Controllers\Crm\TeamReportController;
 use App\Http\Controllers\Crm\TripController;
@@ -151,6 +152,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/quote-content/{id}', [QuoteContentController::class, 'destroy'])->middleware('perm:hotels.manage');
     Route::get('/quote-settings', [QuoteContentController::class, 'settings'])->middleware('perm:hotels.manage');
     Route::put('/quote-settings', [QuoteContentController::class, 'saveSettings'])->middleware('perm:hotels.manage');
+
+    // ---- the premium quotation builder (anyone who can create quotes)
+    Route::post('/quote-proposals/compute', [ProposalController::class, 'compute'])->middleware('perm:quotes.create');
+    Route::get('/quote-proposals/seed', [ProposalController::class, 'seed'])->middleware('perm:quotes.create');
+    Route::post('/quote-proposals', [ProposalController::class, 'store'])->middleware('perm:quotes.create');
+    Route::get('/quote-proposals/{id}', [ProposalController::class, 'show'])->middleware('perm:quotes.view');
+    Route::put('/quote-proposals/{id}', [ProposalController::class, 'update'])->middleware('perm:quotes.create');
 
     // team performance: Super Admin only (the controller answers 404 to everyone else)
     Route::get('/reports/team', [TeamReportController::class, 'index']);

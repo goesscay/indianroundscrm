@@ -796,7 +796,7 @@ export interface Quote {
   subtotal: number; discount_total: number; tax_total: number; tcs_total: number; total: number;
   intro: string | null; inclusions: string | null; exclusions: string | null; terms: string | null; reject_reason: string | null;
   sent_at: string | null; accepted_at: string | null; owner: { id: string; name: string } | null;
-  lines?: QuoteLine[]; itinerary?: PackageDay[];
+  is_proposal?: boolean; lines?: QuoteLine[]; itinerary?: PackageDay[];
   emails?: { to: string; subject: string; status: string; error: string | null; with_pdf: boolean; created_at: string }[];
   created_at: string; updated_at: string;
 }
@@ -949,7 +949,7 @@ export interface HotelRate {
   id: string; room_id: string; meal_plan: MealPlan; season: string | null; start_date: string; end_date: string;
   single: number | null; double: number | null; triple: number | null; extra_adult: number | null; child_with_bed: number | null; child_no_bed: number | null;
 }
-export interface HotelRoom { id: string; name: string; max_adults: number; notes: string | null; active: boolean; rates: HotelRate[] }
+export interface HotelRoom { id: string; name: string; max_adults: number; notes: string | null; active: boolean; meals?: MealPlan[]; rates: HotelRate[] }
 export interface HotelMargin { type: "percent" | "amount"; value: number; source: "hotel" | "destination" | "default" }
 export interface Hotel {
   id: string; name: string; destination: string; city: string | null; stars: number | null; address: string | null; phone: string | null; website: string | null;
@@ -966,3 +966,26 @@ export interface QuoteBlock {
   items: string[]; tiers: { label: string; percent: number }[]; is_default: boolean; active: boolean; position: number;
 }
 export interface QuoteSettings { margin_default: { type: "percent" | "amount"; value: number }; margin_destinations: Record<string, { type: "percent" | "amount"; value: number }> }
+
+// ---- premium quotation builder
+export interface ProposalStay { hotel_id: number | string | null; room_id: number | string | null; meal_plan: MealPlan; start_offset: number; nights: number }
+export interface ProposalDay { title: string; stay: string; bullets: string[]; media_id: number | string | null }
+export interface ProposalData {
+  trip: { destination: string; start_date: string | null; nights: number; adults: number; children_bed: number; children_no_bed: number; group_sizes: number[] };
+  days: ProposalDay[];
+  options: { name: string; stays: ProposalStay[] }[];
+  land: { label: string; rows: { pax: number; cost_pp: number; child_cost_pp: number | null }[] };
+  gst_rate: number; selected_option: number; cover_media_id: number | string | null;
+  content: {
+    inclusions: string[]; exclusions: string[]; notes: string[]; terms: string[]; closing: string[];
+    cancellation: { tiers: { label: string; percent: number }[]; items: string[] };
+  };
+}
+export interface ProposalPrice {
+  persons: number; adults: number; land_selling: number; total: number; per_person: number; cost?: number; margin_amount?: number;
+  stays: { hotel: string; room: string; meal_plan: MealPlan; check_in: string; nights: number; selling: number; cost?: number }[];
+}
+export interface ProposalComputed {
+  options: { name: string; tiers: (ProposalPrice & { pax: number })[]; actual: ProposalPrice }[];
+  selected: number; gst_rate: number; warnings: string[];
+}

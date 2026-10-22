@@ -72,6 +72,7 @@ class HotelController extends Controller
             $a['photos'] = $h->photos->map(fn (Media $m) => $m->toApi())->values()->all();
             $a['rooms'] = $h->rooms->map(fn (HotelRoom $r) => [
                 'id' => (string) $r->id, 'name' => $r->name, 'max_adults' => (int) $r->max_adults, 'notes' => $r->notes, 'active' => (bool) $r->active,
+                'meals' => $r->rates->pluck('meal_plan')->unique()->values()->all(),            // which meal plans have rates (the prices stay hidden)
                 'rates' => $manager ? $r->rates->map(fn ($x) => $this->rateRow($x))->values()->all() : [],
             ])->values()->all();
         }

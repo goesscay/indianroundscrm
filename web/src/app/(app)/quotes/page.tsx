@@ -42,7 +42,12 @@ function QuoteList() {
           <h1 className="mt-1 font-display text-3xl font-black tracking-tight sm:text-4xl">Quotes</h1>
           <p className="mt-1 text-sm text-muted-foreground">Prices you have offered customers. Send a quote as a PDF by e-mail, then mark it accepted when they say yes.</p>
         </div>
-        {can("quotes.create") && <Button onClick={() => router.push("/quotes/new")} data-testid="new-quote-btn">+ New quote</Button>}
+        {can("quotes.create") && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push("/quotes/new")} data-testid="new-quote-btn">+ New quote</Button>
+            <Button onClick={() => router.push("/quotes/proposal/new")} data-testid="new-proposal-btn">+ Premium quotation</Button>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3" data-testid="quotes-filters">

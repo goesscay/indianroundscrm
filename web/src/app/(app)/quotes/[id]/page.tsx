@@ -97,7 +97,7 @@ export default function QuoteDetail() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={openPdf} data-testid="quote-pdf"><FileText size={16} /> PDF</Button>
           {!draft && x.status !== "superseded" && x.status !== "rejected" && can("invoices.create") && <Button variant="outline" disabled={busy} onClick={toInvoice} data-testid="quote-to-invoice"><FilePlus2 size={16} /> Create invoice</Button>}
-          {draft && canCreate && <Button variant="outline" onClick={() => router.push(`/quotes/${x.id}/edit`)} data-testid="quote-edit"><Pencil size={16} /> Edit</Button>}
+          {draft && canCreate && <Button variant="outline" onClick={() => router.push(x.is_proposal ? `/quotes/proposal/${x.id}` : `/quotes/${x.id}/edit`)} data-testid="quote-edit"><Pencil size={16} /> Edit</Button>}
           {canSend && !["superseded", "rejected"].includes(x.status) && <Button onClick={() => setSendOpen(true)} disabled={busy} data-testid="quote-send"><Send size={16} /> {x.status === "draft" ? "Send" : "Send again"}</Button>}
           {canSend && draft && <Button variant="outline" disabled={busy} onClick={() => setStatus("sent")} data-testid="quote-mark-sent">Mark as sent</Button>}
         </div>

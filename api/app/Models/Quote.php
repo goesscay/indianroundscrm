@@ -20,6 +20,7 @@ class Quote extends Model
         'issue_date' => 'date:Y-m-d', 'valid_until' => 'date:Y-m-d', 'travel_date' => 'date:Y-m-d',
         'sent_at' => 'datetime', 'accepted_at' => 'datetime',
         'adults' => 'integer', 'children' => 'integer', 'duration_days' => 'integer', 'version' => 'integer',
+        'proposal' => 'array',
         'tcs_rate' => 'float', 'subtotal' => 'float', 'discount_total' => 'float', 'tax_total' => 'float', 'tcs_total' => 'float', 'total' => 'float',
     ];
 
@@ -68,7 +69,8 @@ class Quote extends Model
     public function toApi(bool $detail = false): array
     {
         $a = $this->toArray();
-        unset($a['customer'], $a['deal'], $a['owner'], $a['lines'], $a['emails'], $a['itinerary']);
+        unset($a['customer'], $a['deal'], $a['owner'], $a['lines'], $a['emails'], $a['itinerary'], $a['proposal']);
+        $a['is_proposal'] = $this->proposal !== null;
         $a['display_status'] = $this->displayStatus();
         $a['customer'] = $this->customer ? $this->customer->brief() : null;
         $a['deal'] = $this->deal ? ['id' => (string) $this->deal->id, 'deal_no' => $this->deal->deal_no, 'name' => $this->deal->name] : null;

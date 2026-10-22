@@ -14,6 +14,18 @@ use Illuminate\Support\Carbon;
  */
 class HotelPricing
 {
+    /** The margin for something that is not a hotel (the land package): the destination\'s, else the default. @return array{type:string,value:float,source:string} */
+    public static function marginForDestination(?string $destination): array
+    {
+        $dest = (array) QuoteSetting::read('margin_destinations', []);
+        if ($destination !== null && isset($dest[$destination]['type'], $dest[$destination]['value'])) {
+            return ['type' => (string) $dest[$destination]['type'], 'value' => (float) $dest[$destination]['value'], 'source' => 'destination'];
+        }
+        $d = (array) QuoteSetting::read('margin_default', ['type' => 'percent', 'value' => 0]);
+
+        return ['type' => (string) ($d['type'] ?? 'percent'), 'value' => (float) ($d['value'] ?? 0), 'source' => 'default'];
+    }
+
     /** The margin that applies to a hotel: its own, else its destination's, else the default. @return array{type:string,value:float,source:string} */
     public static function margin(Hotel $h): array
     {
