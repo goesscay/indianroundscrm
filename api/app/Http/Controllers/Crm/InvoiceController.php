@@ -251,9 +251,12 @@ class InvoiceController extends Controller
 
     private function pdfData(Invoice $inv): array
     {
-        $inv->loadMissing(['customer', 'lines', 'installments', 'receipts', 'creditNotes']);
+        $inv->loadMissing(['customer', 'deal', 'lines', 'installments', 'receipts', 'creditNotes']);
+        // what the customer already owed on their other issued invoices, shown under the balance
+        $previous = Invoice::with('creditNotes')->where('customer_id', $inv->customer_id)->where('status', 'issued')->where('id', '<>', $inv->id)
+            ->where('issue_date', '<=', $inv->issue_date)->get()->sum(fn (Invoice $i) => max(0.0, $i->balance()));
 
-        return ['inv' => $inv, 'schedule' => $inv->scheduleStatus()];
+        return ['inv' => $inv, 'schedule' => $inv->scheduleStatus(), 'previousBalance' => round((float) $previous, 2)];
     }
 
     private function ensureIssued(Invoice $inv): void

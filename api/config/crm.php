@@ -12,11 +12,11 @@ return [
     'company' => [
         'name' => env('CRM_COMPANY_NAME', 'Indian Rounds'),
         'tagline' => env('CRM_COMPANY_TAGLINE', 'Travel & Tours'),
-        'address' => env('CRM_COMPANY_ADDRESS', ''),
-        'phone' => env('CRM_COMPANY_PHONE', ''),
+        'address' => env('CRM_COMPANY_ADDRESS', "13/8 EKR Avenue, Thandalam,\nIrradamkattalai, Chennai,\nTamil Nadu - 600128"),
+        'phone' => env('CRM_COMPANY_PHONE', '+91 8778955009'),
         'email' => env('CRM_COMPANY_EMAIL', 'enquiry@indianrounds.in'),
         'website' => env('CRM_COMPANY_WEBSITE', 'www.indianrounds.in'),
-        'gstin' => env('CRM_COMPANY_GSTIN', ''),
+        'gstin' => env('CRM_COMPANY_GSTIN', '33ARAPV6148H1ZN'),
         'state' => env('CRM_COMPANY_STATE', ''),
         'sac' => env('CRM_COMPANY_SAC', '998555'),   // tour operator services; confirm with your accountant
         'bank' => env('CRM_COMPANY_BANK', ''),       // printed on invoices, e.g. "HDFC Bank, A/c 1234, IFSC HDFC0001"
