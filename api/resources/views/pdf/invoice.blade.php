@@ -12,6 +12,7 @@
   .page { padding: 0 34px; }
   .muted { color: #6B7280; }
   .right { text-align: right; }
+  th.right, td.right { text-align: right !important; }   /* the header cells must line up with the figures under them */
   .center { text-align: center; }
   .caps { text-transform: uppercase; letter-spacing: 1px; font-size: 7.5px; color: #8A909C; }
   .topbar { height: 7px; background: #D71920; }
