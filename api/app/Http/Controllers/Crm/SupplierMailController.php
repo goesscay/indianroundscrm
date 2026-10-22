@@ -29,6 +29,7 @@ class SupplierMailController extends Controller
             'supplier_ids' => 'nullable|array',
             'supplier_ids.*' => 'required',
             'template' => 'nullable|string|in:plain,classic,modern',
+            'mail_type' => 'nullable|string|in:full,portal,both',
             'cc_supplier_ids' => 'nullable|array', 'cc_supplier_ids.*' => 'required',
             'bcc_supplier_ids' => 'nullable|array', 'bcc_supplier_ids.*' => 'required',
             'to' => 'nullable|array', 'to.*' => 'string',
@@ -74,17 +75,24 @@ class SupplierMailController extends Controller
         $respondBy = ! empty($b['respond_by']) ? \Illuminate\Support\Carbon::parse($b['respond_by'])->toDateString()
             : now()->addDays(max(1, (int) config('crm.portal.respond_days', 3)))->toDateString();
         $portal = Supplier::whereIn('id', array_column($suppliers, 'id'))->where('portal_enabled', true)->pluck('id')->map(fn ($i) => (int) $i)->all();
+        // what a portal supplier receives is the sender's choice: the full enquiry only, the short portal link only, or the full enquiry with the link added
+        $type = $b['mail_type'] ?? 'both';
         $units = [];
         $plain = [];
         foreach ($suppliers as $s) {
-            if (in_array($s['id'], $portal, true) && PortalMail::ensureUser(Supplier::find($s['id']))) {
-                $units[] = ['suppliers' => [$s], 'body' => PortalMail::render($lead, Supplier::find($s['id']), $respondBy), 'portal' => true];
+            if ($type !== 'full' && in_array($s['id'], $portal, true) && PortalMail::ensureUser(Supplier::find($s['id']))) {
+                $sup = Supplier::find($s['id']);
+                $body = $type === 'portal' ? PortalMail::render($lead, $sup, $respondBy) : rtrim($fullBody)."
+
+".implode("
+", PortalMail::linkLines($lead, $sup));
+                $units[] = ['suppliers' => [$s], 'body' => $body, 'portal' => true];
             } else {
                 $plain[] = $s;
             }
         }
         if ($plain || $extraTo || ! $units) {
-            // the full enquiry also goes to the extra To addresses; portal suppliers keep their private link mail to themselves
+            // the full enquiry also goes to the extra To addresses; portal suppliers keep their own mail when it carries their link
             $units[] = ['suppliers' => $plain, 'body' => $fullBody, 'portal' => false, 'extra' => $extraTo];
         }
 

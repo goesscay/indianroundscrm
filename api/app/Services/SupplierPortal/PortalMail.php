@@ -25,6 +25,16 @@ class PortalMail
         return SupplierUser::create(['supplier_id' => $s->id, 'name' => $s->name, 'email' => $email, 'active' => true]);
     }
 
+    /** The portal invitation as lines, added under the full enquiry when the sender wants both. @return list<string> */
+    public static function linkLines(Lead $lead, Supplier $s): array
+    {
+        return [
+            'You can send your quotation through our supplier portal, where the full requirement is also available:', '',
+            PortalAuth::url('/portal/requests/'.rawurlencode($lead->lead_id)), '',
+            'Sign in with this e-mail address ('.$s->email.'). We will send a one-time code to it. You can upload your quotation as a file or type the details in.',
+        ];
+    }
+
     public static function render(Lead $lead, Supplier $s, ?string $respondBy = null): string
     {
         $date = '';

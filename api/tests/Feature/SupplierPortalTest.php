@@ -324,7 +324,7 @@ class SupplierPortalTest extends TestCase
 
         $res = $this->postJson('/api/supplier-mail/send', [
             'lead_id' => $lead->lead_id, 'supplier_ids' => [$p1->id, $old->id, $p2->id, $old2->id], 'subject' => 'Trip Enquiry - IRMH10030 - Vietnam',
-            'body' => 'Full enquiry text',
+            'body' => 'Full enquiry text', 'mail_type' => 'portal',
         ])->assertOk();
         $res->assertJsonPath('mails_sent', 3);
 
@@ -419,14 +419,14 @@ class SupplierPortalTest extends TestCase
         $lead = Lead::create(['lead_id' => 'IRMH10031', 'customer_name' => 'Asha', 'phone' => '9876501234', 'destination' => 'Bali']);
         $p = Supplier::create(['name' => 'Portal One', 'email' => 'one@p.test', 'portal_enabled' => true]);
         $this->asUser($ops);
-        $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'Trip Enquiry - IRMH10031 - Bali'])->assertOk();
+        $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'Trip Enquiry - IRMH10031 - Bali', 'mail_type' => 'portal'])->assertOk();
         $by = LeadSupplier::where('supplier_id', $p->id)->first()->respond_by;
         $this->assertSame(now()->addDays(3)->toDateString(), $by->toDateString());          // the default window
         $this->assertStringContainsString('Quote needed by', end($this->mail->sent)->body);
         $this->assertStringContainsString($by->format('d M Y'), end($this->mail->sent)->body);
 
         $custom = now()->addDays(9)->toDateString();
-        $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'Trip Enquiry - IRMH10031 - Bali', 'respond_by' => $custom])->assertOk();
+        $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'Trip Enquiry - IRMH10031 - Bali', 'respond_by' => $custom, 'mail_type' => 'portal'])->assertOk();
         $this->assertSame($custom, LeadSupplier::where('supplier_id', $p->id)->first()->respond_by->toDateString());
         $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'x - IRMH10031', 'respond_by' => '2001-01-01'])->assertStatus(422);
     }
@@ -581,5 +581,35 @@ class SupplierPortalTest extends TestCase
         $this->patchJson("/api/suppliers/{$sup->id}/portal-users/{$new['id']}", ['active' => false])->assertOk()->assertJsonPath('active', false);
         $this->deleteJson("/api/suppliers/{$sup->id}/portal-users/{$new['id']}")->assertOk();
         $this->assertSame(1, SupplierUser::count());
+    }
+
+    public function test_the_sender_chooses_what_a_portal_supplier_receives(): void
+    {
+        $ops = User::factory()->operations()->create();
+        $lead = Lead::create(['lead_id' => 'IRMH10032', 'customer_name' => 'Asha', 'phone' => '9876501234', 'destination' => 'Bali']);
+        $p = Supplier::create(['name' => 'Portal One', 'email' => 'one@p.test', 'portal_enabled' => true]);
+        $this->asUser($ops);
+        $send = fn (array $extra) => $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'Trip Enquiry - IRMH10032 - Bali', 'body' => 'Full enquiry text'] + $extra)->assertOk();
+
+        $send(['mail_type' => 'full']);                                              // the enquiry only: no link, no portal invitation
+        $b = end($this->mail->sent)->body;
+        $this->assertStringContainsString('Full enquiry text', $b);
+        $this->assertStringNotContainsString('/portal/requests/', $b);
+        $this->assertNull(LeadSupplier::where('supplier_id', $p->id)->first()->portal_invited_at);
+
+        $send(['mail_type' => 'both']);                                              // the enquiry with the link added (also the default)
+        $b = end($this->mail->sent)->body;
+        $this->assertStringContainsString('Full enquiry text', $b);
+        $this->assertStringContainsString('https://erp.test/portal/requests/IRMH10032', $b);
+        $this->assertNotNull(LeadSupplier::where('supplier_id', $p->id)->first()->portal_invited_at);
+
+        $send([]);
+        $this->assertStringContainsString('Full enquiry text', end($this->mail->sent)->body);
+
+        $send(['mail_type' => 'portal']);                                            // the short link mail only
+        $b = end($this->mail->sent)->body;
+        $this->assertStringNotContainsString('Full enquiry text', $b);
+        $this->assertStringContainsString('https://erp.test/portal/requests/IRMH10032', $b);
+        $this->postJson('/api/supplier-mail/send', ['lead_id' => $lead->lead_id, 'supplier_ids' => [$p->id], 'subject' => 'x - IRMH10032', 'mail_type' => 'nope'])->assertStatus(422);
     }
 }

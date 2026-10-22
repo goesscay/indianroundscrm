@@ -60,6 +60,7 @@ export default function LeadDetail() {
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
   const [respondBy, setRespondBy] = useState("");
+  const [mailType, setMailType] = useState<"full" | "both" | "portal">("both");    // what a portal supplier receives
   const pickedSuppliers = resolved.to.length;
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -190,6 +191,7 @@ export default function LeadDetail() {
         cc_supplier_ids: resolved.cc,
         bcc_supplier_ids: resolved.bcc,
         template: design,
+        mail_type: mailType,
         to: splitAddresses(toExtra),
         cc: splitAddresses(cc),
         bcc: splitAddresses(bcc),
@@ -639,7 +641,7 @@ export default function LeadDetail() {
                   <div>
                     <Label className="text-[11px] font-semibold text-muted-foreground">To — more addresses besides the suppliers picked above</Label>
                     <Input className="mt-1 h-8 text-[13px]" value={toExtra} onChange={(e) => setToExtra(e.target.value)} placeholder="Optional, separate with commas" data-testid="mail-to" />
-                    {suppliers.some((x) => x.portal_enabled && selected[x.id]) && <div className="mt-1 text-[11px] text-muted-foreground">Portal suppliers get their own private link mail; extra addresses receive the full enquiry instead.</div>}
+                    {suppliers.some((x) => x.portal_enabled && selected[x.id]) && <div className="mt-1 text-[11px] text-muted-foreground">Extra addresses always receive the full enquiry.</div>}
                   </div>
                   <div>
                     <Label className="text-[11px] font-semibold text-muted-foreground">CC — more addresses; everyone sees these</Label>
@@ -654,10 +656,28 @@ export default function LeadDetail() {
             </div>
 
             {suppliers.some((x) => x.portal_enabled && selected[x.id]) && (
-              <div>
-                <Label className="label-caps">Portal suppliers: quote needed by</Label>
-                <Input type="date" className="mt-1.5 h-8 max-w-[200px] text-[13px]" min={new Date().toISOString().slice(0, 10)} value={respondBy} onChange={(e) => setRespondBy(e.target.value)} data-testid="mail-respond-by" />
-                <div className="mt-1 text-[11px] text-muted-foreground">Leave empty for the usual 3 days. They are sent a short link e-mail; the text below goes to the other suppliers.</div>
+              <div className="space-y-2.5 rounded-md border border-border px-3 py-2.5" data-testid="mail-portal">
+                <div>
+                  <Label className="label-caps">What to send to portal suppliers</Label>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {([["both", "Enquiry + portal link"], ["full", "Enquiry only"], ["portal", "Portal link only"]] as const).map(([k, label]) => (
+                      <button key={k} type="button" onClick={() => setMailType(k)} aria-pressed={mailType === k} data-testid={`mail-type-${k}`}
+                              className={cn("rounded-md border px-3 py-1 text-xs font-medium", mailType === k ? "border-foreground bg-foreground text-background" : "border-border hover:bg-secondary")}>{label}</button>
+                    ))}
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    {mailType === "both" && "They get the full enquiry text below, with a link to answer in the portal."}
+                    {mailType === "full" && "They get the full enquiry text below and reply by e-mail. No portal link is sent."}
+                    {mailType === "portal" && "They get a short mail with only the portal link. The text below goes to the other suppliers."}
+                  </div>
+                </div>
+                {mailType !== "full" && (
+                  <div>
+                    <Label className="label-caps">Quote needed by</Label>
+                    <Input type="date" className="mt-1.5 h-8 max-w-[200px] text-[13px]" min={new Date().toISOString().slice(0, 10)} value={respondBy} onChange={(e) => setRespondBy(e.target.value)} data-testid="mail-respond-by" />
+                    <div className="mt-1 text-[11px] text-muted-foreground">Leave empty for the usual 3 days.</div>
+                  </div>
+                )}
               </div>
             )}
             <div data-testid="mail-design">
