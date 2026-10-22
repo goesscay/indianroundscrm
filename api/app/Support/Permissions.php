@@ -106,6 +106,10 @@ class Permissions
                 'payables' => ['Record supplier bills and expenses', 'Enter supplier bills, pay suppliers, and record other money in and money out.'],
                 'manage' => ['Manage the books', 'Add and edit ledger and bank accounts and close the books up to a date.'],
             ]),
+            $g('hotels', 'Hotels and quotation content', [
+                'view' => ['View hotels', 'See the hotel list, rooms and photos (to choose a hotel on a quotation). Vendor rates and margins stay hidden.'],
+                'manage' => ['Manage hotels and quotation content', 'Add and edit hotels, rooms, vendor rates and margins, the photo library, and the standard inclusions, exclusions, policies and terms.'],
+            ]),
             $g('forecasts', 'Forecasts', [
                 'view' => ['View forecasts', 'Open Forecasts for the deals they own.'],
                 'view_all' => ['View team forecasts', 'See the whole team and each consultant, not just their own deals.'],
@@ -196,13 +200,13 @@ class Permissions
                 'ai.use', 'chat.use', 'activities.view', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.create', 'customers.edit',
                 'deals.view', 'deals.create', 'deals.edit', 'forecasts.view', 'trips.view', 'trip_docs.view', 'trip_docs.upload',
-                'packages.view', 'quotes.view', 'quotes.create', 'quotes.send',
+                'packages.view', 'quotes.view', 'quotes.create', 'quotes.send', 'hotels.view',
                 'invoices.view', 'invoices.create', 'receipts.view',
             ],
             'operations' => [
                 'dashboard.view', 'leads.view_all', 'leads.create', 'leads.edit', 'leads.edit_limited', 'leads.reassign',
                 'leads.notes', 'leads.contact_events', 'calendar.view', 'rsq.request', 'rsq.manage',
-                'supplier_mail.send', 'suppliers.view', 'suppliers.manage', 'supplier_dashboard.view', 'finance.bills',
+                'supplier_mail.send', 'suppliers.view', 'suppliers.manage', 'supplier_dashboard.view', 'finance.bills', 'hotels.view', 'hotels.manage',
                 'ai.use', 'chat.use',
                 'activities.view', 'activities.view_all', 'activities.create',
                 'leads.convert', 'customers.view', 'customers.view_all', 'customers.create', 'customers.edit', 'customers.view_passports',

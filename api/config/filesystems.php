@@ -31,6 +31,12 @@ return [
     'disks' => [
 
         // Customer documents for trips (passports, IDs): never public, contents encrypted; storage/app/trip-documents/{deal}/{random}
+        'media' => [
+            'driver' => 'local',
+            'root' => storage_path('app/media'),
+            'throw' => false,
+        ],
+
         'trip_documents' => [
             'driver' => 'local',
             'root' => storage_path('app/trip-documents'),

@@ -6,6 +6,9 @@ use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\CustomerReplyController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\ForecastController;
+use App\Http\Controllers\Crm\HotelController;
+use App\Http\Controllers\Crm\MediaController;
+use App\Http\Controllers\Crm\QuoteContentController;
 use App\Http\Controllers\Crm\TeamReportController;
 use App\Http\Controllers\Crm\TripController;
 use App\Http\Controllers\Crm\TripDocumentController;
@@ -119,6 +122,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/customers/{id}', [CustomerController::class, 'show'])->middleware('perm:customers.view');
     Route::get('/customers/{id}/replies', [CustomerReplyController::class, 'customer'])->middleware('perm:customers.view');
     // ---- Trip plans: payment progress and the operations checklist of a confirmed deal
+    // ---- hotel master, photo library and quotation content (Operations manage; sales can look hotels up)
+    Route::get('/hotels', [HotelController::class, 'index'])->middleware('perm:hotels.view,hotels.manage');
+    Route::get('/hotels/destinations', [HotelController::class, 'destinations'])->middleware('perm:hotels.view,hotels.manage');
+    Route::get('/hotels/import-template', [HotelController::class, 'importTemplate'])->middleware('perm:hotels.manage');
+    Route::post('/hotels/import', [HotelController::class, 'import'])->middleware('perm:hotels.manage');
+    Route::post('/hotels', [HotelController::class, 'store'])->middleware('perm:hotels.manage');
+    Route::get('/hotels/{id}', [HotelController::class, 'show'])->middleware('perm:hotels.view,hotels.manage');
+    Route::patch('/hotels/{id}', [HotelController::class, 'update'])->middleware('perm:hotels.manage');
+    Route::delete('/hotels/{id}', [HotelController::class, 'destroy'])->middleware('perm:hotels.manage');
+    Route::get('/hotels/{id}/estimate', [HotelController::class, 'estimate'])->middleware('perm:hotels.manage');
+    Route::post('/hotels/{id}/rooms', [HotelController::class, 'storeRoom'])->middleware('perm:hotels.manage');
+    Route::post('/hotels/{id}/photos', [HotelController::class, 'addPhotos'])->middleware('perm:hotels.manage');
+    Route::patch('/hotel-rooms/{rid}', [HotelController::class, 'updateRoom'])->middleware('perm:hotels.manage');
+    Route::delete('/hotel-rooms/{rid}', [HotelController::class, 'destroyRoom'])->middleware('perm:hotels.manage');
+    Route::post('/hotel-rooms/{rid}/rates', [HotelController::class, 'storeRate'])->middleware('perm:hotels.manage');
+    Route::patch('/hotel-rates/{rateId}', [HotelController::class, 'updateRate'])->middleware('perm:hotels.manage');
+    Route::delete('/hotel-rates/{rateId}', [HotelController::class, 'destroyRate'])->middleware('perm:hotels.manage');
+    Route::get('/media', [MediaController::class, 'index'])->middleware('perm:hotels.view,hotels.manage');
+    Route::get('/media/destinations', [MediaController::class, 'destinations'])->middleware('perm:hotels.view,hotels.manage');
+    Route::post('/media', [MediaController::class, 'store'])->middleware('perm:hotels.manage');
+    Route::get('/media/{id}/file', [MediaController::class, 'file'])->middleware('perm:hotels.view,hotels.manage');
+    Route::patch('/media/{id}', [MediaController::class, 'update'])->middleware('perm:hotels.manage');
+    Route::delete('/media/{id}', [MediaController::class, 'destroy'])->middleware('perm:hotels.manage');
+    Route::get('/quote-content', [QuoteContentController::class, 'index'])->middleware('perm:hotels.view,hotels.manage');
+    Route::post('/quote-content', [QuoteContentController::class, 'store'])->middleware('perm:hotels.manage');
+    Route::patch('/quote-content/{id}', [QuoteContentController::class, 'update'])->middleware('perm:hotels.manage');
+    Route::delete('/quote-content/{id}', [QuoteContentController::class, 'destroy'])->middleware('perm:hotels.manage');
+    Route::get('/quote-settings', [QuoteContentController::class, 'settings'])->middleware('perm:hotels.manage');
+    Route::put('/quote-settings', [QuoteContentController::class, 'saveSettings'])->middleware('perm:hotels.manage');
+
     // team performance: Super Admin only (the controller answers 404 to everyone else)
     Route::get('/reports/team', [TeamReportController::class, 'index']);
     Route::get('/reports/team/summary', [TeamReportController::class, 'summary']);

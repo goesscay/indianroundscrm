@@ -938,3 +938,31 @@ export interface TeamDrill {
   overdue_tasks: { id: string; title: string; due_date: string; deal_id: string; deal_no: string }[];
   daily: { date: string; actions: number }[];
 }
+
+// ---- Hotel master, photo library and quotation content ----
+export interface MediaItem {
+  id: string; hotel_id: string | null; destination: string | null; kind: string; caption: string | null; is_cover: boolean; position: number;
+  width: number | null; height: number | null; size: number; url: string; thumb_url: string; original_name: string | null;
+}
+export type MealPlan = "EP" | "CP" | "MAP" | "AP";
+export interface HotelRate {
+  id: string; room_id: string; meal_plan: MealPlan; season: string | null; start_date: string; end_date: string;
+  single: number | null; double: number | null; triple: number | null; extra_adult: number | null; child_with_bed: number | null; child_no_bed: number | null;
+}
+export interface HotelRoom { id: string; name: string; max_adults: number; notes: string | null; active: boolean; rates: HotelRate[] }
+export interface HotelMargin { type: "percent" | "amount"; value: number; source: "hotel" | "destination" | "default" }
+export interface Hotel {
+  id: string; name: string; destination: string; city: string | null; stars: number | null; address: string | null; phone: string | null; website: string | null;
+  google_rating: number | null; google_reviews: number | null; description: string | null; amenities: string[]; active: boolean; cover: MediaItem | null;
+  margin_type?: "percent" | "amount" | null; margin_value?: number | null; margin?: HotelMargin; rooms_count?: number;
+  photos?: MediaItem[]; rooms?: HotelRoom[];
+}
+export interface HotelEstimate {
+  nights: { date: string; cost: number | null; season: string | null }[]; rooms: string[]; cost: number; margin: HotelMargin; margin_amount: number;
+  selling: number; per_person: number; persons: number; warnings: string[];
+}
+export interface QuoteBlock {
+  id: string; kind: "inclusions" | "exclusions" | "cancellation" | "notes" | "terms" | "closing"; title: string; destination: string | null;
+  items: string[]; tiers: { label: string; percent: number }[]; is_default: boolean; active: boolean; position: number;
+}
+export interface QuoteSettings { margin_default: { type: "percent" | "amount"; value: number }; margin_destinations: Record<string, { type: "percent" | "amount"; value: number }> }
