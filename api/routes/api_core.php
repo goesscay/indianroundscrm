@@ -43,6 +43,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/users/{uid}/force-reset', [UserController::class, 'forceReset']);
         Route::post('/users/{uid}/unlock', [UserController::class, 'unlock']);
         Route::post('/users/{uid}/status', [UserController::class, 'status']);
+        Route::get('/users/{uid}/workload', [UserController::class, 'workloadOf']);
+        Route::post('/users/{uid}/deactivate', [UserController::class, 'deactivate']);
+        Route::post('/users/{uid}/reactivate', [UserController::class, 'reactivate']);
         Route::post('/users/{uid}/logout', [UserController::class, 'logoutUser']);
     });
     Route::get('/security-audit-log', [UserController::class, 'securityAuditLog'])->middleware('perm:security.view');

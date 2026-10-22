@@ -15,7 +15,8 @@ import { Pagination, usePagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/context/AuthContext";
 import type { DestinationAllocation, MasterItem, RoleDef, User, UserCreate } from "@/types";
-import { Trash2, KeyRound, Unlock as UnlockIcon, Shield, LogOut, UserPlus, Pencil } from "lucide-react";
+import { Trash2, KeyRound, Unlock as UnlockIcon, Shield, LogOut, UserPlus, Pencil, UserX, UserCheck } from "lucide-react";
+import DeactivateUserDialog from "@/components/app/DeactivateUserDialog";
 
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-emerald-100 text-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
@@ -133,8 +134,16 @@ export default function Users() {
     catch (e) { toast.error(formatApiError(e)); }
   };
 
-  const shownUsers = roleFilter === "all" ? users : users.filter(u => u.role === roleFilter);
-  const pg = usePagination(shownUsers, { resetKey: roleFilter });
+  const [leaving, setLeaving] = useState<User | null>(null);          // the person being deactivated
+  const [showInactive, setShowInactive] = useState(false);
+  const reactivate = async (u: User) => {
+    if (!window.confirm(`Reactivate ${u.name || u.email}? They will be able to sign in again.`)) return;
+    try { await api.post(`/users/${u.id}/reactivate`); toast.success("Reactivated"); load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+  const left = users.filter((u) => u.active === false || u.account_status === "inactive").length;
+  const shownUsers = users.filter((u) => (roleFilter === "all" || u.role === roleFilter) && (showInactive || !(u.active === false || u.account_status === "inactive")));
+  const pg = usePagination(shownUsers, { resetKey: `${roleFilter}|${showInactive}` });
 
   return (
     <div className="space-y-6" data-testid="users-page">
@@ -262,6 +271,10 @@ export default function Users() {
               {roles.map(r => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}
             </SelectContent>
           </Select>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="accent-black dark:accent-white" data-testid="u-show-inactive" />
+            Show deactivated ({left})
+          </label>
           <span className="text-xs text-muted-foreground">{shownUsers.length} user{shownUsers.length === 1 ? "" : "s"}</span>
         </div>
         <div className="overflow-x-auto">
@@ -281,8 +294,9 @@ export default function Users() {
               {pg.pageItems.map(u => {
                 const status = u.account_status || "active";
                 const isSelf = u.id === user.id;
+                const gone = u.active === false || status === "inactive";
                 return (
-                  <TableRow key={u.id} data-testid={`user-row-${u.id}`}>
+                  <TableRow key={u.id} data-testid={`user-row-${u.id}`} className={gone ? "opacity-60" : ""}>
                     <TableCell className="font-medium">{u.name || "—"}</TableCell>
                     <TableCell className="text-xs">{u.email}</TableCell>
                     <TableCell><span className="label-caps px-2 py-1 rounded bg-secondary whitespace-nowrap" data-testid={`u-role-badge-${u.id}`}>{u.role_name || u.role}</span></TableCell>
@@ -315,6 +329,16 @@ export default function Users() {
                             <UnlockIcon size={14} className="text-amber-600 dark:text-amber-400" />
                           </Button>
                         )}
+                        {!isSelf && !gone && (
+                          <Button size="sm" variant="ghost" onClick={() => setLeaving(u)} title="Deactivate: this person has left" data-testid={`u-deactivate-${u.id}`}>
+                            <UserX size={14} className="text-amber-700 dark:text-amber-400" />
+                          </Button>
+                        )}
+                        {!isSelf && gone && (
+                          <Button size="sm" variant="ghost" onClick={() => reactivate(u)} title="Reactivate" data-testid={`u-reactivate-${u.id}`}>
+                            <UserCheck size={14} className="text-emerald-600 dark:text-emerald-400" />
+                          </Button>
+                        )}
                         {!isSelf && (
                           <Button size="sm" variant="ghost" onClick={() => logoutUser(u)} title="Terminate all sessions" data-testid={`u-logout-${u.id}`}>
                             <LogOut size={14} />
@@ -336,9 +360,11 @@ export default function Users() {
         <Pagination {...pg.paginationProps} />
         <div className="px-4 py-3 border-t border-border bg-secondary/30 flex items-center gap-2 text-xs text-muted-foreground">
           <Shield size={12} />
-          Key: <Pencil size={11} className="ml-1" /> Edit · <KeyRound size={11} /> Force reset · <UnlockIcon size={11} /> Unlock · <LogOut size={11} /> Kick sessions · <Trash2 size={11} /> Delete
+          Key: <Pencil size={11} className="ml-1" /> Edit · <KeyRound size={11} /> Force reset · <UnlockIcon size={11} /> Unlock · <LogOut size={11} /> Kick sessions · <UserX size={11} /> Deactivate (left the company) · <Trash2 size={11} /> Delete
         </div>
       </Card>
+
+      <DeactivateUserDialog person={leaving} people={users} onClose={() => setLeaving(null)} onDone={load} />
 
       {canAlloc && <Card className="p-6 rounded-lg" data-testid="allocations-section">
         <h3 className="font-display text-xl font-bold mb-1">Lead Allocation by Destination</h3>

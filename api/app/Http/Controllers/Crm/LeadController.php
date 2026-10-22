@@ -482,6 +482,9 @@ class LeadController extends Controller
         }
         $alloc = Allocation::where('destination', $destination)->first();
         $consultant = $alloc ? User::find($alloc->consultant_id) : null;
+        if ($consultant && (! $consultant->active || $consultant->account_status !== 'active')) {
+            $consultant = null;                          // someone who has left never gets new leads
+        }
 
         return $consultant ?: $user;
     }

@@ -222,6 +222,11 @@ class UserController extends Controller
             $this->assertNotLastAdmin($user, 'disable');
         }
         $user->account_status = $data['account_status'];
+        if ($data['account_status'] === 'inactive') {
+            $user->active = false;                    // left the company: also off the pick-lists, chat and reports
+        } elseif ($data['account_status'] === 'active') {
+            $user->active = true;
+        }
         if (in_array($data['account_status'], ['inactive', 'suspended'], true)) {
             $user->invalidateSessions('admin_status_change');
         }
@@ -233,6 +238,82 @@ class UserController extends Controller
         SecurityLogger::log($request->user(), 'admin_status_change', $request, [
             'target_user' => $user->email, 'new_status' => $data['account_status'],
         ]);
+
+        return ['success' => true];
+    }
+
+    /** What a person still has on their plate, so it can be handed over when they leave. @return array<string,int> */
+    private function workload(User $u): array
+    {
+        return [
+            'leads' => \DB::table('leads')->where('staff_id', $u->id)->whereNull('archived_at')->whereIn('lead_status', ['New Lead', 'In Progress', 'Quote Sent to Customer'])->count(),
+            'activities' => \DB::table('activities')->where('assigned_to', $u->id)->whereNull('completed_at')->count(),
+            'trip_tasks' => \DB::table('trip_tasks')->where('assigned_to', $u->id)->whereIn('status', ['pending', 'in_progress'])->count(),
+            'deals' => \DB::table('deals')->where('owner_id', $u->id)->whereIn('stage', ['enquiry', 'quoted', 'negotiation'])->count(),
+            'allocations' => \DB::table('allocations')->where('consultant_id', $u->id)->count(),
+        ];
+    }
+
+    public function workloadOf(Request $request, string $uid)
+    {
+        return $this->workload($this->target($request, $uid));
+    }
+
+    /** POST /users/{id}/deactivate {reassign_to?, reason?}: the person has left. They cannot sign in, and (optionally) their open work goes to someone else. */
+    public function deactivate(Request $request, string $uid)
+    {
+        $actor = $request->user();
+        $user = $this->target($request, $uid);
+        $d = $request->validate(['reassign_to' => ['nullable'], 'reason' => ['nullable', 'string', 'max:300']]);
+        if ((int) $user->id === (int) $actor->id) {
+            abort(400, 'You cannot deactivate yourself.');
+        }
+        $this->assertNotLastAdmin($user, 'deactivate');
+        $to = null;
+        if (! empty($d['reassign_to'])) {
+            $to = User::find(Ids::parse((string) $d['reassign_to']));
+            if (! $to || (int) $to->id === (int) $user->id || ! $to->active || $to->account_status !== 'active' || ! $to->hasPermission('leads.assignable')) {
+                abort(422, 'Choose an active sales consultant to take over their work.');
+            }
+        }
+        $before = $this->workload($user);
+        $moved = ['leads' => 0, 'activities' => 0, 'trip_tasks' => 0, 'deals' => 0];
+        \DB::transaction(function () use ($user, $to, $actor, &$moved, $d) {
+            if ($to) {
+                $code = $to->consultant_code ?: ($to->staff_code ?: '');
+                foreach (\App\Models\Lead::where('staff_id', $user->id)->whereNull('archived_at')->whereIn('lead_status', ['New Lead', 'In Progress', 'Quote Sent to Customer'])->get() as $l) {
+                    $prev = ['staff_id' => (string) $l->staff_id, 'staff_name' => $l->staff_name, 'staff_code' => $l->staff_code];
+                    $l->fill(['staff_id' => $to->id, 'staff_name' => $to->name, 'staff_code' => $code, 'updated_by' => $actor->email])->save();
+                    ActivityLogger::log($actor, 'reassign_lead', 'lead', $l->lead_id, $prev, ['staff_id' => (string) $to->id, 'staff_name' => $to->name, 'reason' => 'Handed over: '.$user->name.' left']);
+                    $moved['leads']++;
+                }
+                $moved['activities'] = \DB::table('activities')->where('assigned_to', $user->id)->whereNull('completed_at')->update(['assigned_to' => $to->id]);
+                $moved['trip_tasks'] = \DB::table('trip_tasks')->where('assigned_to', $user->id)->whereIn('status', ['pending', 'in_progress'])->update(['assigned_to' => $to->id]);
+                $moved['deals'] = \DB::table('deals')->where('owner_id', $user->id)->whereIn('stage', ['enquiry', 'quoted', 'negotiation'])->update(['owner_id' => $to->id]);
+            }
+            \DB::table('allocations')->where('consultant_id', $user->id)->delete();          // new leads must not be auto-assigned to someone who has left
+            $user->active = false;
+            $user->account_status = 'inactive';
+            $user->invalidateSessions('deactivated');
+            $user->save();
+        });
+        ActivityLogger::log($actor, 'deactivate_user', 'user', $user->id, ['active' => true], ['active' => false, 'reassigned_to' => $to?->name, 'moved' => $moved, 'reason' => $d['reason'] ?? null]);
+        SecurityLogger::log($actor, 'admin_status_change', $request, ['target_user' => $user->email, 'new_status' => 'inactive']);
+
+        return ['success' => true, 'moved' => $moved, 'left_with_them' => $to ? [] : $before];
+    }
+
+    public function reactivate(Request $request, string $uid)
+    {
+        $actor = $request->user();
+        $user = $this->target($request, $uid);
+        $user->active = true;
+        $user->account_status = 'active';
+        $user->failed_login_attempts = 0;
+        $user->locked_until = null;
+        $user->save();
+        ActivityLogger::log($actor, 'reactivate_user', 'user', $user->id, ['active' => false], ['active' => true]);
+        SecurityLogger::log($actor, 'admin_status_change', $request, ['target_user' => $user->email, 'new_status' => 'active']);
 
         return ['success' => true];
     }
