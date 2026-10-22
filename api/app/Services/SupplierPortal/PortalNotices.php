@@ -24,7 +24,7 @@ class PortalNotices
 
     private static function sign(): array
     {
-        return ['', 'Regards,', 'Sales Operations Team', (string) config('crm.company.name', 'Indian Rounds')];
+        return array_merge([''], \App\Support\MailSignature::lines());
     }
 
     private static function link(LeadSupplier $t): string

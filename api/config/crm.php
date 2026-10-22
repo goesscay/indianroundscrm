@@ -2,6 +2,13 @@
 
 /** Business details printed on quotes (and later invoices). Set the CRM_COMPANY_* values in .env. */
 return [
+    // the signature on supplier mails (Regards, name, phone, title, company)
+    'signature' => [
+        'name' => env('CRM_SIGNATURE_NAME', 'V. Kanagaraj'),
+        'phone' => env('CRM_SIGNATURE_PHONE', '+91 7305669082'),
+        'title' => env('CRM_SIGNATURE_TITLE', 'Head of Sales & Operation'),
+        'company' => env('CRM_SIGNATURE_COMPANY', 'Indian Rounds'),
+    ],
     'company' => [
         'name' => env('CRM_COMPANY_NAME', 'Indian Rounds'),
         'tagline' => env('CRM_COMPANY_TAGLINE', 'Travel & Tours'),

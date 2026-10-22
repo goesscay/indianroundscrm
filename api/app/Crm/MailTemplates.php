@@ -205,6 +205,58 @@ class MailTemplates
         return $t.'</table>';
     }
 
+    /**
+     * The signature block: name, designation, mobile (tap to call), company with website and e-mail.
+     * Works out which line is which from the plain text: a phone number looks like one, the first other line is the name,
+     * the last is the company, anything between is the designation.
+     */
+    private static function signature(array $b, string $design): string
+    {
+        $f = self::font();
+        $phone = '';
+        $rest = [];
+        foreach ($b['lines'] as $l) {
+            if ($phone === '' && preg_match('/^\+?[\d][\d\s().-]{7,}$/', $l)) {
+                $phone = $l;
+            } else {
+                $rest[] = $l;
+            }
+        }
+        $name = $rest[0] ?? '';
+        $company = count($rest) > 1 ? $rest[count($rest) - 1] : '';
+        $title = count($rest) > 2 ? implode(' · ', array_slice($rest, 1, -1)) : '';
+        $c = self::contact();
+        $classic = $design === 'classic';
+        $accent = self::RED;
+        $dim = '#9AA0AA';
+
+        $out = '<div style="'.($classic ? 'border-left:3px solid '.$accent.';padding-left:14px' : 'padding-top:2px').'">'
+            .'<div style="'.$f.'font-size:13px;color:'.($classic ? '#6B7280' : '#7A8294').'">'.self::e($b['lead']).'</div>';
+        if ($name !== '') {
+            $out .= '<div style="'.$f.'font-size:17px;font-weight:700;color:'.self::INK.';margin-top:5px;line-height:1.25">'.self::e($name).'</div>';
+        }
+        if ($title !== '') {
+            $out .= '<div style="'.$f.'font-size:11.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:'.($classic ? $accent : '#6B7280').';margin-top:2px">'.self::e($title).'</div>';
+        }
+        if ($phone !== '') {
+            $tel = preg_replace('/[^\d+]/', '', $phone);
+            $out .= '<div style="'.$f.'font-size:13.5px;margin-top:9px;color:'.self::INK.'"><span style="color:'.$dim.'">Mobile&nbsp;&nbsp;</span>'
+                .'<a href="tel:'.self::e($tel).'" style="color:'.self::INK.';text-decoration:none;font-weight:600">'.self::e($phone).'</a></div>';
+        }
+        if ($company !== '') {
+            $out .= '<div style="'.$f.'font-size:13.5px;font-weight:700;color:'.self::INK.';margin-top:'.($phone !== '' ? '4' : '9').'px">'.self::e($company).'</div>';
+        }
+        $links = array_filter([
+            $c['website'] !== '' ? '<a href="'.self::e($c['url']).'" style="color:'.$accent.';text-decoration:none">'.self::e($c['website']).'</a>' : '',
+            $c['email'] !== '' ? '<a href="mailto:'.self::e($c['email']).'" style="color:'.$accent.';text-decoration:none">'.self::e($c['email']).'</a>' : '',
+        ]);
+        if ($links) {
+            $out .= '<div style="'.$f.'font-size:12.5px;margin-top:2px">'.implode('<span style="color:'.$dim.'">&nbsp;&nbsp;|&nbsp;&nbsp;</span>', $links).'</div>';
+        }
+
+        return $out.'</div>';
+    }
+
     // ---- Classic: white card, logo on top, red band, red section headings, striped details, dark footer
 
     private static function classic(array $blocks, array $ctx): string
@@ -229,11 +281,7 @@ class MailTemplates
                         .'<div style="'.$f.'font-size:11.5px;color:#9AA0AA;margin-top:8px;word-break:break-all">'.self::e($b['url']).'</div></td></tr>';
                     break;
                 case 'signature':
-                    $sig = '<div style="'.$f.'font-size:14px;color:'.self::INK.'">'.self::e($b['lead']).'</div>';
-                    foreach ($b['lines'] as $i => $l) {
-                        $sig .= '<div style="'.$f.'font-size:'.($i === 0 ? '15' : '13').'px;'.($i === 0 ? 'font-weight:700;' : 'color:#4B5563;').'margin-top:'.($i === 0 ? '3' : '0').'px">'.self::inline($l).'</div>';
-                    }
-                    $body .= '<tr><td style="padding:12px 0 0"><div style="border-left:3px solid '.$red.';padding-left:12px">'.$sig.'</div></td></tr>';
+                    $body .= '<tr><td style="padding:14px 0 0">'.self::signature($b, 'classic').'</td></tr>';
                     break;
             }
         }
@@ -281,11 +329,7 @@ class MailTemplates
                         .'<div style="'.$f.'font-size:11.5px;color:#9AA0AA;margin-top:8px;word-break:break-all">'.self::e($b['url']).'</div></td></tr>';
                     break;
                 case 'signature':
-                    $sig = '<div style="'.$f.'font-size:14px;color:#2B3040">'.self::e($b['lead']).'</div>';
-                    foreach ($b['lines'] as $i => $l) {
-                        $sig .= '<div style="'.$f.'font-size:'.($i === 0 ? '15' : '13').'px;'.($i === 0 ? 'font-weight:700;color:'.self::INK.';' : 'color:#6B7280;').'margin-top:'.($i === 0 ? '3' : '0').'px">'.self::inline($l).'</div>';
-                    }
-                    $body .= '<tr><td style="padding:12px 0 0;border-top:1px solid #EEF0F4">'.$sig.'</td></tr>';
+                    $body .= '<tr><td style="padding:14px 0 0;border-top:1px solid #EEF0F4">'.self::signature($b, 'modern').'</td></tr>';
                     break;
             }
         }

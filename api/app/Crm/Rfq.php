@@ -89,8 +89,7 @@ class Rfq
         $lines = array_merge($lines, [
             '', 'SPECIAL REQUESTS', $special, '',
             'We look forward to receiving your best rates.', '',
-            'Regards,', 'sri', '+91 7305669082', 'sales operation team', 'Indian Rounds',
-        ]);
+        ], \App\Support\MailSignature::lines());
         return implode("\n", $lines);
     }
 }
