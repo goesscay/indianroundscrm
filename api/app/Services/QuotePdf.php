@@ -12,6 +12,9 @@ class QuotePdf
     public static function render(Quote $quote): string
     {
         $quote->loadMissing(['customer', 'lines']);
+        if ($quote->proposal !== null) {
+            return ProposalPdf::render($quote);
+        }
         $html = view('pdf.quote', ['quote' => $quote])->render();
 
         $opts = new Options();

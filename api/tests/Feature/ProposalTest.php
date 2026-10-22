@@ -180,4 +180,44 @@ class ProposalTest extends TestCase
         $this->assertSame(['MAP'], $room['meals']);
         $this->assertSame([], $room['rates']);
     }
+
+    private function photo(string $dest, ?int $hotel, int $r, int $g, int $b): \App\Models\Media
+    {
+        $im = imagecreatetruecolor(1200, 800);
+        imagefill($im, 0, 0, imagecolorallocate($im, $r, $g, $b));
+        imagefilledellipse($im, 600, 420, 500, 500, imagecolorallocate($im, 255, 255, 255));
+        $dir = storage_path('app/media/test');
+        @mkdir($dir, 0777, true);
+        $name = 'p'.uniqid();
+        imagejpeg($im, "$dir/$name.jpg", 80);
+        imagejpeg($im, "$dir/{$name}_t.jpg", 70);
+
+        return \App\Models\Media::create(['hotel_id' => $hotel, 'destination' => $dest, 'kind' => 'day', 'path' => "test/$name.jpg", 'width' => 1200, 'height' => 800, 'size' => 1000, 'position' => 0]);
+    }
+
+    public function test_a_proposal_quote_renders_as_the_premium_pdf_and_a_plain_quote_does_not(): void
+    {
+        [$h, $r] = $this->hotel();
+        $h->update(['address' => 'Old Manali Road', 'phone' => '+91 98160 00000', 'google_rating' => 4.3, 'google_reviews' => 812, 'amenities' => ['Wi-Fi', 'Room heater']]);
+        foreach ([[200, 80, 60], [60, 120, 200], [80, 160, 90], [220, 180, 60]] as $i => $c) {
+            $this->photo('Manali', $h->id, ...$c)->update(['is_cover' => $i === 0]);
+        }
+        $cover = $this->photo('Manali', null, 30, 60, 120);
+        $day = $this->photo('Manali', null, 160, 90, 40);
+        $sales = $this->as(User::factory()->sales()->create());
+        $c = Customer::create(['customer_no' => 'IRC-PR2', 'name' => 'Asha Rao', 'owner_id' => $sales->id]);
+        $p = $this->proposal($h, $r);
+        $p['cover_media_id'] = $cover->id;
+        $p['days'][0]['media_id'] = $day->id;
+        $saved = $this->postJson('/api/quote-proposals', ['customer_id' => (string) $c->id, 'title' => 'Manali 2N 3D', 'proposal' => $p])->assertOk()->json('quote');
+
+        $res = $this->get("/api/quotes/{$saved['id']}/pdf")->assertOk();
+        $pdf = $res->getContent();
+        $this->assertStringStartsWith('%PDF', $pdf);
+        if ($out = getenv('PROPOSAL_PDF_OUT')) {
+            file_put_contents($out, $pdf);
+        }
+        $this->assertGreaterThan(20000, strlen($pdf));
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/media/test'));
+    }
 }
