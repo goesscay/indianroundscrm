@@ -31,7 +31,7 @@
 
   .tl td { padding: 0; border-bottom: 1px solid #ECEEF2; }
   .tl .no { width: 54px; padding: 11px 0; }
-  .dot { width: 34px; height: 34px; line-height: 34px; background: #D71920; color: #fff; font-weight: bold; text-align: center; border-radius: 17px; font-size: 11px; }
+  .dot { width: 34px; height: 24px; padding-top: 10px; line-height: 14px; background: #D71920; color: #fff; font-weight: bold; text-align: center; border-radius: 17px; font-size: 11px; }
   .tl .t { padding: 11px 0; font-size: 12px; font-weight: bold; }
   .tl .s { padding: 11px 0; width: 170px; text-align: right; color: #6B7280; font-size: 9px; }
 
