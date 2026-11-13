@@ -595,6 +595,9 @@ class LeadController extends Controller
         if ($cities !== null) {
             $lead->replaceStayCities($cities);
         }
+        if (($updates['lead_status'] ?? null) === 'Lost') {
+            \App\Services\LeadStatusFlow::clearOpenFollowUps($leadId);   // nothing left to chase on a lost lead
+        }
 
         // RSQ lane -> completed when lead reaches a terminal customer-facing status
         if (in_array($updates['lead_status'] ?? null, self::COMPLETED_STATUSES, true)) {
