@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Activity;
 use App\Models\Deal;
 use App\Models\Lead;
 use App\Support\ActivityLogger;
@@ -29,6 +30,12 @@ class LeadStatusFlow
         return $out;
     }
 
+    /** A lost lead has nothing left to chase: remove its scheduled (not yet completed) follow-up activities. Returns how many were removed. */
+    public static function clearOpenFollowUps(string $leadId): int
+    {
+        return Activity::where('lead_id', $leadId)->where('type', 'follow_up')->whereNull('completed_at')->delete();
+    }
+
     /**
      * Move the leads (of a deal, or one lead id) to $to, but only those currently in one of $from. Returns how many moved.
      *
@@ -45,6 +52,9 @@ class LeadStatusFlow
             }
             $before = $lead->lead_status;
             $lead->forceFill($fields)->save();
+            if ($to === 'Lost') {
+                self::clearOpenFollowUps($lead->lead_id);
+            }
             ActivityLogger::log(null, 'auto_lead_status', 'lead', $lead->lead_id, ['lead_status' => $before], ['lead_status' => $to, 'why' => $why]);
             $n++;
         }

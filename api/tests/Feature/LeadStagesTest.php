@@ -155,6 +155,30 @@ class LeadStagesTest extends TestCase
         $this->assertNotSame('Booked', Lead::where('lead_id', 'IRST00001')->value('booking_status'));
     }
 
+    public function test_marking_a_lead_lost_removes_its_scheduled_follow_ups_only(): void
+    {
+        $this->seed7();
+        $sales = User::factory()->sales()->create();
+        DB::table('leads')->whereIn('lead_id', ['IRST00001', 'IRST00005'])->update(['staff_id' => $sales->id]);
+        Sanctum::actingAs($sales, ['*'], 'sanctum');
+        $mk = fn (string $lead, string $type, bool $done = false) => \App\Models\Activity::create([
+            'type' => $type, 'title' => 't', 'due_at' => now()->addDay(), 'assigned_to' => $sales->id, 'lead_id' => $lead, 'completed_at' => $done ? now() : null,
+        ])->id;
+        $open = $mk('IRST00001', 'follow_up');
+        $open2 = $mk('IRST00001', 'follow_up');
+        $done = $mk('IRST00001', 'follow_up', true);
+        $call = $mk('IRST00001', 'call');
+        $other = $mk('IRST00005', 'follow_up');
+
+        $this->patchJson('/api/leads/IRST00001', ['lead_status' => 'Lost', 'lost_reason' => 'Price too high'])->assertOk();
+
+        $this->assertDatabaseMissing('activities', ['id' => $open]);
+        $this->assertDatabaseMissing('activities', ['id' => $open2]);
+        $this->assertDatabaseHas('activities', ['id' => $done]);
+        $this->assertDatabaseHas('activities', ['id' => $call]);
+        $this->assertDatabaseHas('activities', ['id' => $other]);
+    }
+
     public function test_operations_can_set_any_status_and_booked_follows_into_booking_status(): void
     {
         $this->seed7();
