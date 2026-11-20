@@ -174,4 +174,22 @@ class TransportFormChangesTest extends TestCase
         $this->assertSame([2, 1], $rows->pluck('qty')->all());                                      // 8 guests need two 6-seat Ertigas; the added Innova is one
         $this->assertEquals(5000 * 2 * 3 + 6000 * 1 * 3, $rows->sum('selling') / (1 + 0) - $rows->sum('margin_amount'));
     }
+
+    public function test_a_day_by_day_quotation_with_a_no_car_day_two_cars_and_a_volvo_line_totals_correctly_and_keeps_the_volvo_when_the_mode_changes(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $dz = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'Swift Dzire', 'name' => 'Local', 'charged' => 'per_day', 'price' => 2200, 'currency' => 'INR', 'seats' => 4]);
+        $sumo = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'Sumo', 'name' => 'Local', 'charged' => 'per_day', 'price' => 3000, 'currency' => 'INR', 'seats' => 7]);
+        $volvo = TransportLine::create(['type' => 'bus', 'destination_id' => $d->id, 'car_name' => 'Volvo', 'name' => 'Delhi to Manali', 'charged' => 'per_person', 'price' => 2000, 'currency' => 'INR', 'way' => 'one_way']);
+        \App\Models\QuoteSetting::write('margin_default', ['type' => 'percent', 'value' => 15]);
+        $this->ops();
+        $extras = [['id' => 'x1', 'kind' => 'bus', 'line_id' => $volvo->id, 'day' => 1, 'way' => 'one_way']];
+        $daily = ['mode' => 'daily', 'daily' => [['day' => 1, 'line_id' => null], ['day' => 2, 'line_id' => $dz->id], ['day' => 3, 'line_id' => $sumo->id]], 'extras' => $extras];
+        $p = fn (array $road) => ['trip' => ['destination' => 'Manali', 'start_date' => '2026-12-05', 'nights' => 4, 'adults' => 4, 'group_sizes' => [4]], 'gst_rate' => 5, 'options' => [['name' => 'Option 1', 'stays' => []]], 'road' => $road];
+        $rd = $this->postJson('/api/quote-proposals/compute', ['proposal' => $p($daily)])->assertOk()->json('computed.options.0.actual.road');
+        $this->assertEquals(2530 + 3450 + 9200, $rd['selling']);                                    // Dzire day 2, Sumo day 3, Volvo 4 persons; the No car day adds nothing
+        $this->assertCount(3, $rd['rows']);
+        $stay = $this->postJson('/api/quote-proposals/compute', ['proposal' => $p(['mode' => 'stay', 'stays' => [], 'extras' => $extras] + $daily)])->assertOk()->json('computed.options.0.actual.road');
+        $this->assertEquals(9200, $stay['selling']);                                                // switched to the same car every day with none chosen: the Volvo is still there
+    }
 }
