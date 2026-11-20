@@ -78,10 +78,11 @@ class ProposalPricing
                     'meal_plan' => isset(HotelRate::MEALS[$meal]) ? $meal : 'CP', 'start_offset' => max(0, min(89, (int) ($s['start_offset'] ?? 0))), 'nights' => max(1, min(60, (int) ($s['nights'] ?? 1))),
                 ];
             }
-            $options[] = ['name' => mb_substr(trim((string) ($o['name'] ?? '')) ?: 'Option '.($i + 1), 0, 80), 'stays' => array_values(array_filter($stays, fn ($s) => $s['hotel_id'] && $s['room_id']))];
+            $options[] = ['name' => mb_substr(trim((string) ($o['name'] ?? '')) ?: 'Option '.($i + 1), 0, 80), 'stays' => array_values(array_filter($stays, fn ($s) => $s['hotel_id'] && $s['room_id'])),
+                'legs' => TransportPricing::cleanLegs($o['legs'] ?? [])];
         }
         if (! $options) {
-            $options[] = ['name' => 'Option 1', 'stays' => []];
+            $options[] = ['name' => 'Option 1', 'stays' => [], 'legs' => []];
         }
 
         $rows = [];
@@ -121,7 +122,7 @@ class ProposalPricing
         return [
             'trip' => $trip, 'days' => $days, 'options' => $options, 'land' => ['label' => mb_substr(trim((string) ($p['land']['label'] ?? '')), 0, 200), 'rows' => $rows],
             'gst_rate' => max(0.0, min(100.0, (float) ($p['gst_rate'] ?? 5))), 'selected_option' => max(0, min(count($options) - 1, (int) ($p['selected_option'] ?? 0))),
-            'content' => $content, 'cover_media_id' => $cover,
+            'content' => $content, 'cover_media_id' => $cover, 'transport' => TransportPricing::cleanSettings($p['transport'] ?? []),
         ];
     }
 
@@ -138,7 +139,7 @@ class ProposalPricing
     }
 
     /** @return array<string,mixed> one group priced for one option */
-    private static function price(array $trip, array $land, array $stays, int $adults, int $cb, int $cn): array
+    private static function price(array $trip, array $land, array $stays, array $legs, array $transport, int $adults, int $cb, int $cn, bool $actual = false): array
     {
         $rows = [];
         $sell = $cost = $marginAmt = 0.0;
@@ -171,11 +172,13 @@ class ProposalPricing
         $m = HotelPricing::marginForDestination($trip['destination'] ?: null);
         $landMargin = $m['type'] === 'amount' ? $m['value'] * max(1, $persons) : $landCost * $m['value'] / 100;
         $landSell = round($landCost + $landMargin, 2);
-        $total = round($sell + $landSell, 2);
+        $tr = TransportPricing::price($legs, $trip, $transport, $adults, $cb, $cn, $actual);
+        $total = round($sell + $landSell + $tr['selling'], 2);
 
         return [
-            'persons' => $persons, 'adults' => $adults, 'stays' => $rows, 'land_selling' => $landSell, 'total' => $total, 'per_person' => $persons > 0 ? (float) ceil($total / $persons) : 0.0,
-            'cost' => round($cost + $landCost, 2), 'margin_amount' => round($marginAmt + $landMargin, 2), 'warnings' => $warnings,
+            'persons' => $persons, 'adults' => $adults, 'stays' => $rows, 'land_selling' => $landSell, 'transport' => $tr, 'hotel_selling' => round($sell, 2),
+            'total' => $total, 'per_person' => $persons > 0 ? (float) ceil($total / $persons) : 0.0,
+            'cost' => round($cost + $landCost + $tr['cost'], 2), 'margin_amount' => round($marginAmt + $landMargin + $tr['margin_amount'], 2), 'warnings' => array_merge($warnings, $tr['warnings']),
         ];
     }
 
@@ -184,6 +187,7 @@ class ProposalPricing
      */
     public static function compute(array $p, bool $withCost): array
     {
+        TransportPricing::flush();                              // rates may have changed since the last quotation was priced in this process
         $trip = $p['trip'];
         $warnings = [];
         $out = [];
@@ -199,10 +203,10 @@ class ProposalPricing
             }
             $tiers = [];
             foreach ($trip['group_sizes'] as $g) {
-                $r = self::price($trip, $p['land'], $stays, $g, 0, 0);
+                $r = self::price($trip, $p['land'], $stays, $o['legs'], $p['transport'], $g, 0, 0);
                 $tiers[] = $r + ['pax' => $g];
             }
-            $actual = self::price($trip, $p['land'], $stays, $trip['adults'], $trip['children_bed'], $trip['children_no_bed']);
+            $actual = self::price($trip, $p['land'], $stays, $o['legs'], $p['transport'], $trip['adults'], $trip['children_bed'], $trip['children_no_bed'], true);
             foreach (array_merge($tiers, [$actual]) as $r) {
                 foreach ($r['warnings'] as $w) {
                     $warnings[] = $o['name'].': '.$w;
@@ -212,9 +216,15 @@ class ProposalPricing
         }
         $out = array_map(function ($o) use ($withCost) {
             $strip = function (array $r) use ($withCost) {
-                unset($r['warnings']);
+                unset($r['warnings'], $r['transport']['warnings']);
                 if (! $withCost) {
                     unset($r['cost'], $r['margin_amount']);
+                    unset($r['transport']['cost'], $r['transport']['margin_amount']);
+                    $r['transport']['legs'] = array_map(function ($l) {
+                        unset($l['cost'], $l['margin_amount']);
+
+                        return $l;
+                    }, $r['transport']['legs']);
                     $r['stays'] = array_map(function ($s) {
                         unset($s['cost'], $s['margin_amount']);
 
@@ -242,6 +252,12 @@ class ProposalPricing
         foreach ($opt['actual']['stays'] as $s) {
             $lines[] = ['kind' => 'hotel', 'description' => sprintf('%s: %s, %s, %d night%s', $s['hotel'], $s['room'], strtolower(HotelRate::MEALS[$s['meal_plan']]), $s['nights'], $s['nights'] === 1 ? '' : 's'),
                 'qty' => 1, 'unit_price' => $s['selling'], 'discount' => 0, 'tax_rate' => $p['gst_rate']];
+        }
+        foreach ($opt['actual']['transport']['legs'] as $l) {
+            if ($l['included'] && $l['selling'] > 0) {
+                $lines[] = ['kind' => $l['mode'] === 'flight' ? 'flight' : 'transfer', 'description' => sprintf('%s (Day %d)', $l['description'] ?: ucfirst($l['mode']), $l['day']), 'qty' => 1,
+                    'unit_price' => $l['selling'], 'discount' => 0, 'tax_rate' => $p['gst_rate']];
+            }
         }
         if ($opt['actual']['land_selling'] > 0) {
             $lines[] = ['kind' => 'package', 'description' => $p['land']['label'] ?: 'Land package: transfers and sightseeing', 'qty' => 1,

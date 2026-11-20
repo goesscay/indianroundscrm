@@ -10,6 +10,7 @@ use App\Models\QuoteContentBlock;
 use App\Models\QuoteTemplate;
 use App\Models\TravelPackage;
 use App\Services\ProposalPricing;
+use App\Services\TransportPricing;
 use Illuminate\Http\Request;
 
 /** The premium proposal builder: a starting point, a live price, and saving it as an ordinary draft quote (the quote lines are worked out from it). */
@@ -17,7 +18,7 @@ class ProposalController extends Controller
 {
     private function manager(Request $r): bool
     {
-        return (bool) $r->user()->hasPermission('hotels.manage');
+        return (bool) ($r->user()->hasPermission('hotels.manage') || $r->user()->hasPermission('transport.manage'));
     }
 
     private function body(Request $request): array
@@ -64,9 +65,10 @@ class ProposalController extends Controller
         $p = [
             'trip' => ['destination' => $destination, 'start_date' => $deal?->travel_date?->format('Y-m-d'), 'nights' => $nights, 'adults' => max(1, (int) ($deal?->adults ?? 2)),
                 'children_bed' => (int) ($deal?->children ?? 0), 'children_no_bed' => 0, 'group_sizes' => [2, 4, 6]],
-            'days' => $days, 'options' => [['name' => 'Option 1', 'stays' => []]],
+            'days' => $days, 'options' => [['name' => 'Option 1', 'stays' => [], 'legs' => []]],
             'land' => ['label' => 'Land package: transfers and sightseeing', 'rows' => []], 'gst_rate' => (float) ($pkg?->gst_rate ?? 5), 'selected_option' => 0,
             'content' => $content, 'cover_media_id' => null,
+            'transport' => ['fx' => TransportPricing::defaultFx() + ['safety_pct' => 0], 'cab_scope' => []],
         ];
 
         $title = $destination !== '' ? "$destination trip" : 'Trip proposal';

@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { INR } from "@/components/crm/shared";
+import ProposalTransport from "@/components/crm/ProposalTransport";
 import type { CustomerBrief, Customer, Hotel, MealPlan, MediaItem, ProposalComputed, ProposalData, ProposalDay, ProposalStay, Quote, QuoteTemplateBrief } from "@/types";
 
 const MEAL_LABEL: Record<MealPlan, string> = { EP: "Room only", CP: "Breakfast", MAP: "Breakfast and dinner", AP: "All meals" };
@@ -107,7 +108,7 @@ export default function ProposalEditor() {
   const { id } = useParams<{ id: string }>();
   const { can } = useCurrentUser();
   const editing = id !== "new";
-  const manager = can("hotels.manage");
+  const manager = can("hotels.manage") || can("transport.manage");
 
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -370,7 +371,7 @@ export default function ProposalEditor() {
         </div>
       </Section>
 
-      <Section title="Hotel options" hint="Offer the customer a choice. Each option is priced for every group size." right={p.options.length < 4 ? <Button type="button" variant="outline" size="sm" onClick={() => set((d) => { d.options.push({ name: `Option ${d.options.length + 1}`, stays: [] }); })}><Plus size={14} /> Add option</Button> : null}>
+      <Section title="Hotel options" hint="Offer the customer a choice. Each option is priced for every group size." right={p.options.length < 4 ? <Button type="button" variant="outline" size="sm" onClick={() => set((d) => { d.options.push({ name: `Option ${d.options.length + 1}`, stays: [], legs: [] }); })}><Plus size={14} /> Add option</Button> : null}>
         <div className="space-y-4">
           {p.options.map((o, oi) => (
             <div key={oi} className="rounded-lg border p-3" data-testid={`proposal-option-${oi}`}>
@@ -419,6 +420,10 @@ export default function ProposalEditor() {
         </div>
       </Section>
 
+      <Section title="Transport" hint="Flights, trains, buses, cabs, vans and ferries for each option. Cabs, vans, buses and ferries are priced from the transport master by travel date and season; foreign prices are converted at the rates on this quotation.">
+        <ProposalTransport p={p} set={set} computed={computed} manager={manager} />
+      </Section>
+
       <Section title="Land package" hint="Cost per person for transfers and sightseeing, by group size. A group uses the first row that covers it. Our margin is added on top." right={<Button type="button" variant="outline" size="sm" onClick={() => set((d) => { d.land.rows.push({ pax: (d.land.rows.at(-1)?.pax ?? 0) + 2, cost_pp: 0, child_cost_pp: null }); })}><Plus size={14} /> Add row</Button>}>
         <div className="space-y-3">
           <div><Label>Description on the quotation</Label><Input value={p.land.label} onChange={(e) => set((d) => { d.land.label = e.target.value; })} className="mt-1" placeholder="Delhi–Manali–Delhi Volvo and sightseeing" /></div>
@@ -433,7 +438,7 @@ export default function ProposalEditor() {
         </div>
       </Section>
 
-      <Section title="Package price" hint="Worked out from the hotel rates and the land package. Prices are per person and exclude GST." right={computing ? <Loader2 size={16} className="animate-spin text-muted-foreground" /> : null}>
+      <Section title="Package price" hint="Worked out from the hotel rates, the transport and the land package. Prices are per person and exclude GST." right={computing ? <Loader2 size={16} className="animate-spin text-muted-foreground" /> : null}>
         {computed && computed.warnings.length > 0 && (
           <ul className="mb-3 list-disc space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 py-2 pl-7 pr-3 text-sm" data-testid="proposal-warnings">{computed.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
         )}
@@ -457,6 +462,11 @@ export default function ProposalEditor() {
             </tbody>
           </table>
         </div>
+        {sel && sel.actual.transport && sel.actual.transport.selling > 0 && (
+          <p className="mt-3 text-sm text-muted-foreground" data-testid="proposal-by-mode">
+            Price by mode for this group on the quoted option (before GST): {sel.actual.hotel_selling ? `Hotels ${INR(sel.actual.hotel_selling)} · ` : ""}{Object.entries(sel.actual.transport.by_mode).map(([m, v]) => `${m === "van" ? "Tempo / van" : m.charAt(0).toUpperCase() + m.slice(1)} ${INR(v)}`).join(" · ")}{sel.actual.land_selling ? ` · Land package ${INR(sel.actual.land_selling)}` : ""}
+          </p>
+        )}
         {manager && sel && (
           <p className="mt-3 text-sm text-muted-foreground" data-testid="proposal-margin">Operations view: cost {INR(sel.actual.cost)}, margin {INR(sel.actual.margin_amount)} for this group on the quoted option.</p>
         )}

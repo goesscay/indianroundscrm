@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Crm;
 
 use App\Crm\Fail;
 use App\Http\Controllers\Controller;
+use App\Models\QuoteSetting;
 use App\Models\TransportCountry;
 use App\Models\TransportPlace;
 use App\Models\TransportProvider;
@@ -11,6 +12,7 @@ use App\Models\TransportRate;
 use App\Models\TransportRoute;
 use App\Models\TransportVehicle;
 use App\Services\SpreadsheetRows;
+use App\Services\TransportPricing;
 use App\Support\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -106,6 +108,24 @@ class TransportController extends Controller
     public function destinations()
     {
         return TransportProvider::query()->select('destination')->distinct()->orderBy('destination')->pluck('destination')->values();
+    }
+
+    // ------------------------------------------------------------------ exchange rates
+
+    /** GET /transport/exchange-rates: the default rates (rupees per unit of foreign currency) each new quotation starts with. */
+    public function exchangeRates()
+    {
+        return TransportPricing::defaultFx();
+    }
+
+    public function saveExchangeRates(Request $request)
+    {
+        $d = Fail::validate(Fail::body($request), ['date' => 'nullable|date_format:Y-m-d', 'rates' => 'required|array|max:40']);
+        $clean = TransportPricing::cleanSettings(['fx' => ['rates' => $d['rates']]])['fx']['rates'];
+        QuoteSetting::write('transport_fx', ['date' => $d['date'] ?? now()->toDateString(), 'rates' => $clean]);
+        ActivityLogger::log($request->user(), 'update_transport_fx', 'transport', '', null, ['rates' => $clean]);
+
+        return TransportPricing::defaultFx();
     }
 
     // ------------------------------------------------------------------ countries and places

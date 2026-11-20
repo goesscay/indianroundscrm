@@ -147,6 +147,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/transport/destinations', [TransportController::class, 'destinations'])->middleware('perm:transport.view,transport.manage');
     Route::get('/transport/import-template', [TransportController::class, 'importTemplate'])->middleware('perm:transport.manage');
     Route::post('/transport/import', [TransportController::class, 'import'])->middleware('perm:transport.manage');
+    Route::get('/transport/exchange-rates', [TransportController::class, 'exchangeRates'])->middleware('perm:transport.view,transport.manage');
+    Route::put('/transport/exchange-rates', [TransportController::class, 'saveExchangeRates'])->middleware('perm:transport.manage');
     Route::post('/transport/countries', [TransportController::class, 'storeCountry'])->middleware('perm:transport.manage');
     Route::patch('/transport/countries/{code}', [TransportController::class, 'updateCountry'])->middleware('perm:transport.manage');
     Route::get('/transport/places', [TransportController::class, 'places'])->middleware('perm:transport.manage');
