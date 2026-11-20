@@ -84,6 +84,21 @@ export default function ProposalTransport({ p, set, computed, manager }: { p: Pr
         ))}
       </div>
 
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-2 rounded-md border bg-muted/30 p-3 text-sm" data-testid="customer-wording">
+        <span className="font-medium">What the customer sees</span>
+        <div className="w-[260px]"><Label className="text-xs">Vehicle and airline names</Label>
+          <Select value={p.transport?.wording ?? "named"} onValueChange={(v) => set((d) => { ensureTransport(d).wording = v as "named" | "general"; })}>
+            <SelectTrigger className="mt-1 h-9" data-testid="wording-select"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="named">Show them (Private Ertiga, Volvo bus)</SelectItem><SelectItem value="general">General only (Private cab, Bus)</SelectItem></SelectContent>
+          </Select></div>
+        <div className="w-[260px]"><Label className="text-xs">Transport price</Label>
+          <Select value={p.transport?.tax_display ?? "with_gst"} onValueChange={(v) => set((d) => { ensureTransport(d).tax_display = v as "with_gst" | "before_gst"; })}>
+            <SelectTrigger className="mt-1 h-9" data-testid="taxdisplay-select"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="with_gst">Show the total including GST</SelectItem><SelectItem value="before_gst">Show before GST (GST extra)</SelectItem></SelectContent>
+          </Select></div>
+        <span className="text-xs text-muted-foreground">Provider names, costs and margin are never shown to the customer.</span>
+      </div>
+
       {p.options.map((o, oi) => {
         const legs = o.legs ?? [];
         const priced = computed?.options[oi]?.actual.transport;

@@ -979,7 +979,15 @@ export interface ProposalLeg {
   title: string | null; from: string | null; to: string | null; depart: string | null; arrive: string | null; class: string | null; baggage: string | null; reference: string | null;
   fare_pp: number | null; child_fare_pp: number | null; currency: string; included: boolean; note: string | null;
 }
-export interface ProposalTransportSettings { fx: { date: string | null; rates: Record<string, number>; safety_pct: number }; cab_scope: Record<string, "stay" | "daily"> }
+export interface ProposalTransportSettings {
+  fx: { date: string | null; rates: Record<string, number>; safety_pct: number }; cab_scope: Record<string, "stay" | "daily">;
+  wording?: "named" | "general"; tax_display?: "with_gst" | "before_gst";
+}
+export interface TransportJourneyLine { day: number; date: string | null; mode: LegMode; label: string; title: string; detail: string; included: boolean; tag: string }
+export interface TransportJourney {
+  blocks: { destination: string; lines: TransportJourneyLine[] }[]; summary: { service: string; details: string; included: boolean }[];
+  selling: number; gst_rate: number; tax_display: "with_gst" | "before_gst"; total_incl_gst: number; inclusions: string[]; exclusions: string[]; notes: string[];
+}
 export interface ProposalLegPrice {
   id: string; mode: LegMode; day: number; included: boolean; qty: number | null; basis: string | null; description: string; selling: number; cost?: number; margin_amount?: number;
   currency: string; rate_needed: boolean; warnings?: string[];

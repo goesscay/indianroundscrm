@@ -47,6 +47,11 @@
   .stay { margin: 0 0 24px; }
   .stay .nm { font-size: 17px; font-weight: bold; margin: 2px 0 2px; }
   .star { color: #C9A24B; letter-spacing: 1px; font-size: 11px; }
+  .trn { font-size: 9px; color: #4B5160; margin: 5px 0 0; padding: 4px 7px; background: #F3F4F6; border-left: 3px solid #D71920; }
+  .tt th { font-size: 7.5px; letter-spacing: 1px; text-transform: uppercase; color: #8A909C; text-align: left; padding: 5px 6px; border-bottom: 1px solid #E4E6EB; }
+  .tt td { padding: 7px 6px; font-size: 10px; border-bottom: 1px solid #ECEEF2; vertical-align: top; }
+  .tag { display: inline-block; background: #FDECEC; color: #D71920; font-size: 7px; font-weight: bold; letter-spacing: .8px; text-transform: uppercase; padding: 2px 5px; }
+  .tag.info { background: #F3F4F6; color: #6B7280; }
   .badge { display: inline-block; background: #F3F4F6; border: 1px solid #E4E6EB; padding: 2px 7px; font-size: 8px; margin: 0 4px 4px 0; }
   .kv td { padding: 3px 0; border-bottom: 1px solid #F0F1F4; }
   .kv .k { width: 78px; color: #8A909C; font-size: 8px; text-transform: uppercase; letter-spacing: .8px; }
@@ -138,6 +143,7 @@
         <div class="dt">{{ $d['title'] }}</div>
         @if($d['stay'])<div class="ds">Stay: {{ $d['stay'] }}</div>@endif
         <ul>@foreach(array_slice($d['bullets'], 0, 7) as $b)<li>{{ $b }}</li>@endforeach</ul>
+        @foreach(($journey['by_day'][$d['no']] ?? []) as $tl)<div class="trn">Transport: {{ $tl['label'] }}{{ $tl['title'] && $tl['title'] !== $tl['label'] ? ' · '.$tl['title'] : '' }}{{ $tl['detail'] ? ' · '.$tl['detail'] : '' }}</div>@endforeach
       </td>
     </tr></table>
     @endforeach
@@ -183,6 +189,42 @@
   </div>
 </div>
 @endforeach
+
+{{-- transport --}}
+@if($journey)
+<div class="sheet">
+  <div class="bar"></div>
+  <div class="pad">
+    <div class="caps red">Getting around</div>
+    <div class="h1">Your transport</div>
+    <div class="rule"></div>
+    @foreach($journey['blocks'] as $b)
+    <div class="sec" style="margin-top:{{ $loop->first ? 0 : 14 }}px">{{ $b['destination'] }}</div>
+    <table class="tt" style="width:100%">
+      <tr><th style="width:62px">Day</th><th style="width:84px">Date</th><th style="width:120px">Transport</th><th>Details</th><th style="width:74px"></th></tr>
+      @foreach($b['lines'] as $l)
+      <tr>
+        <td>Day {{ $l['day'] }}</td>
+        <td>{{ $l['date'] ? \Illuminate\Support\Carbon::parse($l['date'])->format('d M Y') : '' }}</td>
+        <td><b>{{ $l['label'] }}</b></td>
+        <td>{{ $l['title'] && $l['title'] !== $l['label'] ? $l['title'] : '' }}{{ $l['detail'] ? ($l['title'] && $l['title'] !== $l['label'] ? ' · ' : '').$l['detail'] : '' }}</td>
+        <td style="text-align:right"><span class="tag {{ $l['included'] ? '' : 'info' }}">{{ $l['tag'] }}</span></td>
+      </tr>
+      @endforeach
+    </table>
+    @endforeach
+    <div class="total" style="margin-top:16px">
+      <div class="caps muted" style="font-size:7.5px">Transport summary</div>
+      <table style="margin-top:6px">
+        @foreach($journey['summary'] as $x)<tr><td style="font-size:10px"><b>{{ $x['service'] }}</b> <span class="muted">{{ $x['details'] }}</span></td><td style="text-align:right; font-size:9px; color:#6B7280">{{ $x['included'] ? 'included below' : 'for information' }}</td></tr>@endforeach
+        <tr><td style="font-size:12px; font-weight:bold; padding-top:6px">Transport total{{ $journey['tax_display'] === 'with_gst' ? ' (incl. GST)' : ' (before GST)' }}</td>
+          <td style="text-align:right; font-size:14px; font-weight:bold; color:#D71920; padding-top:4px">{{ $inr($journey['tax_display'] === 'with_gst' ? $journey['total_incl_gst'] : $journey['selling']) }}</td></tr>
+      </table>
+    </div>
+    @foreach($journey['notes'] as $n)<p class="muted" style="margin:8px 0 0; font-size:9px">{{ $n }}</p>@endforeach
+  </div>
+</div>
+@endif
 
 {{-- price --}}
 <div class="sheet">

@@ -11,6 +11,7 @@ import { useCurrentUser } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import SendQuoteDialog from "@/components/crm/SendQuoteDialog";
+import ProposalJourney from "@/components/crm/ProposalJourney";
 import { INR2, QuotePill, fmtDate } from "@/components/crm/shared";
 import type { Quote } from "@/types";
 
@@ -160,6 +161,7 @@ export default function QuoteDetail() {
               <ol className="space-y-2 text-sm">{x.itinerary!.map((d, i) => <li key={i}><span className="font-semibold">Day {d.day_no ?? i + 1} — {d.title}</span>{d.description && <div className="whitespace-pre-line text-muted-foreground">{d.description}</div>}</li>)}</ol>
             </Card>
           )}
+          {x.is_proposal && <ProposalJourney quoteId={x.id} />}
           {(x.inclusions || x.exclusions) && (
             <div className="grid gap-6 sm:grid-cols-2">
               {x.inclusions && <Card className="rounded-lg p-5"><h3 className="mb-2 font-display font-bold">Inclusions</h3><p className="whitespace-pre-line text-sm">{x.inclusions}</p></Card>}
