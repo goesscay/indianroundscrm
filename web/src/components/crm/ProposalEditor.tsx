@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { INR } from "@/components/crm/shared";
 import ProposalTransport from "@/components/crm/ProposalTransport";
-import ProposalReach from "@/components/crm/ProposalReach";
+import ProposalTransportCard from "@/components/crm/ProposalTransportCard";
 import type { CustomerBrief, Customer, Hotel, MealPlan, MediaItem, ProposalComputed, ProposalData, ProposalDay, ProposalStay, Quote, QuoteTemplateBrief } from "@/types";
 
 const MEAL_LABEL: Record<MealPlan, string> = { EP: "Room only", CP: "Breakfast", MAP: "Breakfast and dinner", AP: "All meals" };
@@ -421,12 +421,15 @@ export default function ProposalEditor() {
         </div>
       </Section>
 
-      <Section title="Transport" hint="Buses, cabs, vans and ferries for each option, priced from the transport master by travel date and season. Foreign prices are converted at the rates on this quotation. Flights and trains are suggested in the next section, with no price.">
-        <ProposalTransport p={p} set={set} computed={computed} manager={manager} />
-      </Section>
-
-      <Section title="Flights and trains" hint="Suggest how the customer can reach the destination. Choose from the list for this trip. Details only: no prices are shown or added, and the package price does not change." right={<span className="rounded bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">Information only</span>}>
-        <ProposalReach p={p} set={set} />
+      <Section title="Transport" hint="One card: road transport is priced from the rates Operations keep; flights and trains show details only, with no price." right={<span className="rounded bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">Flights and trains: information only</span>}>
+        <ProposalTransportCard p={p} set={set} computed={computed} manager={manager} />
+        {p.options.some((o) => (o.legs ?? []).length > 0) && (
+          <div className="mt-6 space-y-2 border-t pt-4" data-testid="legacy-transport">
+            <p className="text-sm font-medium">Transport added before the Transport card</p>
+            <p className="text-xs text-muted-foreground">This quotation has transport legs from the earlier layout. They still price as before and are kept here so nothing is lost. New transport goes in the card above.</p>
+            <ProposalTransport p={p} set={set} computed={computed} manager={manager} />
+          </div>
+        )}
       </Section>
 
       <Section title="Land package" hint="Cost per person for transfers and sightseeing, by group size. A group uses the first row that covers it. Our margin is added on top." right={<Button type="button" variant="outline" size="sm" onClick={() => set((d) => { d.land.rows.push({ pax: (d.land.rows.at(-1)?.pax ?? 0) + 2, cost_pp: 0, child_cost_pp: null }); })}><Plus size={14} /> Add row</Button>}>
@@ -467,9 +470,9 @@ export default function ProposalEditor() {
             </tbody>
           </table>
         </div>
-        {sel && sel.actual.transport && sel.actual.transport.selling > 0 && (
+        {sel && ((sel.actual.transport?.selling ?? 0) > 0 || (sel.actual.road?.selling ?? 0) > 0) && (
           <p className="mt-3 text-sm text-muted-foreground" data-testid="proposal-by-mode">
-            Price by mode for this group on the quoted option (before GST): {sel.actual.hotel_selling ? `Hotels ${INR(sel.actual.hotel_selling)} · ` : ""}{Object.entries(sel.actual.transport.by_mode).map(([m, v]) => `${m === "van" ? "Tempo / van" : m.charAt(0).toUpperCase() + m.slice(1)} ${INR(v)}`).join(" · ")}{sel.actual.land_selling ? ` · Land package ${INR(sel.actual.land_selling)}` : ""}
+            Price by mode for this group on the quoted option (before GST): {sel.actual.hotel_selling ? `Hotels ${INR(sel.actual.hotel_selling)} · ` : ""}{Object.entries(Object.entries({ ...(sel.actual.transport?.by_mode ?? {}), ...Object.fromEntries(Object.entries(sel.actual.road?.by_mode ?? {}).map(([k, v]) => [k, v + ((sel.actual.transport?.by_mode ?? {})[k] ?? 0)])) }).reduce<Record<string, number>>((a, [k, v]) => ({ ...a, [k]: v }), {})).map(([m, v]) => `${m === "van" ? "Tempo / van" : m.charAt(0).toUpperCase() + m.slice(1)} ${INR(v)}`).join(" · ")}{sel.actual.land_selling ? ` · Land package ${INR(sel.actual.land_selling)}` : ""}
           </p>
         )}
         {manager && sel && (

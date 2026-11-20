@@ -161,7 +161,7 @@ class TransportPricing
         return ['type' => $m['type'], 'value' => (float) $m['value']];
     }
 
-    private static function fxRate(string $currency, array $fx): ?float
+    public static function fxRate(string $currency, array $fx): ?float
     {
         if ($currency === 'INR') {
             return 1.0;

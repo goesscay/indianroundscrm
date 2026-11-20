@@ -82,6 +82,23 @@ class TransportLineController extends Controller
         ];
     }
 
+    /**
+     * GET /transport/road-options: what sales can pick on a quotation's Road transport tab. Names, seats and how each is charged only: never the price,
+     * the supplier or the notes. The price follows from the choice and is shown as the selling price on the quotation.
+     */
+    public function roadOptions(Request $request)
+    {
+        $q = TransportLine::query()->with('destination')->where('active', true)->where(fn ($w) => $w->where('price', '>', 0)->orWhereHas('seasons'));
+        if (($d = trim((string) $request->query('destination', ''))) !== '') {
+            $q->whereHas('destination', fn ($x) => $x->whereRaw('lower(name) = ?', [mb_strtolower($d)]));
+        }
+
+        return $q->orderBy('destination_id')->orderBy('type')->orderBy('name')->limit(3000)->get()->map(fn (TransportLine $l) => [
+            'id' => (string) $l->id, 'type' => $l->type, 'name' => $l->name, 'charged' => $l->charged, 'seats' => $l->seats, 'from_name' => $l->from_name, 'to_name' => $l->to_name,
+            'way' => $l->way, 'destination' => $l->destination?->name,
+        ])->values();
+    }
+
     // ------------------------------------------------------------------ the list
 
     public function index(Request $request)

@@ -27,15 +27,15 @@ const Badge = ({ kind }: { kind: ScheduleKind }) => <span className={cn("inline-
 const BLANK = { kind: "flight" as ScheduleKind, title: "", from_name: "", to_name: "", departs: "", arrives: "", classes: "", note: "", days: ALL };
 
 /** Flights and trains on a quotation: suggestions only. The list is already filtered by route and travel date; sales tick the ones to share. No prices, nothing calculated. */
-export default function ProposalReach({ p, set }: { p: ProposalData; set: SetFn }) {
+export default function ProposalReach({ p, set, kind }: { p: ProposalData; set: SetFn; kind?: ScheduleKind }) {
   const [rows, setRows] = useState<TransportSchedule[]>([]);
   const [origins, setOrigins] = useState<string[]>([]);
   const [from, setFrom] = useState(p.reach?.from ?? "");
   const [to, setTo] = useState("");
-  const [show, setShow] = useState<"all" | ScheduleKind>("all");
+  const [show, setShow] = useState<"all" | ScheduleKind>(kind ?? "all");
   const [adding, setAdding] = useState(false);
-  const [f, setF] = useState(BLANK);
-  const items = p.reach?.items ?? [];
+  const [f, setF] = useState({ ...BLANK, kind: kind ?? BLANK.kind });
+  const items = (p.reach?.items ?? []).filter((x) => !kind || x.kind === kind);       // inside a Flights or Trains tab only that kind is shown and counted
   const date = p.trip.start_date ?? "";
 
   useEffect(() => { api.get<string[]>("/transport/schedules/origins").then((r) => setOrigins(r.data)).catch(() => setOrigins([])); }, []);
@@ -54,7 +54,7 @@ export default function ProposalReach({ p, set }: { p: ProposalData; set: SetFn 
     const i = d.reach.items.findIndex((x) => String(x.schedule_id) === s.id);
     if (i >= 0) d.reach.items.splice(i, 1); else if (d.reach.items.length < 12) d.reach.items.push(toItem(s));
   });
-  const shownRows = useMemo(() => rows.filter((r) => show === "all" || r.kind === show), [rows, show]);
+  const shownRows = useMemo(() => rows.filter((r) => (kind ?? show) === "all" || r.kind === (kind ?? show)), [rows, show, kind]);
   const listedIds = new Set(rows.map((r) => r.id));
   const outside = items.filter((x) => x.schedule_id != null && !listedIds.has(String(x.schedule_id)));
   const custom = items.filter((x) => x.schedule_id == null);
@@ -66,7 +66,7 @@ export default function ProposalReach({ p, set }: { p: ProposalData; set: SetFn 
       if (d.reach.items.length < 12) d.reach.items.push({ schedule_id: null, kind: f.kind, title: f.title.trim(), from_name: f.from_name.trim(), from_code: null, to_name: f.to_name.trim(), to_code: null, departs: f.departs || null, arrives: f.arrives || null,
         arrives_next_day: false, days: f.days.length ? f.days : ALL, classes: f.classes || null, note: f.note || null });
     });
-    setF({ ...BLANK, from_name: from }); setAdding(false);
+    setF({ ...BLANK, kind: kind ?? BLANK.kind, from_name: from }); setAdding(false);
   };
 
   return (
@@ -77,9 +77,9 @@ export default function ProposalReach({ p, set }: { p: ProposalData; set: SetFn 
           <datalist id="reach-origins">{origins.map((o) => <option key={o} value={o} />)}</datalist></div>
         <div className="w-[170px]"><Label className="text-xs">To</Label><Input value={toValue} onChange={(e) => setTo(e.target.value)} className="mt-1 h-9" data-testid="reach-to" /></div>
         <div className="w-[150px]"><Label className="text-xs">Travel date</Label><Input type="date" value={date} onChange={(e) => set((d) => { d.trip.start_date = e.target.value || null; })} className="mt-1 h-9" /></div>
-        <div className="w-[170px]"><Label className="text-xs">Show</Label>
+        {!kind && <div className="w-[170px]"><Label className="text-xs">Show</Label>
           <Select value={show} onValueChange={(v) => setShow(v as "all" | ScheduleKind)}><SelectTrigger className="mt-1 h-9" data-testid="reach-show"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="all">Flights and trains</SelectItem><SelectItem value="flight">Flights only</SelectItem><SelectItem value="train">Trains only</SelectItem></SelectContent></Select></div>
+            <SelectContent><SelectItem value="all">Flights and trains</SelectItem><SelectItem value="flight">Flights only</SelectItem><SelectItem value="train">Trains only</SelectItem></SelectContent></Select></div>}
       </div>
 
       {shownRows.length === 0 && outside.length === 0 ? (
@@ -118,14 +118,14 @@ export default function ProposalReach({ p, set }: { p: ProposalData; set: SetFn 
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm" data-testid="reach-count">{items.length === 0 ? "Nothing is shared with the customer yet." : `${items.length} suggestion${items.length === 1 ? "" : "s"} will appear on the customer's quotation.`}</p>
-        <button type="button" className="text-sm underline" onClick={() => { setF({ ...BLANK, from_name: from, to_name: toValue }); setAdding((a) => !a); }} data-testid="reach-add-custom">Not on the list? Add a flight or train typed for this quote only</button>
+        <p className="text-sm" data-testid="reach-count">{items.length === 0 ? "Nothing is shared with the customer yet." : `${items.length} ${kind ? (items.length === 1 ? kind : `${kind}s`) : items.length === 1 ? "suggestion" : "suggestions"} will appear on the customer's quotation.`}</p>
+        <button type="button" className="text-sm underline" onClick={() => { setF({ ...BLANK, kind: kind ?? BLANK.kind, from_name: from, to_name: toValue }); setAdding((a) => !a); }} data-testid="reach-add-custom">Not on the list? Add {kind ? `a ${kind}` : "a flight or train"} typed for this quote only</button>
       </div>
 
       {adding && (
         <div className="space-y-2 rounded-md border p-3" data-testid="reach-custom-form">
-          <div className="grid gap-2 sm:grid-cols-[110px_1.4fr_1fr_1fr]">
-            <div><Label className="text-xs">Type</Label><Select value={f.kind} onValueChange={(v) => setF({ ...f, kind: v as ScheduleKind })}><SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="flight">Flight</SelectItem><SelectItem value="train">Train</SelectItem></SelectContent></Select></div>
+          <div className={cn("grid gap-2", kind ? "sm:grid-cols-[1.4fr_1fr_1fr]" : "sm:grid-cols-[110px_1.4fr_1fr_1fr]")}>
+            {!kind && <div><Label className="text-xs">Type</Label><Select value={f.kind} onValueChange={(v) => setF({ ...f, kind: v as ScheduleKind })}><SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="flight">Flight</SelectItem><SelectItem value="train">Train</SelectItem></SelectContent></Select></div>}
             <div><Label className="text-xs">Name and number</Label><Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className="mt-1 h-9" placeholder="IndiGo 6E 999" data-testid="reach-c-title" /></div>
             <div><Label className="text-xs">From</Label><Input value={f.from_name} onChange={(e) => setF({ ...f, from_name: e.target.value })} className="mt-1 h-9" data-testid="reach-c-from" /></div>
             <div><Label className="text-xs">To</Label><Input value={f.to_name} onChange={(e) => setF({ ...f, to_name: e.target.value })} className="mt-1 h-9" data-testid="reach-c-to" /></div>
