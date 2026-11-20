@@ -165,26 +165,42 @@ function SeasonDialog({ line, onClose, onChanged }: { line: TransportLineRow | n
   useEffect(() => { if (line) { setRows(line.seasons); setF({ name: "", valid_from: "", valid_to: "", price: "" }); } }, [line]);
   if (!line) return null;
   const apply = async (fn: () => Promise<{ data: TransportLineRow }>) => { setBusy(true); try { const r = await fn(); setRows(r.data.seasons); onChanged(); } catch (e) { toast.error(formatApiError(e)); } finally { setBusy(false); } };
-  const add = (e: FormEvent) => { e.preventDefault(); void apply(() => api.post<TransportLineRow>(`/transport/lines/${line.id}/seasons`, { name: f.name, valid_from: f.valid_from || null, valid_to: f.valid_to || null, price: Number(f.price) })).then(() => setF({ name: "", valid_from: "", valid_to: "", price: "" })); };
+  const add = (e: FormEvent) => {
+    e.preventDefault();
+    if (!f.name) { toast.error("Choose the season"); return; }
+    void apply(() => api.post<TransportLineRow>(`/transport/lines/${line.id}/seasons`, { name: f.name, valid_from: f.valid_from || null, valid_to: f.valid_to || null, price: Number(f.price) })).then(() => setF({ name: "", valid_from: "", valid_to: "", price: "" }));
+  };
+  const cols = "grid grid-cols-[minmax(0,1fr)_4.9rem_4.9rem_4.6rem_1.75rem] items-center gap-x-1.5 sm:grid-cols-[minmax(0,1.3fr)_8.5rem_8.5rem_6.5rem_2.25rem] sm:gap-x-2";   // one grid for the heading, the rows and the add row: nothing can overlap
+  const dateTag = (v: string | null, needed: boolean) => (v ? fmtDate(v) : needed ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">Dates needed</span> : "–");
   return (
     <Dialog open={!!line} onOpenChange={(o) => !busy && !o && onClose()}>
-      <DialogContent className="max-w-xl" data-testid="season-dialog">
-        <DialogHeader><DialogTitle className="font-display text-xl font-black">Seasons</DialogTitle><DialogDescription>{line.name}. {line.destination?.name} · {chargedLabel(line.charged)}. The line keeps one row; each season has its own dates and price.</DialogDescription></DialogHeader>
-        <table className="w-full text-sm"><thead><tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2">Season</th><th>From</th><th>To</th><th className="text-right">Price</th><th /></tr></thead>
-          <tbody>
-            <tr className="border-b"><td className="py-2">{line.season_name ?? "All year"} <span className="text-xs text-muted-foreground">(main price)</span></td><td>{line.valid_from ? fmtDate(line.valid_from) : "–"}</td><td>{line.valid_to ? fmtDate(line.valid_to) : "–"}</td><td className="text-right tabular-nums">{money(line.price, line.currency)}</td><td /></tr>
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto" data-testid="season-dialog">
+        <DialogHeader><DialogTitle className="font-display text-xl font-black">Seasons</DialogTitle><DialogDescription>{line.car_name ? `${line.car_name}, ` : ""}{line.name}. {line.destination?.name} · {chargedLabel(line.charged)}. The line keeps one row; each season has its own dates and price.</DialogDescription></DialogHeader>
+        <div>
+          <div className="text-xs sm:text-sm" data-testid="season-grid">
+            <div className={cn(cols, "border-b py-2 text-[11px] uppercase tracking-wide text-muted-foreground")}><span>Season</span><span>From</span><span>To</span><span className="text-right">Price</span><span /></div>
+            <div className={cn(cols, "border-b py-2")}>
+              <span className="min-w-0 break-words">{line.season_name ?? "All year"} <span className="text-xs text-muted-foreground">(main price)</span></span>
+              <span>{dateTag(line.valid_from, false)}</span><span>{dateTag(line.valid_to, false)}</span><span className="text-right tabular-nums">{money(line.price, line.currency)}</span><span />
+            </div>
             {rows.map((s) => (
-              <tr key={s.id} className="border-b last:border-0" data-testid={`season-row-${s.id}`}><td className="py-2">{s.name}</td><td>{s.valid_from ? fmtDate(s.valid_from) : <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">Dates needed</span>}</td><td>{s.valid_to ? fmtDate(s.valid_to) : "–"}</td>
-                <td className="text-right tabular-nums">{money(s.price, line.currency)}</td><td className="text-right"><button type="button" aria-label="Delete season" className="rounded p-1.5 hover:bg-accent" onClick={() => apply(() => api.delete<TransportLineRow>(`/transport/line-seasons/${s.id}`))}><Trash2 size={13} /></button></td></tr>
+              <div key={s.id} className={cn(cols, "border-b py-2")} data-testid={`season-row-${s.id}`}>
+                <span className="min-w-0 break-words">{s.name}</span>
+                <span>{dateTag(s.valid_from, true)}</span><span>{dateTag(s.valid_to, false)}</span>
+                <span className="text-right tabular-nums">{money(s.price, line.currency)}</span>
+                <button type="button" aria-label="Delete season" className="justify-self-end rounded p-1.5 hover:bg-accent" onClick={() => apply(() => api.delete<TransportLineRow>(`/transport/line-seasons/${s.id}`))}><Trash2 size={14} /></button>
+              </div>
             ))}
-          </tbody></table>
-        <form onSubmit={add} className="grid grid-cols-[1.2fr_1fr_1fr_90px_auto] items-end gap-2" data-testid="season-form">
-          <div><Label className="text-xs">Season</Label><Input className="mt-1 h-9" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required placeholder="Peak" data-testid="season-name" /></div>
-          <div><Label className="text-xs">From</Label><Input className="mt-1 h-9" type="date" value={f.valid_from} onChange={(e) => setF({ ...f, valid_from: e.target.value })} /></div>
-          <div><Label className="text-xs">To</Label><Input className="mt-1 h-9" type="date" value={f.valid_to} onChange={(e) => setF({ ...f, valid_to: e.target.value })} /></div>
-          <div><Label className="text-xs">Price</Label><Input className="mt-1 h-9" type="number" min={0} step="any" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} required data-testid="season-price" /></div>
-          <Button type="submit" size="sm" disabled={busy} data-testid="season-add"><Plus size={14} /> Add season</Button>
-        </form>
+            <form onSubmit={add} className="grid grid-cols-[minmax(0,1fr)_6rem_2.25rem] items-center gap-2 pt-3 sm:grid-cols-[minmax(0,1.3fr)_8.5rem_8.5rem_6.5rem_2.25rem]" data-testid="season-form">
+              <Select value={f.name || undefined} onValueChange={(v) => setF({ ...f, name: v })}><SelectTrigger className="order-1 h-9 sm:order-none" aria-label="Season" data-testid="season-name"><SelectValue placeholder="Season" /></SelectTrigger>
+                <SelectContent>{SEASONS.map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent></Select>
+              <Input className="order-4 h-9 px-2 sm:order-none" type="date" aria-label="From" value={f.valid_from} onChange={(e) => setF({ ...f, valid_from: e.target.value })} />
+              <Input className="order-5 col-span-2 h-9 px-2 sm:order-none sm:col-span-1" type="date" aria-label="To" value={f.valid_to} onChange={(e) => setF({ ...f, valid_to: e.target.value })} />
+              <Input className="order-2 h-9 px-2 text-right sm:order-none" type="number" min={0} step="any" aria-label="Price" placeholder="Price" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} required data-testid="season-price" />
+              <Button type="submit" size="icon" className="order-3 h-9 w-9 sm:order-none" disabled={busy} aria-label="Add season" data-testid="season-add"><Plus size={16} /></Button>
+            </form>
+          </div>
+        </div>
         <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
       </DialogContent>
     </Dialog>
@@ -416,7 +432,7 @@ export default function RateList() {
         <Card className="overflow-x-auto rounded-lg">
           <table className="w-full min-w-[860px] text-sm">
             <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-              {manage && <th className="w-8 p-3" />}<th className="p-3">Type</th><th className="p-3">Car name</th><th className="p-3">Route service</th><th className="p-3">Charged</th><th className="p-3 text-right">Price</th><th className="p-3">Season</th><th className="p-3">Supplier</th>{manage && <th className="w-10 p-3" />}
+              {manage && <th className="w-8 p-3" />}<th className="p-3">Type</th><th className="p-3">Car name</th><th className="p-3">Route service</th><th className="p-3">Charged</th><th className="p-3 text-right">Price</th><th className="p-3">Season</th><th className="p-3">Supplier</th>{manage && <th className="w-12 p-0" />}
             </tr></thead>
             <tbody>
               {groups.map((g) => (
@@ -435,16 +451,16 @@ export default function RateList() {
                         <td className="p-3 text-xs">{r.season_name ?? "All year"}{r.valid_from && r.valid_to ? <div className="text-muted-foreground">{fmtDate(r.valid_from)} – {fmtDate(r.valid_to)}</div> : null}</td>
                         <td className="p-3 text-xs">{r.supplier ?? <span className="text-muted-foreground">–</span>}</td>
                         {manage && (
-                          <td className="relative p-3 text-right">
-                            <button type="button" aria-label="Actions" onClick={() => setMenu(menu === r.id ? null : r.id)} className="rounded p-1 hover:bg-accent" data-testid={`rate-menu-${r.id}`}><MoreHorizontal size={16} /></button>
-                            {menu === r.id && (
-                              <div className="absolute right-2 top-10 z-10 w-40 rounded-md border border-border bg-background p-1 text-left shadow-md">
+                          <td className="w-12 p-0 text-center align-middle">
+                            <Popover open={menu === r.id} onOpenChange={(o) => setMenu(o ? r.id : null)}>
+                              <PopoverTrigger asChild><button type="button" aria-label="Actions" className="mx-auto flex h-9 w-9 items-center justify-center rounded hover:bg-accent" data-testid={`rate-menu-${r.id}`}><MoreHorizontal size={16} /></button></PopoverTrigger>
+                              <PopoverContent align="end" collisionPadding={8} className="w-40 p-1 text-left">
                                 <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent" onClick={() => { setMenu(null); setDlg({ open: true, item: r }); }} data-testid={`rate-edit-${r.id}`}><Pencil size={13} /> Edit</button>
                                 <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent" onClick={() => { setMenu(null); void dup(r); }} data-testid={`rate-dup-${r.id}`}><Copy size={13} /> Duplicate</button>
                                 <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent" onClick={() => { setMenu(null); setSeasons(r); }} data-testid={`rate-season-${r.id}`}><Plus size={13} /> Add season</button>
                                 <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-red-600 hover:bg-accent" onClick={() => { setMenu(null); void del(r); }}><Trash2 size={13} /> Delete</button>
-                              </div>
-                            )}
+                              </PopoverContent>
+                            </Popover>
                           </td>
                         )}
                       </tr>

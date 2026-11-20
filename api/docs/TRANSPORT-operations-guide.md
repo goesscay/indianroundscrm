@@ -13,7 +13,7 @@ There is nothing to set up first. No countries, places or providers screens. The
 - **Save and add another** keeps the type and destination filled in, so a whole sheet can be keyed quickly.
 - **Supplier** is just a name typed on a rate. It is remembered and suggested next time, and one supplier typed in different spellings of the same name is kept once.
 - **⋯ menu on each line:** Edit, **Duplicate** (for example copy Ertiga to Innova), **Add season**, Delete.
-- **Seasons:** a service keeps one line. Each extra season has its own dates and price; the main price covers the rest of the year. A price with no dates applies all year. A season without dates is kept but marked "Dates needed".
+- **Seasons:** the **Add season** popup shows Season, From, To and Price in five columns, with a trash icon on each extra season and the add row at the bottom (pick the season from the dropdown, give the dates and the price, press +). A service keeps one line. Each extra season has its own dates and price; the main price covers the rest of the year. A price with no dates applies all year. A season without dates is kept but marked "Dates needed".
 - **Change prices:** tick several lines, press **Change prices**, choose increase or decrease by a percentage and **Preview**. The old and new prices are shown, and nothing is saved until you press Apply. Seasons move with their line.
 - **Filters:** All, Cabs, Vans, Buses, Ferries, **Needs a price**; search finds a service, place or supplier.
 - Rates are shown grouped by destination, with the country and currency on the heading. A rate may use a different currency from its destination if it needs to.
