@@ -42,7 +42,7 @@ class TransportLine extends Model
     public function toApi(): array
     {
         return [
-            'id' => (string) $this->id, 'type' => $this->type, 'name' => $this->name, 'from_name' => $this->from_name, 'to_name' => $this->to_name, 'way' => $this->way,
+            'id' => (string) $this->id, 'type' => $this->type, 'car_name' => $this->car_name, 'name' => $this->name, 'from_name' => $this->from_name, 'to_name' => $this->to_name, 'way' => $this->way,
             'charged' => $this->charged, 'price' => $this->price, 'currency' => $this->currency, 'season_name' => $this->season_name,
             'valid_from' => $this->valid_from?->toDateString(), 'valid_to' => $this->valid_to?->toDateString(), 'seats' => $this->seats, 'hours_per_day' => $this->hours_per_day,
             'km_included' => $this->km_included, 'extra_hour' => $this->extra_hour, 'note' => $this->note, 'active' => (bool) $this->active,

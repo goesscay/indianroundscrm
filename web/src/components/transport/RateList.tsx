@@ -30,17 +30,20 @@ const defaultCharged = (t: LineType): Charged => (t === "bus" || t === "ferry" ?
 const routeType = (t: LineType) => t === "bus" || t === "ferry";
 
 interface Form {
-  type: LineType; destination: string; country: string; dest_currency: string; name: string; from_name: string; to_name: string; way: "one_way" | "return"; price: string; currency: string; charged: Charged;
-  supplier: string; season_name: string; valid_from: string; valid_to: string; seats: string; hours_per_day: string; km_included: string; extra_hour: string; note: string;
+  type: LineType; destination: string; country: string; dest_currency: string; car_name: string; name: string; from_name: string; to_name: string; way: "one_way" | "return"; price: string; currency: string; charged: Charged;
+  supplier: string; season_name: string; valid_from: string; valid_to: string; seats: string; note: string;
 }
-const blank = (type: LineType = "cab", destination = ""): Form => ({ type, destination, country: "India", dest_currency: "INR", name: "", from_name: "", to_name: "", way: "one_way", price: "", currency: "", charged: defaultCharged(type),
-  supplier: "", season_name: "", valid_from: "", valid_to: "", seats: "", hours_per_day: "", km_included: "", extra_hour: "", note: "" });
+const SEASONS = ["On Season", "Off Season", "Mid Season"];
+const carLabel = (t: LineType) => (t === "bus" ? "Bus name" : t === "ferry" ? "Boat name" : "Car name");
+const blank = (type: LineType = "cab", destination = ""): Form => ({ type, destination, country: "India", dest_currency: "INR", car_name: "", name: "", from_name: "", to_name: "", way: "one_way", price: "", currency: "", charged: defaultCharged(type),
+  supplier: "", season_name: "", valid_from: "", valid_to: "", seats: "", note: "" });
 
 function Datalists({ look }: { look: LineLookups | null }) {
   return (
     <>
       <datalist id="tl-destinations">{(look?.destinations ?? []).map((d) => <option key={d.name} value={d.name}>{d.country}</option>)}</datalist>
       <datalist id="tl-places">{(look?.places ?? []).map((p) => <option key={p.name} value={p.name}>{`Used on ${p.rates} rate${p.rates === 1 ? "" : "s"}`}</option>)}</datalist>
+      <datalist id="tl-car-names">{(look?.car_names ?? []).map((c) => <option key={c.name} value={c.name} />)}</datalist>
       <datalist id="tl-suppliers">{(look?.suppliers ?? []).map((s) => <option key={s.name} value={s.name} />)}</datalist>
     </>
   );
@@ -58,11 +61,10 @@ function RateDialog({ open, item, look, preset, onClose, onSaved }: { open: bool
   useEffect(() => {
     if (!open) return;
     setMore(false);
-    setF(item ? { type: item.type, destination: item.destination?.name ?? "", country: item.destination?.country ?? "India", dest_currency: item.destination?.currency ?? "INR", name: item.name, from_name: item.from_name ?? "", to_name: item.to_name ?? "",
+    setF(item ? { type: item.type, destination: item.destination?.name ?? "", country: item.destination?.country ?? "India", dest_currency: item.destination?.currency ?? "INR", car_name: item.car_name ?? "", name: item.name, from_name: item.from_name ?? "", to_name: item.to_name ?? "",
       way: item.way ?? "one_way", price: item.price == null ? "" : String(item.price), currency: item.currency, charged: item.charged, supplier: item.supplier ?? "", season_name: item.season_name ?? "", valid_from: item.valid_from ?? "", valid_to: item.valid_to ?? "",
-      seats: item.seats == null ? "" : String(item.seats), hours_per_day: item.hours_per_day == null ? "" : String(item.hours_per_day), km_included: item.km_included == null ? "" : String(item.km_included),
-      extra_hour: item.extra_hour == null ? "" : String(item.extra_hour), note: item.note ?? "" } : blank(preset.type, preset.destination));
-    if (item && (item.supplier || item.season_name || item.valid_from || item.seats || item.hours_per_day || item.km_included || item.extra_hour || item.note)) setMore(true);
+      seats: item.seats == null ? "" : String(item.seats), note: item.note ?? "" } : blank(preset.type, preset.destination));
+    if (item && (item.supplier || item.season_name || item.valid_from || item.seats || item.note)) setMore(true);
   }, [open, item, preset.type, preset.destination]);
   const dest = useDestination(look, f.destination);
   const isNew = f.destination.trim() !== "" && !dest?.known && !item;
@@ -70,9 +72,9 @@ function RateDialog({ open, item, look, preset, onClose, onSaved }: { open: bool
   const save = async (e: FormEvent, again: boolean) => {
     e.preventDefault(); setBusy(true);
     const body = {
-      type: f.type, destination: f.destination.trim(), country: isNew ? f.country : undefined, dest_currency: isNew ? f.dest_currency : undefined, name: f.name, price: Number(f.price), charged: f.charged,
+      type: f.type, destination: f.destination.trim(), country: isNew ? f.country : undefined, dest_currency: isNew ? f.dest_currency : undefined, car_name: f.car_name || null, name: f.name, price: Number(f.price), charged: f.charged,
       currency: f.currency || undefined, supplier: f.supplier || null, from_name: routeType(f.type) ? f.from_name || null : null, to_name: routeType(f.type) ? f.to_name || null : null, way: routeType(f.type) ? f.way : null,
-      season_name: f.season_name || null, valid_from: f.valid_from || null, valid_to: f.valid_to || null, seats: num(f.seats), hours_per_day: num(f.hours_per_day), km_included: num(f.km_included), extra_hour: num(f.extra_hour), note: f.note || null,
+      season_name: f.season_name || null, valid_from: f.valid_from || null, valid_to: f.valid_to || null, seats: num(f.seats), note: f.note || null,
     };
     try {
       if (item) await api.patch(`/transport/lines/${item.id}`, body); else await api.post("/transport/lines", body);
@@ -83,7 +85,7 @@ function RateDialog({ open, item, look, preset, onClose, onSaved }: { open: bool
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && !o && onClose()}>
       <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto" data-testid="rate-dialog">
-        <DialogHeader><DialogTitle className="font-display text-2xl font-black">{item ? "Edit transport rate" : "Add transport rate"}</DialogTitle><DialogDescription>Only the destination, the service name and the price are needed. Everything else is optional.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display text-2xl font-black">{item ? "Edit transport" : "Add transport"}</DialogTitle><DialogDescription>Only the destination, the route service and the price are needed. Everything else is optional.</DialogDescription></DialogHeader>
         <form onSubmit={(e) => save(e, false)} className="space-y-3">
           <div>
             <Label className="label-caps">1. What is it?</Label>
@@ -112,7 +114,8 @@ function RateDialog({ open, item, look, preset, onClose, onSaved }: { open: bool
                 <Select value={f.way} onValueChange={(v) => setF({ ...f, way: v as "one_way" | "return" })}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="one_way">One way</SelectItem><SelectItem value="return">Return</SelectItem></SelectContent></Select></div>
             </div>
           )}
-          <div><Label className="label-caps">Service name</Label><Input className="mt-1.5" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required placeholder={routeType(f.type) ? "Volvo, semi-sleeper" : "Ertiga, 6 seats: local sightseeing"} data-testid="rate-name" /></div>
+          <div><Label className="label-caps">{carLabel(f.type)}</Label><Input className="mt-1.5" list="tl-car-names" value={f.car_name} onChange={(e) => setF({ ...f, car_name: e.target.value })} maxLength={120} placeholder={routeType(f.type) ? "Volvo B11R" : "Ertiga"} data-testid="rate-car-name" /></div>
+          <div><Label className="label-caps">Route service</Label><Input className="mt-1.5" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required placeholder={routeType(f.type) ? "Delhi to Manali, semi-sleeper" : "Local sightseeing"} data-testid="rate-name" /></div>
           <div className="grid grid-cols-[1fr_90px] gap-3">
             <div><Label className="label-caps">3. Price</Label><Input className="mt-1.5" type="number" min={0} step="any" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} required placeholder="5500" data-testid="rate-price" /></div>
             <div><Label className="label-caps">Currency</Label><Input className="mt-1.5" value={f.currency || (dest?.currency ?? f.dest_currency)} maxLength={3} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} data-testid="rate-currency" /></div>
@@ -124,19 +127,18 @@ function RateDialog({ open, item, look, preset, onClose, onSaved }: { open: bool
               {CHARGED.map((c) => <button key={c.v} type="button" aria-pressed={f.charged === c.v} onClick={() => setF({ ...f, charged: c.v })} className={cn("rounded-md border px-3 py-1.5 text-sm", f.charged === c.v ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-accent")} data-testid={`rate-charged-${c.v}`}>{c.label}</button>)}
             </div>
           </div>
-          <button type="button" onClick={() => setMore((m) => !m)} className="flex items-center gap-1 text-sm underline" data-testid="rate-more"><ChevronDown size={14} className={cn(more && "rotate-180")} /> {more ? "Hide details" : "More details: supplier, season dates, seats, hours (optional)"}</button>
+          <button type="button" onClick={() => setMore((m) => !m)} className="flex items-center gap-1 text-sm underline" data-testid="rate-more"><ChevronDown size={14} className={cn(more && "rotate-180")} /> {more ? "Hide details" : "More details: supplier, season, seats (optional)"}</button>
           {more && (
             <div className="space-y-3 rounded-md border p-3" data-testid="rate-more-fields">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2"><Label className="text-xs">Supplier</Label><Input className="mt-1 h-9" list="tl-suppliers" value={f.supplier} onChange={(e) => setF({ ...f, supplier: e.target.value })} placeholder="Manali Taxi Service" data-testid="rate-supplier" /></div>
-                <div><Label className="text-xs">Season name</Label><Input className="mt-1 h-9" value={f.season_name} onChange={(e) => setF({ ...f, season_name: e.target.value })} placeholder="Off season" /></div>
+                <div><Label className="text-xs">Season</Label>
+                  <Select value={f.season_name || "none"} onValueChange={(v) => setF({ ...f, season_name: v === "none" ? "" : v })}><SelectTrigger className="mt-1 h-9" data-testid="rate-season"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="none">All year</SelectItem>{[...SEASONS, ...(f.season_name && !SEASONS.includes(f.season_name) ? [f.season_name] : [])].map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent></Select></div>
                 <div />
                 <div><Label className="text-xs">Valid from</Label><Input className="mt-1 h-9" type="date" value={f.valid_from} onChange={(e) => setF({ ...f, valid_from: e.target.value })} data-testid="rate-valid-from" /></div>
                 <div><Label className="text-xs">Valid to</Label><Input className="mt-1 h-9" type="date" value={f.valid_to} onChange={(e) => setF({ ...f, valid_to: e.target.value })} data-testid="rate-valid-to" /></div>
                 <div><Label className="text-xs">Seats</Label><Input className="mt-1 h-9" type="number" min={1} value={f.seats} onChange={(e) => setF({ ...f, seats: e.target.value })} data-testid="rate-seats" /></div>
-                <div><Label className="text-xs">Hours per day</Label><Input className="mt-1 h-9" type="number" min={0} step="any" value={f.hours_per_day} onChange={(e) => setF({ ...f, hours_per_day: e.target.value })} /></div>
-                <div><Label className="text-xs">Km included</Label><Input className="mt-1 h-9" type="number" min={0} value={f.km_included} onChange={(e) => setF({ ...f, km_included: e.target.value })} /></div>
-                <div><Label className="text-xs">Extra hour</Label><Input className="mt-1 h-9" type="number" min={0} step="any" value={f.extra_hour} onChange={(e) => setF({ ...f, extra_hour: e.target.value })} /></div>
               </div>
               <div><Label className="text-xs">Note</Label><Textarea className="mt-1" rows={2} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="Toll and parking extra" /></div>
               <p className="text-xs text-muted-foreground">Leave both dates empty for a price that applies all year. More seasons of the same service are added from the ⋯ menu on the list.</p>
@@ -276,7 +278,7 @@ function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () =>
               </div>
             )}
             <div className="max-h-72 overflow-y-auto rounded-md border">
-              <table className="w-full text-sm"><thead><tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="p-2">Check</th><th className="p-2">Type</th><th className="p-2">Service</th><th className="p-2">Charged</th><th className="p-2 text-right">Price</th><th className="p-2">Note</th></tr></thead>
+              <table className="w-full text-sm"><thead><tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="p-2">Check</th><th className="p-2">Type</th><th className="p-2">Route service</th><th className="p-2">Charged</th><th className="p-2 text-right">Price</th><th className="p-2">Note</th></tr></thead>
                 <tbody>{res.rows.map((r) => (
                   <tr key={r.row} className="border-b align-top last:border-0" data-testid={`import-row-${r.row}`}>
                     <td className="p-2"><span className={pill(r.status)}>{r.status}</span></td><td className="p-2 uppercase text-xs">{r.type}</td>
@@ -354,7 +356,7 @@ export default function RateList() {
     <div className="space-y-4" data-testid="rates-page">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div><div className="label-caps">Operations</div><h1 className="font-display text-2xl font-black tracking-tight sm:text-3xl">Transport</h1></div>
-        {manage && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setImporting(true)} data-testid="rates-import-btn"><Upload size={15} /> Import from sheet</Button><Button onClick={() => setDlg({ open: true, item: null })} data-testid="rates-add-btn">+ Add rate</Button></div>}
+        {manage && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setImporting(true)} data-testid="rates-import-btn"><Upload size={15} /> Import from sheet</Button><Button onClick={() => setDlg({ open: true, item: null })} data-testid="rates-add-btn">+ Add transport</Button></div>}
       </div>
       <TransportTabs active="rates" />
       <Datalists look={look} />
