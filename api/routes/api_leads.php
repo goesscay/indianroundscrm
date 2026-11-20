@@ -13,6 +13,7 @@ use App\Http\Controllers\Crm\QuoteContentController;
 use App\Http\Controllers\Crm\QuoteTemplateController;
 use App\Http\Controllers\Crm\TeamReportController;
 use App\Http\Controllers\Crm\TransportController;
+use App\Http\Controllers\Crm\TransportLineController;
 use App\Http\Controllers\Crm\TransportScheduleController;
 use App\Http\Controllers\Crm\TripController;
 use App\Http\Controllers\Crm\TripDocumentController;
@@ -154,6 +155,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/transport/schedules/{id}', [TransportScheduleController::class, 'update'])->middleware('perm:transport.manage');
     Route::delete('/transport/schedules/{id}', [TransportScheduleController::class, 'destroy'])->middleware('perm:transport.manage');
     Route::post('/transport/schedules/{id}/duplicate', [TransportScheduleController::class, 'duplicate'])->middleware('perm:transport.manage');
+    // ---- the transport rate list: one line per rate (Operations only; prices and suppliers are not for sales)
+    Route::get('/transport/lines/lookups', [TransportLineController::class, 'lookups'])->middleware('perm:transport.manage');
+    Route::get('/transport/lines/import-template', [TransportLineController::class, 'importTemplate'])->middleware('perm:transport.manage');
+    Route::post('/transport/lines/import', [TransportLineController::class, 'import'])->middleware('perm:transport.manage');
+    Route::post('/transport/lines/bulk-price', [TransportLineController::class, 'bulkPrice'])->middleware('perm:transport.manage');
+    Route::get('/transport/lines', [TransportLineController::class, 'index'])->middleware('perm:transport.manage');
+    Route::post('/transport/lines', [TransportLineController::class, 'store'])->middleware('perm:transport.manage');
+    Route::patch('/transport/lines/{id}', [TransportLineController::class, 'update'])->middleware('perm:transport.manage');
+    Route::delete('/transport/lines/{id}', [TransportLineController::class, 'destroy'])->middleware('perm:transport.manage');
+    Route::post('/transport/lines/{id}/duplicate', [TransportLineController::class, 'duplicate'])->middleware('perm:transport.manage');
+    Route::post('/transport/lines/{id}/seasons', [TransportLineController::class, 'storeSeason'])->middleware('perm:transport.manage');
+    Route::patch('/transport/line-seasons/{id}', [TransportLineController::class, 'updateSeason'])->middleware('perm:transport.manage');
+    Route::delete('/transport/line-seasons/{id}', [TransportLineController::class, 'destroySeason'])->middleware('perm:transport.manage');
     Route::get('/transport/meta', [TransportController::class, 'meta'])->middleware('perm:transport.view,transport.manage');
     Route::get('/transport/destinations', [TransportController::class, 'destinations'])->middleware('perm:transport.view,transport.manage');
     Route::get('/transport/import-template', [TransportController::class, 'importTemplate'])->middleware('perm:transport.manage');

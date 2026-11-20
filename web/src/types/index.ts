@@ -1051,3 +1051,22 @@ export interface ReachBlock {
   heading: string; disclaimer: string;
   items: { kind: ScheduleKind; label: string; title: string; route: string; time: string; runs_on: string; classes: string | null; note: string | null }[];
 }
+
+// ---- the transport rate list: one line per rate
+export type LineType = "cab" | "van" | "bus" | "ferry";
+export type Charged = "per_day" | "per_trip" | "per_person";
+export interface TransportLineSeason { id: string; name: string; valid_from: string | null; valid_to: string | null; price: number; dates_needed: boolean }
+export interface TransportLineRow {
+  id: string; type: LineType; name: string; from_name: string | null; to_name: string | null; way: "one_way" | "return" | null; charged: Charged; price: number | null; currency: string;
+  season_name: string | null; valid_from: string | null; valid_to: string | null; seats: number | null; hours_per_day: number | null; km_included: number | null; extra_hour: number | null;
+  note: string | null; active: boolean; needs_price: boolean; destination: { id: string; name: string; country: string; currency: string } | null; supplier: string | null;
+  seasons: TransportLineSeason[]; updated_at: string | null;
+}
+export interface LineLookups {
+  destinations: { name: string; country: string; currency: string; known: boolean; rates: number }[]; places: { name: string; rates: number }[]; suppliers: { name: string; rates: number }[];
+}
+export interface LineImportRow { row: number; status: "Ready" | "Check" | "Missing"; type: string; destination: string; service: string; charged: Charged | null; price: number | null; currency: string | null; note: string; needs: "charged" | "destination" | null }
+export interface LineImportResult {
+  dry_run: boolean; summary: { ready: number; check: number; missing: number }; rows: LineImportRow[]; new_destinations?: { name: string; country: string; currency: string }[];
+  new?: number; updated?: number; skipped?: number;
+}
