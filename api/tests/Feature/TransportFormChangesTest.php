@@ -192,4 +192,38 @@ class TransportFormChangesTest extends TestCase
         $stay = $this->postJson('/api/quote-proposals/compute', ['proposal' => $p(['mode' => 'stay', 'stays' => [], 'extras' => $extras] + $daily)])->assertOk()->json('computed.options.0.actual.road');
         $this->assertEquals(9200, $stay['selling']);                                                // switched to the same car every day with none chosen: the Volvo is still there
     }
+
+    public function test_a_quotation_saved_with_a_typed_vehicle_count_and_an_old_style_rate_opens_and_saves_with_the_same_total(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $old = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'name' => 'Ertiga, 6 seats: Local sightseeing', 'charged' => 'per_day', 'price' => 5000, 'currency' => 'INR', 'seats' => 6]);
+        $sales = User::factory()->sales()->create();
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs($sales, ['*'], 'sanctum');
+        $cust = \App\Models\Customer::create(['customer_no' => 'IRC-O1', 'name' => 'Ramesh Kumar', 'owner_id' => $sales->id]);
+        $p = ['trip' => ['destination' => 'Manali', 'start_date' => '2026-12-05', 'nights' => 4, 'adults' => 4, 'group_sizes' => [4]], 'gst_rate' => 5, 'options' => [['name' => 'Option 1', 'stays' => []]],
+            'road' => ['mode' => 'stay', 'stays' => [['line_id' => $old->id, 'days' => 5, 'qty' => 2]], 'extras' => []]];            // the old Vehicles box held 2
+        $q = $this->postJson('/api/quote-proposals', ['customer_id' => (string) $cust->id, 'proposal' => $p])->assertOk()->json('quote');
+        $show = $this->getJson('/api/quote-proposals/'.$q['id'])->assertOk()->json();
+        $row = $show['computed']['options'][0]['actual']['road']['rows'][0];
+        $this->assertSame(2, $row['qty']);                                                          // the typed count is still honoured
+        $this->assertNull($row['car_name']);                                                        // an old rate with no car name still opens
+        $this->assertEquals($q['total'], $show['quote']['total']);
+        $again = $this->putJson('/api/quote-proposals/'.$q['id'], ['customer_id' => (string) $cust->id, 'proposal' => $show['proposal']])->assertOk()->json('quote');
+        $this->assertEquals($q['total'], $again['total']);                                          // open and save again: the same total
+    }
+
+    public function test_a_car_with_no_price_for_the_travel_date_is_marked_rate_needed_and_the_warning_reaches_the_price_bar_data(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $l = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'Ertiga', 'name' => 'Local', 'charged' => 'per_day', 'price' => 5000, 'currency' => 'INR', 'seats' => 6, 'valid_from' => '2027-04-01', 'valid_to' => '2027-06-30']);
+        $this->ops();
+        $p = ['trip' => ['destination' => 'Manali', 'start_date' => '2026-12-05', 'nights' => 4, 'adults' => 4, 'group_sizes' => [4]], 'gst_rate' => 5, 'options' => [['name' => 'Option 1', 'stays' => []]],
+            'road' => ['mode' => 'stay', 'stays' => [['line_id' => $l->id, 'days' => 5]], 'extras' => []]];
+        $c = $this->postJson('/api/quote-proposals/compute', ['proposal' => $p])->assertOk()->json('computed');
+        $r = $c['options'][0]['actual']['road'];
+        $this->assertTrue($r['rows'][0]['rate_needed']);
+        $this->assertEquals(0, $r['selling']);
+        $this->assertStringContainsString('Rate needed', implode(' ', $c['warnings']));
+    }
 }

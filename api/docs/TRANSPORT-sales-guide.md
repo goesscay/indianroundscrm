@@ -33,3 +33,5 @@ Open the **Flights** or **Trains** tab. Details only: nothing is priced and the 
 ## Older quotations
 
 A quotation saved before the Transport card opens as it was and prices exactly the same. If it has transport from the earlier layout, it is shown under the card and still works.
+
+**When something is missing:** if the destination has no cab or van in the rate list, the card says so and tells you Operations add one. If a car has no price for the travel date, the row says **Rate needed**, the amount shows a dash, and the Transport price bar warns that the price is not complete. Changing the car clears the route service (unless the new car has only one route). A quotation saved before the Car name and Route service dropdowns opens with the same prices.

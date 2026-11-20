@@ -113,6 +113,7 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
     setAdding(null);
   };
   const needFx = priced?.fx_needed ?? [];
+  const needed = (priced?.rows ?? []).filter((r) => r.rate_needed).length;
   const foreign = Array.from(new Set((priced?.rows ?? []).map((r) => r.currency).filter((c) => c !== "INR").concat(needFx)));
   const ensureTransport = (d: ProposalData) => {
     const t = (d.transport ??= { fx: { date: null, rates: {}, safety_pct: 0 }, cab_scope: {} });
@@ -146,6 +147,10 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
           </div>
 
           {options !== null && options.length === 0 && <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground" data-testid="road-no-rates">There are no road transport rates yet. Operations add them under Transport → Rates.</p>}
+
+          {road.mode === "daily" && options !== null && options.length > 0 && !days.some((d) => vehiclesFor(p.days[d.n - 1]?.stay || trip.destination).length > 0) && (
+            <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground" data-testid="road-no-cars">There is no cab or van in the rate list for {trip.destination || "this destination"} yet. Operations add one under Transport → Rates, and it appears here with no extra step.</p>
+          )}
 
           {road.mode === "stay" && (
             <div className="space-y-2" data-testid="road-stay">
@@ -292,6 +297,7 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-secondary/60 px-4 py-3" data-testid="transport-price-bar">
         <div><span className="text-sm text-muted-foreground">Transport price</span> <span className="font-display text-xl font-black" data-testid="transport-price">{INR(priced?.selling ?? 0)}</span>
           {manager && priced?.cost != null && priced.selling > 0 && <span className="ml-3 text-xs text-muted-foreground" data-testid="transport-price-ops">Operations view: cost {INR(priced.cost)}, margin {INR(priced.margin_amount ?? 0)}</span>}</div>
+        {needed > 0 && <p className="flex w-full items-start gap-1 text-xs text-amber-700 dark:text-amber-300" data-testid="transport-price-warning"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {needed} road transport line{needed === 1 ? " has" : "s have"} no rate for the travel date, so this price is not complete. Fix it below or ask Operations for the rate.</p>}
         <div className="text-xs text-muted-foreground">Road transport only. Flights and trains have no price.{pax > 0 ? ` For ${pax} traveller${pax === 1 ? "" : "s"}, before GST.` : ""}</div>
       </div>
     </div>
