@@ -123,6 +123,7 @@ class ProposalPricing
             'trip' => $trip, 'days' => $days, 'options' => $options, 'land' => ['label' => mb_substr(trim((string) ($p['land']['label'] ?? '')), 0, 200), 'rows' => $rows],
             'gst_rate' => max(0.0, min(100.0, (float) ($p['gst_rate'] ?? 5))), 'selected_option' => max(0, min(count($options) - 1, (int) ($p['selected_option'] ?? 0))),
             'content' => $content, 'cover_media_id' => $cover, 'transport' => TransportPricing::cleanSettings($p['transport'] ?? []),
+            'reach' => TransportReach::clean($p['reach'] ?? []),                // flights and trains as suggestions: details only, never priced
         ];
     }
 

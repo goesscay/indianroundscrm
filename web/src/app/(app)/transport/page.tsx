@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { TransportMeta, TransportMode, TransportProvider } from "@/types";
+import TransportTabs from "@/components/transport/TransportTabs";
 
 export const MODE_LABEL: Record<string, string> = { cab: "Cab", van: "Van", bus: "Bus", ferry: "Ferry" };
 export const modesText = (m: string[] | undefined) => (m ?? []).map((x) => MODE_LABEL[x] ?? x).join(" · ") || "No vehicles yet";
@@ -170,6 +171,8 @@ export default function TransportPage() {
           </div>
         )}
       </div>
+
+      <TransportTabs active="rates" />
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] max-w-[320px] flex-1">

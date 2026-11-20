@@ -190,6 +190,30 @@
 </div>
 @endforeach
 
+{{-- how to reach: flight and train suggestions, details only --}}
+@if($reach)
+<div class="sheet">
+  <div class="bar"></div>
+  <div class="pad">
+    <div class="caps red">Getting there</div>
+    <div class="h1">{{ $reach['heading'] }}</div>
+    <div class="rule"></div>
+    <p class="muted" style="margin:-6px 0 12px; font-size:9px">Details only</p>
+    @foreach($reach['items'] as $x)
+    <table style="width:100%; border-bottom:1px solid #ECEEF2; margin-bottom:8px"><tr>
+      <td style="width:62px; vertical-align:top; padding:4px 0 8px"><span class="tag {{ $x['kind'] === 'train' ? 'info' : '' }}">{{ $x['label'] }}</span></td>
+      <td style="padding:2px 0 8px">
+        <div style="font-size:12px; font-weight:bold">{{ $x['title'] }}</div>
+        <div style="font-size:10px; margin-top:2px">{{ $x['route'] }}@if($x['time']) · {{ $x['time'] }}@endif · {{ $x['runs_on'] }}@if($x['classes']) · {{ $x['classes'] }}@endif</div>
+        @if($x['note'])<div class="muted" style="font-size:9px; margin-top:3px">{{ $x['note'] }}</div>@endif
+      </td>
+    </tr></table>
+    @endforeach
+    <p class="muted" style="margin-top:12px; font-size:9px">{{ $reach['disclaimer'] }}</p>
+  </div>
+</div>
+@endif
+
 {{-- transport --}}
 @if($journey)
 <div class="sheet">

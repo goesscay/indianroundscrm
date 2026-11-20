@@ -13,6 +13,7 @@ use App\Http\Controllers\Crm\QuoteContentController;
 use App\Http\Controllers\Crm\QuoteTemplateController;
 use App\Http\Controllers\Crm\TeamReportController;
 use App\Http\Controllers\Crm\TransportController;
+use App\Http\Controllers\Crm\TransportScheduleController;
 use App\Http\Controllers\Crm\TripController;
 use App\Http\Controllers\Crm\TripDocumentController;
 use App\Http\Controllers\Crm\AccountController;
@@ -143,6 +144,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/hotel-rates/{rateId}', [HotelController::class, 'updateRate'])->middleware('perm:hotels.manage');
     Route::delete('/hotel-rates/{rateId}', [HotelController::class, 'destroyRate'])->middleware('perm:hotels.manage');
     // ---- transport master (Operations manage; sales can look providers, vehicles and routes up)
+    // ---- flights and trains: details only, no prices (Operations manage; sales look them up to suggest on a quotation)
+    Route::get('/transport/schedules/routes', [TransportScheduleController::class, 'routes'])->middleware('perm:transport.view,transport.manage');
+    Route::get('/transport/schedules/origins', [TransportScheduleController::class, 'origins'])->middleware('perm:transport.view,transport.manage');
+    Route::get('/transport/schedules/import-template', [TransportScheduleController::class, 'importTemplate'])->middleware('perm:transport.manage');
+    Route::post('/transport/schedules/import', [TransportScheduleController::class, 'import'])->middleware('perm:transport.manage');
+    Route::get('/transport/schedules', [TransportScheduleController::class, 'index'])->middleware('perm:transport.view,transport.manage');
+    Route::post('/transport/schedules', [TransportScheduleController::class, 'store'])->middleware('perm:transport.manage');
+    Route::patch('/transport/schedules/{id}', [TransportScheduleController::class, 'update'])->middleware('perm:transport.manage');
+    Route::delete('/transport/schedules/{id}', [TransportScheduleController::class, 'destroy'])->middleware('perm:transport.manage');
+    Route::post('/transport/schedules/{id}/duplicate', [TransportScheduleController::class, 'duplicate'])->middleware('perm:transport.manage');
     Route::get('/transport/meta', [TransportController::class, 'meta'])->middleware('perm:transport.view,transport.manage');
     Route::get('/transport/destinations', [TransportController::class, 'destinations'])->middleware('perm:transport.view,transport.manage');
     Route::get('/transport/import-template', [TransportController::class, 'importTemplate'])->middleware('perm:transport.manage');

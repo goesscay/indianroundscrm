@@ -107,10 +107,10 @@ export default function ProposalTransport({ p, set, computed, manager }: { p: Pr
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="font-medium">{o.name}{p.selected_option === oi && <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">quote</span>}</div>
               <div className="flex flex-wrap gap-1.5">
-                {MODES.map((m) => <Button key={m.v} type="button" variant="outline" size="sm" onClick={() => addLeg(oi, m.v)} data-testid={`add-leg-${oi}-${m.v}`}><m.icon size={14} /> {m.label}</Button>)}
+                {MODES.filter((m) => !TYPED.includes(m.v)).map((m) => <Button key={m.v} type="button" variant="outline" size="sm" onClick={() => addLeg(oi, m.v)} data-testid={`add-leg-${oi}-${m.v}`}><m.icon size={14} /> {m.label}</Button>)}
               </div>
             </div>
-            {legs.length === 0 && <p className="mt-3 text-sm text-muted-foreground">No transport on this option. Add a flight, train, bus, cab, van or ferry. Or use the manual Land package line below.</p>}
+            {legs.length === 0 && <p className="mt-3 text-sm text-muted-foreground">No transport on this option. Add a bus, cab, van or ferry priced from the transport master. Flights and trains are suggested in their own section below. Or use the manual Land package line.</p>}
             <div className="mt-3 space-y-2">
               {[...legs.keys()].sort((a, b) => legs[a].day_offset - legs[b].day_offset).map((li) => {
                 const l = legs[li];
