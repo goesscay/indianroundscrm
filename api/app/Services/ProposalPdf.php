@@ -99,8 +99,14 @@ class ProposalPdf
             $options[] = ['name' => $o['name'], 'stays' => $stays, 'prices' => $computed['options'][$oi] ?? null, 'selected' => $oi === $p['selected_option']];
         }
 
+        $journey = TransportJourney::build($p, $computed);
+        if ($journey) {                                                          // what the transport adds to the standard text
+            $p['content']['inclusions'] = TransportJourney::merge($p['content']['inclusions'], $journey['inclusions']);
+            $p['content']['exclusions'] = TransportJourney::merge($p['content']['exclusions'], $journey['exclusions']);
+        }
+
         return [
-            'quote' => $quote, 'p' => $p, 'trip' => $trip, 'start' => $start, 'days' => $days, 'options' => $options, 'sizes' => $trip['group_sizes'],
+            'quote' => $quote, 'p' => $p, 'journey' => $journey, 'trip' => $trip, 'start' => $start, 'days' => $days, 'options' => $options, 'sizes' => $trip['group_sizes'],
             'cover' => self::image($p['cover_media_id'] ? $mediaById->get((string) $p['cover_media_id']) : null, 1190, 1060, 82),
             'logo' => self::logo(), 'company' => config('crm.company'), 'sign' => config('crm.signature'),
         ];

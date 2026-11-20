@@ -10,6 +10,7 @@ use App\Models\QuoteContentBlock;
 use App\Models\QuoteTemplate;
 use App\Models\TravelPackage;
 use App\Services\ProposalPricing;
+use App\Services\TransportJourney;
 use App\Services\TransportPricing;
 use Illuminate\Http\Request;
 
@@ -128,7 +129,7 @@ class ProposalController extends Controller
         return [
             'destination' => $t['destination'] ?: null, 'travel_date' => $t['start_date'], 'duration_days' => $t['nights'] > 0 ? $t['nights'] + 1 : null,
             'adults' => $t['adults'], 'children' => $t['children_bed'] + $t['children_no_bed'], 'lines' => ProposalPricing::quoteLines($p, $computed),
-        ] + ProposalPricing::legacyFields($p);
+        ] + ProposalPricing::legacyFields($p, $computed);
     }
 
     private function call(string $method, array $payload, Request $request, ?string $id = null)
@@ -143,7 +144,9 @@ class ProposalController extends Controller
     {
         $p = ProposalPricing::clean((array) $q->proposal);
 
-        return ['quote' => $q->toApi(true), 'proposal' => $p, 'computed' => ProposalPricing::compute($p, $this->manager($request))];
+        $computed = ProposalPricing::compute($p, $this->manager($request));
+
+        return ['quote' => $q->toApi(true), 'proposal' => $p, 'computed' => $computed, 'journey' => TransportJourney::build($p, $computed)];
     }
 
     private function mine(Request $request, string $id): Quote

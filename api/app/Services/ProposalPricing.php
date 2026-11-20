@@ -268,9 +268,15 @@ class ProposalPricing
     }
 
     /** What the older quote page and PDF show: the itinerary and the text sections as plain lines. @return array<string,mixed> */
-    public static function legacyFields(array $p): array
+    public static function legacyFields(array $p, ?array $computed = null): array
     {
         $c = $p['content'];
+        $j = $computed ? TransportJourney::build($p, $computed) : null;
+        if ($j) {
+            $c['inclusions'] = TransportJourney::merge($c['inclusions'], $j['inclusions']);
+            $c['exclusions'] = TransportJourney::merge($c['exclusions'], $j['exclusions']);
+            $c['notes'] = TransportJourney::merge($c['notes'], $j['notes']);
+        }
         $canc = array_merge(array_map(fn ($t) => $t['label'].': '.rtrim(rtrim(number_format($t['percent'], 2, '.', ''), '0'), '.').'% cancellation charge', $c['cancellation']['tiers']), $c['cancellation']['items']);
 
         return [

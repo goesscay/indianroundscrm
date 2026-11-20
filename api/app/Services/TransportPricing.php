@@ -89,7 +89,7 @@ class TransportPricing
         return $out;
     }
 
-    /** The exchange rates held on the quotation, and how each destination's cabs are booked. @return array{fx:array<string,mixed>,cab_scope:array<string,string>} */
+    /** The exchange rates held on the quotation, and how each destination's cabs are booked. @return array{fx:array<string,mixed>,cab_scope:array<string,string>,wording:string,tax_display:string} */
     public static function cleanSettings(mixed $t): array
     {
         $t = (array) $t;
@@ -109,7 +109,11 @@ class TransportPricing
             }
         }
 
-        return ['fx' => ['date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ? $date : null, 'rates' => $rates, 'safety_pct' => round(max(0.0, min(25.0, (float) ($fx['safety_pct'] ?? 0))), 2)], 'cab_scope' => $scope];
+        return [
+            'fx' => ['date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ? $date : null, 'rates' => $rates, 'safety_pct' => round(max(0.0, min(25.0, (float) ($fx['safety_pct'] ?? 0))), 2)], 'cab_scope' => $scope,
+            // how the customer sees it: vehicle and airline names or a general description; the transport price with or before GST
+            'wording' => ($t['wording'] ?? 'named') === 'general' ? 'general' : 'named', 'tax_display' => ($t['tax_display'] ?? 'with_gst') === 'before_gst' ? 'before_gst' : 'with_gst',
+        ];
     }
 
     /** The default exchange rates Operations keep (used to start each new quotation). @return array{date:?string,rates:array<string,float>} */
