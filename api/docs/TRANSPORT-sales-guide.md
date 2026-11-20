@@ -25,9 +25,10 @@ You see selling prices only. Suppliers, costs and margin are never shown to you 
 Open the **Flights** or **Trains** tab. Details only: nothing is priced and the package price never changes.
 
 1. The list is already filtered by the trip: **From** (where the customer starts), **To** (the destination) and the **travel date**. Only services that run on that weekday are shown. A service that ends near the destination (for example a train to Kalka for Manali) is shown with its note on how to continue.
-2. **Tick** the ones to share with the customer.
-3. Not on the list? **Add a flight or train typed for this quote only.** It is kept on this quotation and is not added to the master list.
-4. The customer sees a **How to reach** block with the details, the running days and a note that these are suggestions with no price and that timings must be confirmed at booking.
+2. **Going / Return:** *Going* lists services from where the customer starts to the destination. Switch to *Return* for the way back: the date becomes the last day of the trip (change it if needed) and the list shows services that start at or near the destination and end where the customer started. Enter **From** first: the way back needs to know where it is going back to.
+3. **Tick** the ones to share with the customer. Going and return ticks are kept together and the tab count shows the total.
+4. Not on the list? **Add a flight or train typed for this quote only** (it is added for the direction you are on). It is kept on this quotation and is not added to the master list.
+5. The customer sees a **How to reach** block with the details, the running days (return services are marked **Return**, after the ones for the way there) and a note that these are suggestions with no price and that timings must be confirmed at booking.
 
 ## Older quotations
 

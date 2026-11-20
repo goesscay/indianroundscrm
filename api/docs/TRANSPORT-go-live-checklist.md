@@ -10,6 +10,8 @@
 - [ ] At least four real quotations approved as sent to a customer.
 - [ ] Sales and Operations guides handed out and the training session held.
 - [ ] Flights and trains: first real list loaded, an owner and review rhythm agreed, sample schedules removed, customer wording agreed (names or general description).
+- [ ] Tested on a phone: the Transport card, the Rates list and the Flights and Trains lists.
+- [ ] A real quotation built with all three tabs; ticking flights and trains (going and return) changed no price.
 - [ ] The sample provider "Lion City Cabs (Sample)" removed or replaced with the real rate sheet.
 
 Client name and role: ____________________   Date: ____________   Signature: ____________________

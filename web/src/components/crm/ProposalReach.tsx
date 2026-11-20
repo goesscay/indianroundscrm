@@ -20,7 +20,7 @@ const runsOn = (days: DayKey[]) => {
   return DAYS.filter((d) => days.includes(d.k)).map((d) => d.l).join(", ") || "No days set";
 };
 const timeOf = (x: { departs: string | null; arrives: string | null; arrives_next_day: boolean }) => [x.departs, x.arrives].filter(Boolean).join(" → ") + (x.arrives && x.arrives_next_day ? " (+1)" : "");
-const toItem = (s: TransportSchedule): ReachItem => ({ schedule_id: s.id, kind: s.kind, title: s.title, from_name: s.from_name, from_code: s.from_code, to_name: s.to_name, to_code: s.to_code, departs: s.departs, arrives: s.arrives,
+const toItem = (s: TransportSchedule, direction: "going" | "return"): ReachItem => ({ schedule_id: s.id, kind: s.kind, direction, title: s.title, from_name: s.from_name, from_code: s.from_code, to_name: s.to_name, to_code: s.to_code, departs: s.departs, arrives: s.arrives,
   arrives_next_day: s.arrives_next_day, days: s.days, classes: s.classes, note: s.note });
 const Badge = ({ kind }: { kind: ScheduleKind }) => <span className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide", kind === "flight" ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300" : "bg-secondary text-muted-foreground")}>{kind === "flight" ? <Plane size={10} /> : <Train size={10} />}{kind}</span>;
 
@@ -33,37 +33,46 @@ export default function ProposalReach({ p, set, kind }: { p: ProposalData; set: 
   const [from, setFrom] = useState(p.reach?.from ?? "");
   const [to, setTo] = useState("");
   const [show, setShow] = useState<"all" | ScheduleKind>(kind ?? "all");
+  const [direction, setDirection] = useState<"going" | "return">("going");
+  const [retDate, setRetDate] = useState("");                                // the return date; empty = the last day of the trip
   const [adding, setAdding] = useState(false);
   const [f, setF] = useState({ ...BLANK, kind: kind ?? BLANK.kind });
   const items = (p.reach?.items ?? []).filter((x) => !kind || x.kind === kind);       // inside a Flights or Trains tab only that kind is shown and counted
-  const date = p.trip.start_date ?? "";
+  const dayCount = p.days.length > 0 ? p.days.length : p.trip.nights + 1;
+  const endDate = p.trip.start_date ? new Date(new Date(`${p.trip.start_date}T00:00:00`).getTime() + (dayCount - 1) * 86400000).toISOString().slice(0, 10) : "";
+  const date = direction === "return" ? (retDate || endDate) : (p.trip.start_date ?? "");
 
   useEffect(() => { api.get<string[]>("/transport/schedules/origins").then((r) => setOrigins(r.data)).catch(() => setOrigins([])); }, []);
   // the destination follows the trip until the salesperson types another
   const toValue = to !== "" ? to : p.trip.destination;
+  const needsOrigin = direction === "return" && from.trim() === "";            // the way back needs to know where it is going back to
   useEffect(() => {
+    if (needsOrigin) { setRows([]); return; }
     const t = setTimeout(() => {
-      api.get<TransportSchedule[]>("/transport/schedules", { params: { from: from || undefined, to: toValue || undefined, date: date || undefined } }).then((r) => setRows(r.data)).catch(() => setRows([]));
+      // Going: from where the customer starts to the destination. Return: from the destination (or near it) back to where they started.
+      const params = direction === "return" ? { from: toValue || undefined, to: from || undefined, date: date || undefined, direction: "return" } : { from: from || undefined, to: toValue || undefined, date: date || undefined };
+      api.get<TransportSchedule[]>("/transport/schedules", { params }).then((r) => setRows(r.data)).catch(() => setRows([]));
     }, 300);
     return () => clearTimeout(t);
-  }, [from, toValue, date]);
+  }, [from, toValue, date, direction, needsOrigin]);
 
-  const ticked = (id: string) => items.some((x) => String(x.schedule_id) === id);
+  const dirOf = (x: ReachItem) => x.direction ?? "going";
+  const ticked = (id: string) => items.some((x) => String(x.schedule_id) === id && dirOf(x) === direction);
   const toggle = (s: TransportSchedule) => set((d) => {
     d.reach ??= { from: null, items: [] };
-    const i = d.reach.items.findIndex((x) => String(x.schedule_id) === s.id);
-    if (i >= 0) d.reach.items.splice(i, 1); else if (d.reach.items.length < 12) d.reach.items.push(toItem(s));
+    const i = d.reach.items.findIndex((x) => String(x.schedule_id) === s.id && (x.direction ?? "going") === direction);
+    if (i >= 0) d.reach.items.splice(i, 1); else if (d.reach.items.length < 12) d.reach.items.push(toItem(s, direction));
   });
   const shownRows = useMemo(() => rows.filter((r) => (kind ?? show) === "all" || r.kind === (kind ?? show)), [rows, show, kind]);
   const listedIds = new Set(rows.map((r) => r.id));
-  const outside = items.filter((x) => x.schedule_id != null && !listedIds.has(String(x.schedule_id)));
+  const outside = items.filter((x) => x.schedule_id != null && dirOf(x) === direction && !listedIds.has(String(x.schedule_id)));
   const custom = items.filter((x) => x.schedule_id == null);
 
   const addCustom = () => {
     if (!f.title.trim() || !f.from_name.trim() || !f.to_name.trim()) return;
     set((d) => {
       d.reach ??= { from: null, items: [] };
-      if (d.reach.items.length < 12) d.reach.items.push({ schedule_id: null, kind: f.kind, title: f.title.trim(), from_name: f.from_name.trim(), from_code: null, to_name: f.to_name.trim(), to_code: null, departs: f.departs || null, arrives: f.arrives || null,
+      if (d.reach.items.length < 12) d.reach.items.push({ schedule_id: null, kind: f.kind, direction, title: f.title.trim(), from_name: f.from_name.trim(), from_code: null, to_name: f.to_name.trim(), to_code: null, departs: f.departs || null, arrives: f.arrives || null,
         arrives_next_day: false, days: f.days.length ? f.days : ALL, classes: f.classes || null, note: f.note || null });
     });
     setF({ ...BLANK, kind: kind ?? BLANK.kind, from_name: from }); setAdding(false);
@@ -76,13 +85,21 @@ export default function ProposalReach({ p, set, kind }: { p: ProposalData; set: 
           <Input list="reach-origins" value={from} onChange={(e) => { setFrom(e.target.value); set((d) => { d.reach ??= { from: null, items: [] }; d.reach.from = e.target.value || null; }); }} placeholder="Delhi" className="mt-1 h-9" data-testid="reach-from" />
           <datalist id="reach-origins">{origins.map((o) => <option key={o} value={o} />)}</datalist></div>
         <div className="w-[170px]"><Label className="text-xs">To</Label><Input value={toValue} onChange={(e) => setTo(e.target.value)} className="mt-1 h-9" data-testid="reach-to" /></div>
-        <div className="w-[150px]"><Label className="text-xs">Travel date</Label><Input type="date" value={date} onChange={(e) => set((d) => { d.trip.start_date = e.target.value || null; })} className="mt-1 h-9" /></div>
+        <div className="w-[150px]"><Label className="text-xs">{direction === "return" ? "Return date" : "Travel date"}</Label>
+          <Input type="date" value={date} onChange={(e) => (direction === "return" ? setRetDate(e.target.value) : set((d) => { d.trip.start_date = e.target.value || null; }))} className="mt-1 h-9" data-testid="reach-date" /></div>
+        <div><Label className="text-xs">Direction</Label>
+          <div className="mt-1 flex gap-1" data-testid="reach-direction">
+            {(["going", "return"] as const).map((x) => <button key={x} type="button" aria-pressed={direction === x} onClick={() => setDirection(x)} data-testid={`reach-dir-${x}`}
+              className={cn("h-9 rounded-md border px-3 text-sm", direction === x ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-accent")}>{x === "going" ? "Going" : "Return"}</button>)}
+          </div></div>
         {!kind && <div className="w-[170px]"><Label className="text-xs">Show</Label>
           <Select value={show} onValueChange={(v) => setShow(v as "all" | ScheduleKind)}><SelectTrigger className="mt-1 h-9" data-testid="reach-show"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="all">Flights and trains</SelectItem><SelectItem value="flight">Flights only</SelectItem><SelectItem value="train">Trains only</SelectItem></SelectContent></Select></div>}
       </div>
 
-      {shownRows.length === 0 && outside.length === 0 ? (
+      {needsOrigin && outside.length === 0 ? (
+        <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground" data-testid="reach-needs-origin">Enter where the customer starts (From) to see the services back there.</p>
+      ) : shownRows.length === 0 && outside.length === 0 ? (
         <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground" data-testid="reach-empty">{date ? "Nothing in the list runs on this route and day." : "Nothing in the list for this route yet."} You can add one for this quote only below.</p>
       ) : (
         <div className="overflow-x-auto rounded-md border">
@@ -110,7 +127,7 @@ export default function ProposalReach({ p, set, kind }: { p: ProposalData; set: 
           <div className="text-xs font-medium text-muted-foreground">Typed for this quote only</div>
           {custom.map((x) => (
             <div key={`${x.kind}-${x.title}-${x.from_name}`} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2.5 py-2 text-sm">
-              <span className="flex items-center gap-2"><Badge kind={x.kind} /><span className="font-medium">{x.title}</span><span className="text-xs text-muted-foreground">{x.from_name} → {x.to_name}{timeOf(x) ? ` · ${timeOf(x)}` : ""} · {runsOn(x.days)}</span></span>
+              <span className="flex items-center gap-2"><Badge kind={x.kind} />{dirOf(x) === "return" && <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">Return</span>}<span className="font-medium">{x.title}</span><span className="text-xs text-muted-foreground">{x.from_name} → {x.to_name}{timeOf(x) ? ` · ${timeOf(x)}` : ""} · {runsOn(x.days)}</span></span>
               <button type="button" aria-label="Remove" className="rounded p-1.5 text-muted-foreground hover:bg-accent" onClick={() => set((d) => { const i = d.reach?.items.findIndex((y) => y.schedule_id == null && y.title === x.title && y.from_name === x.from_name); if (d.reach && i != null && i >= 0) d.reach.items.splice(i, 1); })}><Trash2 size={14} /></button>
             </div>
           ))}
@@ -119,7 +136,7 @@ export default function ProposalReach({ p, set, kind }: { p: ProposalData; set: 
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm" data-testid="reach-count">{items.length === 0 ? "Nothing is shared with the customer yet." : `${items.length} ${kind ? (items.length === 1 ? kind : `${kind}s`) : items.length === 1 ? "suggestion" : "suggestions"} will appear on the customer's quotation.`}</p>
-        <button type="button" className="text-sm underline" onClick={() => { setF({ ...BLANK, kind: kind ?? BLANK.kind, from_name: from, to_name: toValue }); setAdding((a) => !a); }} data-testid="reach-add-custom">Not on the list? Add {kind ? `a ${kind}` : "a flight or train"} typed for this quote only</button>
+        <button type="button" className="text-sm underline" onClick={() => { setF({ ...BLANK, kind: kind ?? BLANK.kind, from_name: direction === "return" ? toValue : from, to_name: direction === "return" ? from : toValue }); setAdding((a) => !a); }} data-testid="reach-add-custom">Not on the list? Add {kind ? `a ${kind}` : "a flight or train"} typed for this quote only</button>
       </div>
 
       {adding && (

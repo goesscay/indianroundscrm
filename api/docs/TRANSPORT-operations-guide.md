@@ -29,7 +29,7 @@ There is nothing to set up first. No countries, places or providers screens. The
 **Where:** Transport has three tabs: **Rates** (price a quotation), **Flights** and **Trains** (details shown to customers as suggestions).
 
 - **Add flight / Add train:** airline or train name and number, from and to (with airport or station codes), departs, arrives (tick "arrives the next day" if it does), the days it **runs on**, class, and a note. There is **no price field**.
-- **Also reaches:** if a service ends near, not at, a destination (Kalka for Manali, Chandigarh for Manali), write the destination(s) here and put how to continue in the **note** ("Then a road transfer to Manali"). Quotations for that destination then suggest it.
+- **Also serves:** if a service starts or ends near, not at, a destination (Kalka or Chandigarh for Manali), write the destination(s) here and put how to continue in the **note** ("Then a road transfer to Manali"). Quotations for that destination then suggest it: on the way there if it ends near the destination, and on the way back if it starts near it.
 - **Edit, Duplicate, Delete** are under the ⋯ menu on each row. Search, and filter by route.
 - **Import from Excel:** download the template, fill one row per service, **Check first**, then Import. Importing again updates rows that already exist.
 - **Needs update:** a service not touched for 180 days is flagged. Open it and save to confirm it is still correct. Agree who reviews the lists and how often.

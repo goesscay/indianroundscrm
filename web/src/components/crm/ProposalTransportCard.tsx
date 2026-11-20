@@ -87,8 +87,8 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
       <div className="flex gap-1 border-b" role="tablist" data-testid="transport-tabs-card">
         {([["road", "Road transport", roadCount, Car], ["flight", "Flights", flights, Plane], ["train", "Trains", trains, Train]] as const).map(([k, l, n, Icon]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} data-testid={`ttab-${k}`}
-            className={cn("-mb-px flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium", tab === k ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
-            <Icon size={15} />{l}<span className="rounded-full bg-secondary px-2 py-0.5 text-xs" data-testid={`ttab-count-${k}`}>{n}</span>
+            className={cn("-mb-px flex min-w-0 flex-1 items-center justify-center gap-1.5 border-b-2 px-1.5 py-2 text-xs font-medium sm:flex-none sm:gap-2 sm:px-4 sm:text-sm", tab === k ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
+            <Icon size={15} className="hidden shrink-0 sm:block" /><span className="truncate">{l}</span><span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-xs sm:px-2" data-testid={`ttab-count-${k}`}>{n}</span>
           </button>
         ))}
       </div>

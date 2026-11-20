@@ -58,8 +58,8 @@ function ScheduleDialog({ kind, open, item, onClose, onSaved }: { kind: Schedule
             <div><Label className="label-caps">To</Label><Input className="mt-1.5" value={f.to_name} onChange={(e) => setF({ ...f, to_name: e.target.value })} required placeholder={kind === "flight" ? "Kullu-Manali" : "Kalka"} data-testid="schedule-to" /></div>
             <div><Label className="label-caps">{kind === "flight" ? "Airport code" : "Station code"}</Label><Input className="mt-1.5" value={f.to_code} maxLength={12} onChange={(e) => setF({ ...f, to_code: e.target.value.toUpperCase() })} placeholder={kind === "flight" ? "KUU" : "KLK"} /></div>
           </div>
-          <div><Label className="label-caps">Also reaches (if it ends near, not at, these places)</Label><Input className="mt-1.5" value={f.serves} onChange={(e) => setF({ ...f, serves: e.target.value })} placeholder="Manali, Shimla" data-testid="schedule-serves" />
-            <p className="mt-1 text-xs text-muted-foreground">Quotations for these places suggest this {noun}. The note below tells the customer how to continue.</p></div>
+          <div><Label className="label-caps">Also serves (places near where it starts or ends)</Label><Input className="mt-1.5" value={f.serves} onChange={(e) => setF({ ...f, serves: e.target.value })} placeholder="Manali, Shimla" data-testid="schedule-serves" />
+            <p className="mt-1 text-xs text-muted-foreground">Quotations for these places suggest this {noun}, on the way there if it ends near them and on the way back if it starts near them. The note below tells the customer how to continue.</p></div>
           <div className="grid grid-cols-3 gap-3">
             <div><Label className="label-caps">Departs</Label><Input className="mt-1.5" type="time" value={f.departs} onChange={(e) => setF({ ...f, departs: e.target.value })} data-testid="schedule-departs" /></div>
             <div><Label className="label-caps">Arrives</Label><Input className="mt-1.5" type="time" value={f.arrives} onChange={(e) => setF({ ...f, arrives: e.target.value })} data-testid="schedule-arrives" /></div>
@@ -210,7 +210,7 @@ export default function ScheduleList({ kind }: { kind: ScheduleKind }) {
               {shown.map((s) => (
                 <tr key={s.id} className={cn("border-b border-border/60 last:border-0", !s.active && "opacity-60")} data-testid={`schedule-row-${s.id}`}>
                   <td className="p-3 font-medium"><span className="flex items-center gap-2"><Icon size={14} className="shrink-0 text-muted-foreground" />{s.title}</span>{s.note && <div className="ml-6 max-w-[260px] truncate text-xs font-normal text-muted-foreground" title={s.note}>{s.note}</div>}</td>
-                  <td className="p-3">{place(s.from_name, s.from_code)} → {place(s.to_name, s.to_code)}{s.serves && <div className="text-xs text-muted-foreground">Reaches {s.serves}</div>}</td>
+                  <td className="p-3">{place(s.from_name, s.from_code)} → {place(s.to_name, s.to_code)}{s.serves && <div className="text-xs text-muted-foreground">Serves {s.serves}</div>}</td>
                   <td className="p-3 tabular-nums">{timeOf(s) || "–"}</td>
                   <td className="p-3">{s.runs_on}</td>
                   <td className="p-3">{s.classes ?? "–"}</td>
