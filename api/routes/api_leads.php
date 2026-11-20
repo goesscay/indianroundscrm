@@ -156,6 +156,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/transport/schedules/{id}', [TransportScheduleController::class, 'destroy'])->middleware('perm:transport.manage');
     Route::post('/transport/schedules/{id}/duplicate', [TransportScheduleController::class, 'duplicate'])->middleware('perm:transport.manage');
     // ---- the transport rate list: one line per rate (Operations only; prices and suppliers are not for sales)
+    Route::get('/transport/road-options', [TransportLineController::class, 'roadOptions'])->middleware('perm:transport.view,transport.manage,quotes.create');
     Route::get('/transport/lines/lookups', [TransportLineController::class, 'lookups'])->middleware('perm:transport.manage');
     Route::get('/transport/lines/import-template', [TransportLineController::class, 'importTemplate'])->middleware('perm:transport.manage');
     Route::post('/transport/lines/import', [TransportLineController::class, 'import'])->middleware('perm:transport.manage');

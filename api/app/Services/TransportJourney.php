@@ -61,7 +61,8 @@ class TransportJourney
         self::$vehicles = self::$routes = [];
         $sel = (int) $p['selected_option'];
         $legs = $p['options'][$sel]['legs'] ?? [];
-        if (! $legs) {
+        $roadRows = array_values(array_filter($computed['options'][$sel]['actual']['road']['rows'] ?? [], fn ($r) => ! $r['rate_needed']));
+        if (! $legs && ! $roadRows) {
             return null;
         }
         $t = $p['transport'];
@@ -154,11 +155,57 @@ class TransportJourney
             $byDay[$day][] = $line;
             $summary[] = ['service' => $label, 'details' => trim($title.($detail && $detail !== $title ? ' · '.$detail : ''), ' ·'), 'included' => $included];
         }
+
+        // the Transport card's road plan: the same lines, from the rate list
+        foreach ($roadRows as $r) {
+            $master = true;
+            [$veh, $route] = self::splitName($r['name']);
+            $label = $named ? match ($r['type']) {
+                'cab' => 'Private '.$veh,
+                'bus' => stripos($veh, 'bus') === false ? $veh.' bus' : $veh,
+                default => $veh,
+            } : self::GENERAL[$r['type']];
+            $path = $r['from_name'] && $r['to_name'] ? $r['from_name'].' to '.$r['to_name'] : '';
+            $title = $route ?: ($path ?: $label);
+            $bits = [];
+            $perPerson = $r['charged'] === 'per_person';
+            $return = $r['way'] === 'return';
+            if ($perPerson) {
+                $bits[] = $r['persons'].' '.($r['persons'] === 1 ? 'person' : 'persons').($return ? ', return' : ', one way');
+            } else {
+                $bits[] = (int) $r['qty'] > 1 ? $r['qty'].' vehicles' : 'private vehicle';
+                if ($r['charged'] === 'per_trip' && $return) {
+                    $bits[] = 'return';
+                }
+                if ($r['charged'] === 'per_day' && $r['days'] > 1) {
+                    $bits[] = $r['days'].' days';
+                }
+            }
+            $detail = implode(', ', $bits);
+            $dest = $r['destination'] ?: ($trip['destination'] ?: 'Your trip');
+            if ($perPerson) {
+                $inc[] = $label.' seats'.($path ? ' '.$path : '').' for all travellers'.($return ? ' (return)' : '');
+            } elseif ($r['charged'] === 'per_day' && in_array($r['type'], ['cab', 'van'], true)) {
+                $inc[] = $label.' for '.self::days($r['day'], $r['days']).($route ? ' ('.$route.')' : '');
+                if ($route) {
+                    $exc[] = 'Any route or sightseeing beyond the one listed.';
+                }
+            } else {
+                $inc[] = $label.($route ? ': '.$route : ($path ? ': '.$path : ''));
+            }
+            if ($r['currency'] !== 'INR') {
+                $foreign[$r['currency']] = true;
+            }
+            $line = ['day' => $r['day'], 'date' => $r['date'], 'mode' => $r['type'], 'label' => $label, 'title' => $title, 'detail' => $detail, 'included' => true, 'tag' => 'Included'];
+            $blocks[$dest][] = $line;
+            $byDay[$r['day']][] = $line;
+            $summary[] = ['service' => $label, 'details' => trim($title.($detail && $detail !== $title ? ' · '.$detail : ''), ' ·'), 'included' => true];
+        }
         if (! $blocks) {
             return null;
         }
 
-        $sell = (float) ($computed['options'][$sel]['actual']['transport']['selling'] ?? 0);
+        $sell = (float) ($computed['options'][$sel]['actual']['transport']['selling'] ?? 0) + (float) ($computed['options'][$sel]['actual']['road']['selling'] ?? 0);
         $gst = (float) $p['gst_rate'];
         $display = ($t['tax_display'] ?? 'with_gst') === 'before_gst' ? 'before_gst' : 'with_gst';
         $notes = [];
@@ -180,10 +227,23 @@ class TransportJourney
         }
 
         return [
-            'blocks' => array_map(fn ($dest, $lines) => ['destination' => $dest, 'lines' => $lines], array_keys($blocks), array_values($blocks)),
+            'blocks' => array_map(function ($dest, $lines) {
+                usort($lines, fn ($a, $b) => $a['day'] <=> $b['day']);
+
+                return ['destination' => $dest, 'lines' => $lines];
+            }, array_keys($blocks), array_values($blocks)),
             'by_day' => $byDay, 'summary' => $summary, 'selling' => round($sell, 2), 'gst_rate' => $gst, 'tax_display' => $display,
             'total_incl_gst' => round($sell * (1 + $gst / 100)), 'inclusions' => self::unique($inc), 'exclusions' => self::unique($exc), 'notes' => $notes,
         ];
+    }
+
+    /** "Ertiga, 6 seats: local sightseeing" into the vehicle ("Ertiga") and the route ("local sightseeing"). @return array{0:string,1:string} */
+    private static function splitName(string $name): array
+    {
+        $parts = explode(':', $name, 2);
+        $veh = trim((string) preg_replace('/,?\s*\d+\s*(seats?|seater).*$/i', '', trim($parts[0])));
+
+        return [$veh !== '' ? $veh : trim($parts[0]), trim($parts[1] ?? '')];
     }
 
     /** @param list<string> $items @return list<string> */

@@ -999,6 +999,7 @@ export interface ProposalData {
   options: { name: string; stays: ProposalStay[]; legs?: ProposalLeg[] }[];
   transport?: ProposalTransportSettings;
   reach?: { from: string | null; items: ReachItem[] };
+  road?: RoadPlan;
   land: { label: string; rows: { pax: number; cost_pp: number; child_cost_pp: number | null }[] };
   gst_rate: number; selected_option: number; cover_media_id: number | string | null;
   content: {
@@ -1007,7 +1008,7 @@ export interface ProposalData {
   };
 }
 export interface ProposalPrice {
-  persons: number; adults: number; land_selling: number; hotel_selling?: number; transport?: ProposalTransportPrice; total: number; per_person: number; cost?: number; margin_amount?: number;
+  persons: number; adults: number; land_selling: number; hotel_selling?: number; transport?: ProposalTransportPrice; road?: RoadPrice; total: number; per_person: number; cost?: number; margin_amount?: number;
   stays: { hotel: string; room: string; meal_plan: MealPlan; check_in: string; nights: number; selling: number; cost?: number }[];
 }
 export interface ProposalComputed {
@@ -1070,3 +1071,17 @@ export interface LineImportResult {
   dry_run: boolean; summary: { ready: number; check: number; missing: number }; rows: LineImportRow[]; new_destinations?: { name: string; country: string; currency: string }[];
   new?: number; updated?: number; skipped?: number;
 }
+
+// ---- the Transport card: road transport priced from the rate list
+export interface RoadStay { destination: string | null; line_id: number | string | null; from_day: number; days: number | null; qty: number | null }
+export interface RoadDaily { day: number; line_id: number | string | null; qty: number | null }
+export type RoadKind = "transfer" | "bus" | "ferry" | "vehicle";
+export interface RoadExtra { id: string; kind: RoadKind; line_id: number | string | null; qty: number | null; day: number; way: "one_way" | "return" }
+export interface RoadPlan { mode: "stay" | "daily"; stays: RoadStay[]; daily: RoadDaily[]; extras: RoadExtra[] }
+export interface RoadOption { id: string; type: LineType; name: string; charged: Charged; seats: number | null; from_name: string | null; to_name: string | null; way: "one_way" | "return" | null; destination: string | null }
+export interface RoadRow {
+  key: string; source: "stay" | "daily" | "extra"; line_id: string; type: LineType; name: string; destination: string | null; from_name: string | null; to_name: string | null; charged: Charged;
+  way: "one_way" | "return"; day: number; days: number; date: string | null; persons: number; qty: number | null; unit_selling: number | null; selling: number; cost?: number; margin_amount?: number;
+  currency: string; rate_needed: boolean; warnings: string[];
+}
+export interface RoadPrice { selling: number; cost?: number; margin_amount?: number; by_mode: Record<string, number>; rows: RoadRow[]; fx_needed: string[] }
