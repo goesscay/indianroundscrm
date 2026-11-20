@@ -34,3 +34,5 @@ There is nothing to set up first. No countries, places or providers screens. The
 - **Import from Excel:** download the template, fill one row per service, **Check first**, then Import. Importing again updates rows that already exist.
 - **Needs update:** a service not touched for 180 days is flagged. Open it and save to confirm it is still correct. Agree who reviews the lists and how often.
 - Sample schedules (marked "Sample schedule: confirm before use") can be loaded with `php artisan transport:load-schedules-sample`. Replace them with the real list before use.
+
+**Moving old rates to Car name and Route service (once):** rates entered before the Car name field keep both in one name (for example "Ertiga: Local sightseeing"). Run `php artisan transport:fill-car-names` to see the proposed split, and `php artisan transport:fill-car-names --apply` to save it. Prices, seasons and saved quotations do not change. Until a rate has a car name it appears under **Other** in the quotation's Car name list. A car added in Rates appears in the quotation list with no extra step.

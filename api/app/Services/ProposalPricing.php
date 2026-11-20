@@ -271,7 +271,7 @@ class ProposalPricing
         foreach ($opt['actual']['road']['rows'] as $x) {
             if ($x['selling'] > 0) {
                 $what = $x['charged'] === 'per_person' ? $x['persons'].' persons'.($x['way'] === 'return' ? ', return' : '') : ($x['days'] > 1 ? $x['days'].' days' : null);
-                $lines[] = ['kind' => 'transfer', 'description' => sprintf('%s%s (Day %d)', $x['name'], $what ? ', '.$what : '', $x['day']), 'qty' => 1, 'unit_price' => $x['selling'], 'discount' => 0, 'tax_rate' => $p['gst_rate']];
+                $lines[] = ['kind' => 'transfer', 'description' => sprintf('%s%s (Day %d)', ($x['car_name'] ?? null) ? $x['car_name'].': '.$x['name'] : $x['name'], $what ? ', '.$what : '', $x['day']), 'qty' => 1, 'unit_price' => $x['selling'], 'discount' => 0, 'tax_rate' => $p['gst_rate']];
             }
         }
         if ($opt['actual']['land_selling'] > 0) {

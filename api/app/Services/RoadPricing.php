@@ -139,7 +139,7 @@ class RoadPricing
 
                 return;
             }
-            $row = ['key' => $key, 'source' => $source, 'line_id' => (string) $l->id, 'type' => $l->type, 'name' => $l->name, 'destination' => $l->destination?->name, 'from_name' => $l->from_name, 'to_name' => $l->to_name,
+            $row = ['key' => $key, 'source' => $source, 'line_id' => (string) $l->id, 'type' => $l->type, 'car_name' => $l->car_name, 'name' => $l->name, 'destination' => $l->destination?->name, 'from_name' => $l->from_name, 'to_name' => $l->to_name,
                 'charged' => $l->charged, 'way' => $way, 'day' => $fromDay, 'days' => $days, 'date' => $dateOf($fromDay), 'persons' => $persons, 'qty' => null, 'unit_selling' => null, 'selling' => 0.0, 'cost' => 0.0,
                 'margin_amount' => 0.0, 'currency' => $l->currency, 'rate_needed' => false, 'warnings' => []];
             $w = [];

@@ -208,7 +208,7 @@ class TransportRoadTabTest extends TestCase
         $opts = $this->getJson('/api/transport/road-options?destination=Manali')->assertOk()->json();
         $this->assertCount(6, $opts);
         foreach ($opts as $o) {
-            $this->assertEqualsCanonicalizing(['id', 'type', 'name', 'charged', 'seats', 'from_name', 'to_name', 'way', 'destination'], array_keys($o));       // no price, supplier or note
+            $this->assertEqualsCanonicalizing(['id', 'type', 'car_name', 'name', 'charged', 'seats', 'from_name', 'to_name', 'way', 'destination'], array_keys($o));       // no price, supplier or note
         }
         $this->assertStringNotContainsString('Secret Supplier', json_encode($opts));
         $this->getJson('/api/transport/lines')->assertStatus(403);                                  // the rate list itself stays with Operations

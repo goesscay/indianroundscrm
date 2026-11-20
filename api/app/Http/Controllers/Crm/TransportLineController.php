@@ -94,10 +94,12 @@ class TransportLineController extends Controller
             $q->whereHas('destination', fn ($x) => $x->whereRaw('lower(name) = ?', [mb_strtolower($d)]));
         }
 
-        return $q->orderBy('destination_id')->orderBy('type')->orderBy('name')->limit(3000)->get()->map(fn (TransportLine $l) => [
-            'id' => (string) $l->id, 'type' => $l->type, 'name' => $l->name, 'charged' => $l->charged, 'seats' => $l->seats, 'from_name' => $l->from_name, 'to_name' => $l->to_name,
+        $mgr = (bool) $request->user()?->hasPermission('transport.manage');             // the supplier only tells two identical car and route lines apart, and only for operations
+
+        return $q->orderBy('destination_id')->orderBy('type')->orderBy('car_name')->orderBy('name')->limit(3000)->with('supplier')->get()->map(fn (TransportLine $l) => [
+            'id' => (string) $l->id, 'type' => $l->type, 'car_name' => $l->car_name, 'name' => $l->name, 'charged' => $l->charged, 'seats' => $l->seats, 'from_name' => $l->from_name, 'to_name' => $l->to_name,
             'way' => $l->way, 'destination' => $l->destination?->name,
-        ])->values();
+        ] + ($mgr ? ['supplier' => $l->supplier?->name] : []))->values();
     }
 
     // ------------------------------------------------------------------ the list

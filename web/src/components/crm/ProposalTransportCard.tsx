@@ -26,6 +26,39 @@ const defaultRoad = (dest: string | null): RoadPlan => ({ mode: "stay", stays: [
 const same = (a: string | null | undefined, b: string | null | undefined) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 const newId = () => `x${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
+const OTHER = "Other";
+const carOf = (o: RoadOption) => o.car_name?.trim() || OTHER;
+
+/**
+ * Car name then Route service, over the same saved rate line: the car narrows the list, the route service picks the rate. The route service stays locked until
+ * a car is chosen, and a car with one route service is chosen for the sales person. Rates with no car name yet sit under "Other" with their old full name.
+ */
+function CarRoutePicker({ list, all, lineId, onChange, testid, none }: { list: RoadOption[]; all: RoadOption[]; lineId: number | string | null; onChange: (id: string | null) => void; testid: string; none?: string }) {
+  const [pick, setPick] = useState<string | null>(null);
+  const current = lineId != null ? all.find((o) => o.id === String(lineId)) : undefined;
+  const car = current ? carOf(current) : pick;
+  const cars = useMemo(() => Array.from(new Set(list.map(carOf))).sort((a, b) => (a === OTHER ? 1 : b === OTHER ? -1 : a.localeCompare(b))), [list]);
+  const routes = useMemo(() => (car ? list.filter((o) => carOf(o) === car) : []), [list, car]);
+  const label = (o: RoadOption) => (routes.filter((x) => x.name === o.name).length > 1 && o.supplier ? `${o.name} (${o.supplier})` : o.name);
+  const missing = lineId != null && !current;                               // a rate that was removed or switched off since the quotation was saved
+  return (
+    <>
+      <div><Label className="text-xs">Car name</Label>
+        <Select value={car ?? NONE} onValueChange={(v) => { if (v === NONE) { setPick(null); onChange(null); return; } setPick(v); const rs = list.filter((o) => carOf(o) === v); onChange(rs.length === 1 ? rs[0].id : null); }}>
+          <SelectTrigger className="mt-1 h-9" data-testid={`${testid}-car`}><SelectValue placeholder="Choose a car" /></SelectTrigger>
+          <SelectContent><SelectItem value={NONE}>{none ?? "No car"}</SelectItem>{cars.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+        </Select></div>
+      <div><Label className="text-xs">Route service</Label>
+        <Select disabled={!car} value={current ? current.id : NONE} onValueChange={(v) => onChange(v === NONE ? null : v)}>
+          <SelectTrigger className="mt-1 h-9" data-testid={`${testid}-route`}><SelectValue placeholder={car ? "Choose the route" : "Choose a car first"} /></SelectTrigger>
+          <SelectContent><SelectItem value={NONE}>Choose the route</SelectItem>{routes.map((o) => <SelectItem key={o.id} value={o.id}>{label(o)}</SelectItem>)}</SelectContent>
+        </Select>
+        {missing && <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">This rate is no longer in the rate list.</p>}
+      </div>
+    </>
+  );
+}
+
 /**
  * The Transport card: one card with Road transport, Flights and Trains tabs. Road transport is priced from the rate list Operations keep; flights and
  * trains show details only, with no price. A bar at the bottom always shows the Transport price, which counts road transport only.
@@ -52,6 +85,8 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
   const vehiclesFor = (dest: string | null) => (options ?? []).filter((o) => (o.type === "cab" || o.type === "van") && same(o.destination, dest || trip.destination));
   const destinations = useMemo(() => Array.from(new Set((options ?? []).map((o) => o.destination).filter(Boolean) as string[])).sort(), [options]);
 
+  // a second car on the same destination and days: it is one vehicle, so it does not size the whole group again
+  const isExtraCar = (i: number) => i > 0 && road.stays.slice(0, i).some((x) => same(x.destination || trip.destination, road.stays[i].destination || trip.destination) && x.from_day === road.stays[i].from_day);
   const roadCount = (road.mode === "stay" ? road.stays.filter((s) => s.line_id != null).length : road.daily.filter((d) => d.line_id != null).length) + road.extras.filter((e) => e.line_id != null).length;
   const flights = (p.reach?.items ?? []).filter((x) => x.kind === "flight").length;
   const trains = (p.reach?.items ?? []).filter((x) => x.kind === "train").length;
@@ -113,23 +148,22 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
                 const row = rowBy(`stay${i}`);
                 return (
                   <div key={i} className="rounded-md border p-3" data-testid={`road-stay-${i}`}>
-                    {road.stays.length > 1 && (
+                    {isExtraCar(i) ? (
+                      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">Another car for the same days
+                        <button type="button" aria-label="Remove this car" className="ml-auto rounded p-1.5 hover:bg-accent" onClick={() => setRoad((r) => { r.stays.splice(i, 1); })} data-testid={`road-stay-remove-${i}`}><Trash2 size={14} /></button></div>
+                    ) : road.stays.filter((_, k) => !isExtraCar(k)).length > 1 && (
                       <div className="mb-2 flex items-center gap-2"><Label className="text-xs">Destination</Label>
                         <Input list="road-destinations" value={s.destination ?? ""} onChange={(e) => setRoad((r) => { r.stays[i].destination = e.target.value || null; r.stays[i].line_id = null; })} className="h-8 w-[180px]" />
                         <Label className="text-xs">From day</Label><Input type="number" min={1} value={s.from_day} onChange={(e) => setRoad((r) => { r.stays[i].from_day = Math.max(1, Number(e.target.value) || 1); })} className="h-8 w-[70px]" />
                         <button type="button" aria-label="Remove destination" className="ml-auto rounded p-1.5 text-muted-foreground hover:bg-accent" onClick={() => setRoad((r) => { r.stays.splice(i, 1); })}><Trash2 size={14} /></button></div>
                     )}
-                    <div className="grid gap-3 sm:grid-cols-[1.6fr_90px_90px_110px_120px]">
-                      <div><Label className="text-xs">Vehicle</Label>
-                        <Select value={s.line_id != null ? String(s.line_id) : NONE} onValueChange={(v) => setRoad((r) => { r.stays[i].line_id = v === NONE ? null : v; })}>
-                          <SelectTrigger className="mt-1 h-9" data-testid={`road-stay-vehicle-${i}`}><SelectValue placeholder="Choose a vehicle" /></SelectTrigger>
-                          <SelectContent><SelectItem value={NONE}>No vehicle</SelectItem>{list.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
-                        </Select></div>
+                    <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr_80px_110px_110px]">
+                      <CarRoutePicker list={list} all={options ?? []} lineId={s.line_id} onChange={(id) => setRoad((r) => { r.stays[i].line_id = id; })} testid={`road-stay-${i}`} />
                       <div><Label className="text-xs">Days</Label><Input type="number" min={1} max={90} value={s.days ?? ""} placeholder={String(Math.max(1, dayCount - s.from_day + 1))} onChange={(e) => setRoad((r) => { r.stays[i].days = e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1); })} className="mt-1 h-9" data-testid={`road-stay-days-${i}`} /></div>
-                      <div><Label className="text-xs">Vehicles</Label><Input type="number" min={1} max={50} value={s.qty ?? ""} placeholder={row?.qty != null ? String(row.qty) : "auto"} onChange={(e) => setRoad((r) => { r.stays[i].qty = e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1); })} className="mt-1 h-9" data-testid={`road-stay-qty-${i}`} /></div>
                       <div><Label className="text-xs">Rate per day</Label><div className="mt-1 flex h-9 items-center text-sm tabular-nums" data-testid={`road-stay-rate-${i}`}>{row?.unit_selling != null ? INR(row.unit_selling) : "–"}</div></div>
                       <div><Label className="text-xs">Amount</Label><div className="mt-1 flex h-9 items-center text-sm font-semibold tabular-nums" data-testid={`road-stay-amount-${i}`}>{row && !row.rate_needed ? INR(row.selling) : "–"}</div></div>
                     </div>
+                    {row && row.qty != null && <p className="mt-2 text-xs text-muted-foreground" data-testid={`road-stay-vehicles-${i}`}>{row.qty} vehicle{row.qty === 1 ? "" : "s"} for {pax} guest{pax === 1 ? "" : "s"}{opt(s.line_id)?.seats ? `, ${opt(s.line_id)?.seats} seats each` : ""}.</p>}
                     {options !== null && options.length > 0 && list.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No cab or van in the rate list for {dest || "this destination"} yet. Operations add one under Transport → Rates.</p>}
                     {row && <p className="mt-2 text-xs text-muted-foreground">The rate is found from Operations → Transport → Rates for the travel date. Change the vehicle and the price follows.{row.currency !== "INR" ? ` Priced in ${row.currency}, converted at the rate on this quotation.` : ""}</p>}
                     {sub(row)}
@@ -137,7 +171,8 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
                 );
               })}
               <datalist id="road-destinations">{destinations.map((d) => <option key={d} value={d} />)}</datalist>
-              <Button type="button" variant="outline" size="sm" onClick={() => setRoad((r) => { const last = r.stays[r.stays.length - 1]; r.stays.push({ destination: null, line_id: null, from_day: Math.min(dayCount, (last?.from_day ?? 1) + (last?.days ?? 1)), days: null, qty: null }); })} data-testid="road-add-destination"><Plus size={14} /> Add another destination</Button>
+              <Button type="button" variant="outline" size="sm" disabled={!road.stays.some((x) => x.line_id != null)} onClick={() => setRoad((r) => { const f = r.stays.find((x) => x.line_id != null) ?? r.stays[0]; r.stays.push({ destination: f.destination, line_id: null, from_day: f.from_day, days: f.days, qty: 1 }); })} data-testid="road-add-car"><Plus size={14} /> Add another car</Button>
+              <Button type="button" variant="outline" size="sm" className="ml-2" onClick={() => setRoad((r) => { const last = r.stays[r.stays.length - 1]; r.stays.push({ destination: null, line_id: null, from_day: Math.min(dayCount, (last?.from_day ?? 1) + (last?.days ?? 1)), days: null, qty: null }); })} data-testid="road-add-destination"><Plus size={14} /> Add another destination</Button>
             </div>
           )}
 
