@@ -12,6 +12,7 @@ use App\Models\TravelPackage;
 use App\Services\ProposalPricing;
 use App\Services\TransportJourney;
 use App\Services\TransportPricing;
+use App\Services\TransportReach;
 use Illuminate\Http\Request;
 
 /** The premium proposal builder: a starting point, a live price, and saving it as an ordinary draft quote (the quote lines are worked out from it). */
@@ -70,6 +71,7 @@ class ProposalController extends Controller
             'land' => ['label' => 'Land package: transfers and sightseeing', 'rows' => []], 'gst_rate' => (float) ($pkg?->gst_rate ?? 5), 'selected_option' => 0,
             'content' => $content, 'cover_media_id' => null,
             'transport' => ['fx' => TransportPricing::defaultFx() + ['safety_pct' => 0], 'cab_scope' => []],
+            'reach' => ['from' => null, 'items' => []],
         ];
 
         $title = $destination !== '' ? "$destination trip" : 'Trip proposal';
@@ -146,7 +148,7 @@ class ProposalController extends Controller
 
         $computed = ProposalPricing::compute($p, $this->manager($request));
 
-        return ['quote' => $q->toApi(true), 'proposal' => $p, 'computed' => $computed, 'journey' => TransportJourney::build($p, $computed)];
+        return ['quote' => $q->toApi(true), 'proposal' => $p, 'computed' => $computed, 'journey' => TransportJourney::build($p, $computed), 'reach' => TransportReach::build($p)];
     }
 
     private function mine(Request $request, string $id): Quote

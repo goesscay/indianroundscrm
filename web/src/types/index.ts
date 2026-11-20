@@ -998,6 +998,7 @@ export interface ProposalData {
   days: ProposalDay[];
   options: { name: string; stays: ProposalStay[]; legs?: ProposalLeg[] }[];
   transport?: ProposalTransportSettings;
+  reach?: { from: string | null; items: ReachItem[] };
   land: { label: string; rows: { pax: number; cost_pp: number; child_cost_pp: number | null }[] };
   gst_rate: number; selected_option: number; cover_media_id: number | string | null;
   content: {
@@ -1033,3 +1034,20 @@ export interface TransportProvider {
   vehicles?: TransportVehicle[]; routes?: TransportRoute[]; rates?: TransportRate[];
 }
 export interface TransportMeta { countries: TransportCountry[]; modes: TransportMode[]; route_kinds: string[]; place_kinds: string[]; bases: Record<TransportBasis, string> }
+
+// ---- flights and trains: details only, no prices
+export type ScheduleKind = "flight" | "train";
+export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+export interface TransportSchedule {
+  id: string; kind: ScheduleKind; title: string; from_name: string; from_code: string | null; to_name: string; to_code: string | null; serves: string | null;
+  departs: string | null; arrives: string | null; arrives_next_day: boolean; days: DayKey[]; runs_on: string; classes: string | null; note: string | null;
+  active: boolean; updated_at: string | null; needs_update: boolean;
+}
+export interface ReachItem {
+  schedule_id: number | string | null; kind: ScheduleKind; title: string; from_name: string; from_code: string | null; to_name: string; to_code: string | null;
+  departs: string | null; arrives: string | null; arrives_next_day: boolean; days: DayKey[]; classes: string | null; note: string | null;
+}
+export interface ReachBlock {
+  heading: string; disclaimer: string;
+  items: { kind: ScheduleKind; label: string; title: string; route: string; time: string; runs_on: string; classes: string | null; note: string | null }[];
+}

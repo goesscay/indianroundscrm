@@ -19,3 +19,15 @@
 **Margin:** a provider's own margin if set, otherwise the destination margin, otherwise the default (Quotation Content → margins). Sales never see costs or margin.
 
 **Before a quotation goes out:** open it, check there is no "Rate needed" warning, and read the **Your transport** section of the PDF.
+
+
+## Flights and trains (details only, no prices)
+
+**Where:** Transport has three tabs: **Rates** (price a quotation), **Flights** and **Trains** (details shown to customers as suggestions).
+
+- **Add flight / Add train:** airline or train name and number, from and to (with airport or station codes), departs, arrives (tick "arrives the next day" if it does), the days it **runs on**, class, and a note. There is **no price field**.
+- **Also reaches:** if a service ends near, not at, a destination (Kalka for Manali, Chandigarh for Manali), write the destination(s) here and put how to continue in the **note** ("Then a road transfer to Manali"). Quotations for that destination then suggest it.
+- **Edit, Duplicate, Delete** are under the ⋯ menu on each row. Search, and filter by route.
+- **Import from Excel:** download the template, fill one row per service, **Check first**, then Import. Importing again updates rows that already exist.
+- **Needs update:** a service not touched for 180 days is flagged. Open it and save to confirm it is still correct. Agree who reviews the lists and how often.
+- Sample schedules (marked "Sample schedule: confirm before use") can be loaded with `php artisan transport:load-schedules-sample`. Replace them with the real list before use.
