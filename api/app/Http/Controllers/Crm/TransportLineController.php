@@ -120,7 +120,7 @@ class TransportLineController extends Controller
         if (($s = trim((string) $request->query('q', ''))) !== '') {
             $like = $this->like($s);
             $op = Fail::ilike();
-            $q->where(fn ($w) => $w->where('name', $op, $like)->orWhere('from_name', $op, $like)->orWhere('to_name', $op, $like)
+            $q->where(fn ($w) => $w->where('name', $op, $like)->orWhere('car_name', $op, $like)->orWhere('from_name', $op, $like)->orWhere('to_name', $op, $like)
                 ->orWhereHas('destination', fn ($x) => $x->where('name', $op, $like))->orWhereHas('supplier', fn ($x) => $x->where('name', $op, $like)));
         }
 

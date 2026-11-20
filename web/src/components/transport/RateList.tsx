@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Bus, Car, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, MoreHorizontal, Pencil, Plus, Search, Ship, Trash2, Truck, Upload } from "lucide-react";
+import { Bus, Car, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, MapPin, MoreHorizontal, Pencil, Plus, Search, Ship, Trash2, Truck, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtDate } from "@/components/crm/shared";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ const typeLabel = (t: string) => TYPES.find((x) => x.v === t)?.label ?? t;
 const money = (n: number | null | undefined, cur: string) => (n == null ? "–" : new Intl.NumberFormat(cur === "INR" ? "en-IN" : "en-US", { style: "currency", currency: cur, maximumFractionDigits: 2 }).format(n));
 const num = (v: string) => (v.trim() === "" ? null : Number(v));
 const defaultCharged = (t: LineType): Charged => (t === "bus" || t === "ferry" ? "per_person" : "per_day");
+const DEST_KEY = "transport.rates.destination";
 const routeType = (t: LineType) => t === "bus" || t === "ferry";
 
 interface Form {
@@ -313,9 +315,11 @@ export default function RateList() {
   const [menu, setMenu] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [bulk, setBulk] = useState<string[]>([]);
-  // the quick add line
-  const [qa, setQa] = useState({ type: "cab" as LineType, destination: "", country: "India", currency: "INR", name: "", price: "", charged: "per_day" as Charged });
-  const [qaBusy, setQaBusy] = useState(false);
+  const [dest, setDest] = useState("");                              // the destination filter; remembered for the next visit
+  const [destOpen, setDestOpen] = useState(false);
+  const [destQ, setDestQ] = useState("");
+  useEffect(() => { try { setDest(window.localStorage.getItem(DEST_KEY) ?? ""); } catch { /* private window: no memory */ } }, []);
+  const pickDest = (d: string) => { setDest(d); setDestOpen(false); setDestQ(""); try { if (d) window.localStorage.setItem(DEST_KEY, d); else window.localStorage.removeItem(DEST_KEY); } catch { /* ignore */ } };
 
   const load = useCallback(() => {
     api.get<TransportLineRow[]>("/transport/lines").then((r) => setRows(r.data)).catch((e) => toast.error(formatApiError(e)));
@@ -323,30 +327,30 @@ export default function RateList() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  const matchesText = useCallback((r: TransportLineRow) => {
+    const t = q.trim().toLowerCase();
+    return !t || [r.name, r.car_name, r.destination?.name, r.supplier, r.from_name, r.to_name].some((x) => (x ?? "").toLowerCase().includes(t));
+  }, [q]);
+  const matchesType = useCallback((r: TransportLineRow) => filter === "all" || (filter === "needs_price" ? r.needs_price : r.type === filter), [filter]);
+  // the destination list counts what the type chips and the search leave
+  const destCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    (rows ?? []).filter((r) => matchesType(r) && matchesText(r)).forEach((r) => { const k = r.destination?.name ?? ""; if (k) m.set(k, (m.get(k) ?? 0) + 1); });
+    return m;
+  }, [rows, matchesType, matchesText]);
+  const destNames = useMemo(() => Array.from(new Set((rows ?? []).map((r) => r.destination?.name ?? "").filter(Boolean))).sort((a, b) => a.localeCompare(b)), [rows]);
+  useEffect(() => { if (rows && dest && !destNames.includes(dest)) pickDest(""); }, [rows, dest, destNames]);          // a remembered destination that has no rates any more is dropped
   const counts = useMemo(() => {
     const r = rows ?? [];
     return { all: r.length, cab: r.filter((x) => x.type === "cab").length, van: r.filter((x) => x.type === "van").length, bus: r.filter((x) => x.type === "bus").length, ferry: r.filter((x) => x.type === "ferry").length, needs_price: r.filter((x) => x.needs_price).length };
   }, [rows]);
-  const shown = useMemo(() => (rows ?? []).filter((r) => {
-    const t = q.trim().toLowerCase();
-    return (filter === "all" || (filter === "needs_price" ? r.needs_price : r.type === filter))
-      && (!t || [r.name, r.destination?.name, r.supplier, r.from_name, r.to_name].some((x) => (x ?? "").toLowerCase().includes(t)));
-  }), [rows, filter, q]);
+  const shown = useMemo(() => (rows ?? []).filter((r) => matchesType(r) && matchesText(r) && (!dest || r.destination?.name === dest)), [rows, matchesType, matchesText, dest]);
   const groups = useMemo(() => {
     const m = new Map<string, { dest: TransportLineRow["destination"]; items: TransportLineRow[] }>();
     shown.forEach((r) => { const k = r.destination?.name ?? "–"; if (!m.has(k)) m.set(k, { dest: r.destination, items: [] }); m.get(k)!.items.push(r); });
     return Array.from(m.values());
   }, [shown]);
 
-  const qaDest = look?.destinations.find((d) => d.name.toLowerCase() === qa.destination.trim().toLowerCase()) ?? null;
-  const qaNew = qa.destination.trim() !== "" && !qaDest?.known;
-  const quickAdd = async (e: FormEvent) => {
-    e.preventDefault(); setQaBusy(true);
-    try {
-      await api.post("/transport/lines", { type: qa.type, destination: qa.destination.trim(), country: qaNew ? qa.country : undefined, dest_currency: qaNew ? qa.currency : undefined, name: qa.name, price: Number(qa.price), charged: qa.charged });
-      toast.success("Rate added"); setQa({ ...qa, name: "", price: "" }); load();
-    } catch (err) { toast.error(formatApiError(err)); } finally { setQaBusy(false); }
-  };
   const del = async (r: TransportLineRow) => { if (!window.confirm(`Delete "${r.name}"?`)) return; try { await api.delete(`/transport/lines/${r.id}`); load(); } catch (e) { toast.error(formatApiError(e)); } };
   const dup = async (r: TransportLineRow) => { try { await api.post(`/transport/lines/${r.id}/duplicate`); toast.success("Duplicated. Edit the copy."); load(); } catch (e) { toast.error(formatApiError(e)); } };
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -366,37 +370,32 @@ export default function RateList() {
           <h2 className="font-display text-lg font-black">No rates yet. Pick the easiest way to start.</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             <Card className="cursor-pointer rounded-lg p-4 hover:shadow-md" onClick={() => setImporting(true)}><div className="flex items-center gap-2 font-medium"><FileSpreadsheet size={16} /> Import a rate sheet</div><p className="mt-1 text-sm text-muted-foreground">Upload the supplier&apos;s Excel. We read it and you confirm.</p></Card>
-            <Card className="cursor-pointer rounded-lg p-4 hover:shadow-md" onClick={() => setDlg({ open: true, item: null })}><div className="flex items-center gap-2 font-medium"><Plus size={16} /> Add the first rate</div><p className="mt-1 text-sm text-muted-foreground">Four fields: type, destination, name, price.</p></Card>
+            <Card className="cursor-pointer rounded-lg p-4 hover:shadow-md" onClick={() => setDlg({ open: true, item: null })}><div className="flex items-center gap-2 font-medium"><Plus size={16} /> Add the first rate</div><p className="mt-1 text-sm text-muted-foreground">Four fields: type, destination, route service, price.</p></Card>
             <Card className="cursor-pointer rounded-lg p-4 hover:shadow-md" onClick={async () => { try { const r = await api.get("/transport/lines/import-template", { responseType: "blob" }); const a = document.createElement("a"); a.href = URL.createObjectURL(r.data as Blob); a.download = "transport-rates-template.csv"; a.click(); } catch (e) { toast.error(formatApiError(e)); } }}><div className="flex items-center gap-2 font-medium"><Download size={16} /> Use a template</div><p className="mt-1 text-sm text-muted-foreground">Cab day rates, bus seats, airport transfers: download, fill, upload.</p></Card>
           </div>
         </div>
       )}
 
-      {manage && !empty && (
-        <form onSubmit={quickAdd} className="rounded-lg border bg-muted/30 p-3" data-testid="quick-add">
-          <div className="mb-2 text-xs font-medium text-muted-foreground">Quick add: fill one line and press Add</div>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="w-[130px]"><Select value={qa.type} onValueChange={(v) => setQa({ ...qa, type: v as LineType, charged: defaultCharged(v as LineType) })}><SelectTrigger className="h-9" data-testid="qa-type"><SelectValue /></SelectTrigger><SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}</SelectContent></Select></div>
-            <Input className="h-9 w-[150px]" list="tl-destinations" placeholder="Destination" value={qa.destination} onChange={(e) => setQa({ ...qa, destination: e.target.value })} required data-testid="qa-destination" />
-            <Input className="h-9 min-w-[200px] flex-1" placeholder="Service, e.g. Ertiga local sightseeing" value={qa.name} onChange={(e) => setQa({ ...qa, name: e.target.value })} required data-testid="qa-name" />
-            <Input className="h-9 w-[110px]" type="number" min={0} step="any" placeholder="Price" value={qa.price} onChange={(e) => setQa({ ...qa, price: e.target.value })} required data-testid="qa-price" />
-            <div className="w-[120px]"><Select value={qa.charged} onValueChange={(v) => setQa({ ...qa, charged: v as Charged })}><SelectTrigger className="h-9" data-testid="qa-charged"><SelectValue /></SelectTrigger><SelectContent>{CHARGED.map((c) => <SelectItem key={c.v} value={c.v}>{c.label}</SelectItem>)}</SelectContent></Select></div>
-            <Button type="submit" disabled={qaBusy} data-testid="qa-add">{qaBusy ? <Loader2 size={14} className="animate-spin" /> : null} Add</Button>
-          </div>
-          {qaNew && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid="qa-new-destination">
-              {qaDest ? `${qaDest.name} is in Hotels already.` : "A new destination."} Confirm its country and currency once:
-              <Input className="h-8 w-[130px]" value={qa.country} onChange={(e) => setQa({ ...qa, country: e.target.value })} aria-label="Country" data-testid="qa-country" />
-              <Input className="h-8 w-[70px]" maxLength={3} value={qa.currency} onChange={(e) => setQa({ ...qa, currency: e.target.value.toUpperCase() })} aria-label="Currency" data-testid="qa-currency" />
-            </div>
-          )}
-          {qaDest?.known && <div className="mt-2 text-xs text-muted-foreground">{qaDest.name}, {qaDest.country} · currency {qaDest.currency}</div>}
-        </form>
-      )}
-
       {!empty && (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] max-w-[320px] flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search service, place or supplier" className="h-9 pl-9" data-testid="rates-search" /></div>
+          <div className="relative min-w-[220px] max-w-[320px] flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search car, route or supplier" className="h-9 pl-9" data-testid="rates-search" /></div>
+          <Popover open={destOpen} onOpenChange={setDestOpen}>
+            <div className={cn("inline-flex h-9 items-center rounded-md border text-sm", dest ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-accent")}>
+              <PopoverTrigger asChild><button type="button" className="inline-flex h-full items-center gap-1.5 px-3" data-testid="filter-destination"><MapPin size={14} />{dest || "Destination"}{!dest && <ChevronDown size={13} />}</button></PopoverTrigger>
+              {dest && <button type="button" aria-label="Clear destination" onClick={() => pickDest("")} className="h-full rounded-r-md px-2 hover:bg-white/20" data-testid="filter-destination-clear"><X size={14} /></button>}
+            </div>
+            <PopoverContent align="start" className="w-64 p-2" data-testid="destination-list">
+              <Input autoFocus value={destQ} onChange={(e) => setDestQ(e.target.value)} placeholder="Type a destination" className="mb-2 h-9" data-testid="destination-search" />
+              <div className="max-h-64 overflow-y-auto">
+                {destNames.filter((n) => n.toLowerCase().includes(destQ.trim().toLowerCase())).map((n) => (
+                  <button key={n} type="button" onClick={() => pickDest(n)} className={cn("flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-accent", n === dest && "font-semibold")} data-testid={`destination-${n}`}>
+                    <span>{n}</span><span className="text-xs text-muted-foreground">{destCounts.get(n) ?? 0}</span>
+                  </button>
+                ))}
+                {destNames.filter((n) => n.toLowerCase().includes(destQ.trim().toLowerCase())).length === 0 && <p className="px-2 py-3 text-center text-xs text-muted-foreground">No destination matches.</p>}
+              </div>
+            </PopoverContent>
+          </Popover>
           {([["all", `All (${counts.all})`], ...TYPES.map((t) => [t.v, `${t.filter} (${counts[t.v]})`]), ["needs_price", `Needs a price (${counts.needs_price})`]] as [string, string][]).map(([k, l]) => (
             <button key={k} type="button" onClick={() => setFilter(k as typeof filter)} aria-pressed={filter === k} className={cn("h-9 rounded-md border px-3 text-sm", filter === k ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-accent")} data-testid={`filter-${k}`}>{l}</button>
           ))}
@@ -417,19 +416,20 @@ export default function RateList() {
         <Card className="overflow-x-auto rounded-lg">
           <table className="w-full min-w-[860px] text-sm">
             <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-              {manage && <th className="w-8 p-3" />}<th className="p-3">Type</th><th className="p-3">Service</th><th className="p-3">Charged</th><th className="p-3 text-right">Price</th><th className="p-3">Season</th><th className="p-3">Supplier</th>{manage && <th className="w-10 p-3" />}
+              {manage && <th className="w-8 p-3" />}<th className="p-3">Type</th><th className="p-3">Car name</th><th className="p-3">Route service</th><th className="p-3">Charged</th><th className="p-3 text-right">Price</th><th className="p-3">Season</th><th className="p-3">Supplier</th>{manage && <th className="w-10 p-3" />}
             </tr></thead>
             <tbody>
               {groups.map((g) => (
                 <Fragment key={g.dest?.name ?? "none"}>
-                  <tr className="bg-secondary/50"><td colSpan={manage ? 8 : 6} className="px-3 py-2 text-sm font-semibold" data-testid={`group-${g.dest?.name}`}>{g.dest?.name}, {g.dest?.country} <span className="ml-2 text-xs font-normal text-muted-foreground">Currency {g.dest?.currency}</span></td></tr>
+                  <tr className="bg-secondary/50"><td colSpan={manage ? 9 : 7} className="px-3 py-2 text-sm font-semibold" data-testid={`group-${g.dest?.name}`}>{g.dest?.name}, {g.dest?.country} <span className="ml-2 text-xs font-normal text-muted-foreground">Currency {g.dest?.currency}</span></td></tr>
                   {g.items.map((r) => {
                     const T = TYPES.find((t) => t.v === r.type)!;
                     return (
                       <tr key={r.id} className="border-b border-border/60 last:border-0" data-testid={`rate-row-${r.id}`}>
                         {manage && <td className="p-3"><input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} className="accent-black dark:accent-white" data-testid={`rate-select-${r.id}`} /></td>}
                         <td className="p-3"><span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"><T.icon size={11} />{typeLabel(r.type)}</span></td>
-                        <td className="p-3 font-medium">{r.name}<div className="text-xs font-normal text-muted-foreground">{[r.seats ? `${r.seats} seats` : null, r.from_name && r.to_name ? `${r.from_name} → ${r.to_name}${r.way === "return" ? ", return" : r.way === "one_way" ? ", one way" : ""}` : null, r.note].filter(Boolean).join(" · ")}</div></td>
+                        <td className="p-3 font-medium" data-testid={`rate-car-${r.id}`}>{r.car_name ?? <span className="font-normal text-muted-foreground">–</span>}</td>
+                        <td className="p-3 font-medium" data-testid={`rate-service-${r.id}`}>{r.name}<div className="text-xs font-normal text-muted-foreground">{[r.seats ? `${r.seats} seats` : null, r.from_name && r.to_name ? `${r.from_name} → ${r.to_name}${r.way === "return" ? ", return" : r.way === "one_way" ? ", one way" : ""}` : null, r.note].filter(Boolean).join(" · ")}</div></td>
                         <td className="p-3">{chargedLabel(r.charged)}</td>
                         <td className="p-3 text-right tabular-nums">{r.needs_price ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">Needs a price</span> : money(r.price, r.currency)}{r.seasons.length > 0 && <div className="text-[11px] text-muted-foreground">+ {r.seasons.length} season{r.seasons.length === 1 ? "" : "s"}</div>}</td>
                         <td className="p-3 text-xs">{r.season_name ?? "All year"}{r.valid_from && r.valid_to ? <div className="text-muted-foreground">{fmtDate(r.valid_from)} – {fmtDate(r.valid_to)}</div> : null}</td>
@@ -457,7 +457,7 @@ export default function RateList() {
         </Card>
       )}
       <p className="text-xs text-muted-foreground">Flights and trains are details-only lists in their own tabs. Rates here price road transport on a quotation.</p>
-      {manage && <RateDialog open={dlg.open} item={dlg.item} look={look} preset={{ type: qa.type, destination: qa.destination }} onClose={() => setDlg({ open: false, item: null })} onSaved={load} />}
+      {manage && <RateDialog open={dlg.open} item={dlg.item} look={look} preset={{ type: filter === "all" || filter === "needs_price" ? "cab" : filter, destination: dest }} onClose={() => setDlg({ open: false, item: null })} onSaved={load} />}
       {manage && <SeasonDialog line={seasons ? (rows?.find((x) => x.id === seasons.id) ?? seasons) : null} onClose={() => setSeasons(null)} onChanged={load} />}
       {manage && <BulkDialog ids={bulk} rows={rows ?? []} onClose={() => setBulk([])} onDone={() => { setSelected([]); load(); }} />}
       {manage && <ImportDialog open={importing} onClose={() => setImporting(false)} onDone={load} />}
