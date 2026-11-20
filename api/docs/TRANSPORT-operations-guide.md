@@ -6,7 +6,7 @@
 
 There is nothing to set up first. No countries, places or providers screens. The first rate can be saved on day one.
 
-**Quick add (top of the list):** choose the type (cab, van, bus, ferry), type the destination, the route service, the price, and how it is charged (per day, per trip, per person), then press **Add**. A rate needs only those four things.
+**Finding a rate:** the **Destination** button above the list opens a short list with a type-to-search box and a count for each destination. Choosing one (say Manali) shows only its rates; the × on the button clears it. It works together with the type buttons and the search box, and it is remembered on that computer for your next visit. The list columns are Type, Car name, Route service, Charged, Price, Season and Supplier. To add a rate press **+ Add transport**, then type, destination, car name, route service, price and how it is charged.
 
 - **Destination** is typed with suggestions: the same names Hotels use. The country and currency come with the destination, so you are never asked for them on every rate. The first time a destination is used on a rate you confirm its country and currency once.
 - **+ Add transport** opens the short form: type, destination, **Car name** (Bus name or Boat name for those types; suggestions come from names already used), **Route service**, price and how it is charged. **More details** are all optional: supplier, season (On Season, Off Season or Mid Season), dates, seats, note. Hours per day, km included and extra hour are no longer on the form; put them in the note if you need them. Old values are kept. For buses and ferries add **From**, **To** and one way or return.

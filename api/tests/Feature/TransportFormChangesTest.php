@@ -93,4 +93,17 @@ class TransportFormChangesTest extends TestCase
         $this->assertSame(5000.0, $l->price);
         $this->get('/api/transport/lines/import-template')->assertOk()->assertSee('car_name');
     }
+
+    public function test_the_list_carries_car_name_route_service_and_destination_for_the_main_page_filter(): void
+    {
+        $this->ops();
+        $this->postJson('/api/transport/lines', ['type' => 'cab', 'destination' => 'Manali', 'car_name' => 'Ertiga', 'name' => 'Local sightseeing', 'price' => 5000, 'charged' => 'per_day'])->assertOk();
+        $this->postJson('/api/transport/lines', ['type' => 'bus', 'destination' => 'Goa', 'name' => 'Mumbai to Goa', 'price' => 900, 'charged' => 'per_person'])->assertOk();
+        $rows = collect($this->getJson('/api/transport/lines')->assertOk()->json());
+        $this->assertSame('Ertiga', $rows->firstWhere('destination.name', 'Manali')['car_name']);
+        $this->assertNull($rows->firstWhere('destination.name', 'Goa')['car_name']);
+        $this->assertSame(['Goa', 'Manali'], $rows->pluck('destination.name')->sort()->values()->all());
+        $this->assertSame(['Local sightseeing'], $this->getJson('/api/transport/lines?destination=Manali')->assertOk()->json('*.name'));
+        $this->assertCount(1, $this->getJson('/api/transport/lines?q=Ertiga')->assertOk()->json());                       // a car name can be searched
+    }
 }
