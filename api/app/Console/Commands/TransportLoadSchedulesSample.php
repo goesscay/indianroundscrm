@@ -23,7 +23,7 @@ class TransportLoadSchedulesSample extends Command
         $rows = [
             ['flight', 'Air India AI 123', 'Delhi', 'DEL', 'Kullu-Manali', 'KUU', 'Manali', '09:10', '10:35', $all, 'Economy', 'The airport is about 40 km from Manali. We can arrange a cab.'],
             ['flight', 'IndiGo 6E 456', 'Delhi', 'DEL', 'Chandigarh', 'IXC', 'Manali', '07:00', '08:05', $all, 'Economy', 'Then a 7 to 8 hour road transfer to Manali.'],
-            ['flight', 'IndiGo 6E 789', 'Chandigarh', 'IXC', 'Delhi', 'DEL', null, '18:30', '19:35', $all, 'Economy', null],
+            ['flight', 'IndiGo 6E 789', 'Chandigarh', 'IXC', 'Delhi', 'DEL', 'Manali', '18:30', '19:35', $all, 'Economy', 'The way back from Manali: about 7 to 8 hours by road to Chandigarh first.'],
             ['train', 'Shatabdi 12011', 'New Delhi', 'NDLS', 'Kalka', 'KLK', 'Manali, Shimla', '07:40', '11:45', array_values(array_diff($all, ['sun'])), 'CC, EC', 'Then a road transfer to Manali.'],
             ['train', 'Himalayan Queen 14095', 'Kalka', 'KLK', 'Shimla', 'SML', null, '05:10', '10:30', $all, '2S, CC', null],
             ['train', 'Vande Bharat 22447', 'New Delhi', 'NDLS', 'Amb Andaura', 'ANDI', 'Manali', '15:00', '19:50', array_values(array_diff($all, ['fri'])), 'CC, EC', 'Then a road transfer to Manali.'],

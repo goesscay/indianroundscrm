@@ -201,7 +201,7 @@
     <p class="muted" style="margin:-6px 0 12px; font-size:9px">Details only</p>
     @foreach($reach['items'] as $x)
     <table style="width:100%; border-bottom:1px solid #ECEEF2; margin-bottom:8px"><tr>
-      <td style="width:62px; vertical-align:top; padding:4px 0 8px"><span class="tag {{ $x['kind'] === 'train' ? 'info' : '' }}">{{ $x['label'] }}</span></td>
+      <td style="width:62px; vertical-align:top; padding:4px 0 8px"><span class="tag {{ $x['kind'] === 'train' ? 'info' : '' }}">{{ $x['label'] }}</span>@if(($x['direction'] ?? 'going') === 'return')<br><span class="tag info" style="margin-top:3px">Return</span>@endif</td>
       <td style="padding:2px 0 8px">
         <div style="font-size:12px; font-weight:bold">{{ $x['title'] }}</div>
         <div style="font-size:10px; margin-top:2px">{{ $x['route'] }}@if($x['time']) · {{ $x['time'] }}@endif · {{ $x['runs_on'] }}@if($x['classes']) · {{ $x['classes'] }}@endif</div>

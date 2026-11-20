@@ -37,7 +37,7 @@ function ReachCard({ reach }: { reach: ReachBlock }) {
           const Icon = x.kind === "flight" ? Plane : Train;
           return (
             <li key={i} className="flex flex-wrap items-start gap-3 px-3 py-2.5 text-sm" data-testid={`reach-line-${i}`}>
-              <span className={cn("w-[64px] shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-bold uppercase tracking-wide", x.kind === "flight" ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300" : "bg-secondary text-muted-foreground")}>{x.label}</span>
+              <span className="flex w-[64px] shrink-0 flex-col gap-1"><span className={cn("rounded px-1.5 py-0.5 text-center text-[10px] font-bold uppercase tracking-wide", x.kind === "flight" ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300" : "bg-secondary text-muted-foreground")}>{x.label}</span>{x.direction === "return" && <span className="rounded bg-secondary px-1.5 py-0.5 text-center text-[10px] font-bold uppercase tracking-wide" data-testid={`reach-return-${i}`}>Return</span>}</span>
               <span className="flex min-w-0 flex-1 items-start gap-2"><Icon size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                 <span><span className="font-medium">{x.title}</span><div className="text-muted-foreground">{x.route}{x.time ? ` · ${x.time}` : ""} · {x.runs_on}{x.classes ? ` · ${x.classes}` : ""}</div>{x.note && <div className="text-xs text-muted-foreground">{x.note}</div>}</span></span>
             </li>

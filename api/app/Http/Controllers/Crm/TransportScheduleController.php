@@ -50,13 +50,16 @@ class TransportScheduleController extends Controller
             [$a, $b] = explode(' → ', $r, 2);
             $q->where('from_name', $a)->where('to_name', $b);
         }
+        // Going: it starts where the customer starts and ends at, or near ("serves"), the destination.
+        // Return: the other way round: it starts at, or near, the destination and ends where the customer started.
+        $return = $request->query('direction') === 'return';
         if (($f = trim((string) $request->query('from', ''))) !== '') {
             $like = $this->like($f);
-            $q->where(fn ($w) => $w->where('from_name', $op, $like)->orWhere('from_code', $op, $like));
+            $q->where(fn ($w) => $w->where('from_name', $op, $like)->orWhere('from_code', $op, $like)->when($return, fn ($x) => $x->orWhere('serves', $op, $like)));
         }
         if (($t = trim((string) $request->query('to', ''))) !== '') {
             $like = $this->like($t);
-            $q->where(fn ($w) => $w->where('to_name', $op, $like)->orWhere('to_code', $op, $like)->orWhere('serves', $op, $like));
+            $q->where(fn ($w) => $w->where('to_name', $op, $like)->orWhere('to_code', $op, $like)->when(! $return, fn ($x) => $x->orWhere('serves', $op, $like)));
         }
         $rows = $q->orderBy('kind')->orderBy('from_name')->orderBy('to_name')->orderBy('departs')->limit(2000)->get();
         if (($date = (string) $request->query('date', '')) !== '' && ($day = TransportSchedule::dayKey($date))) {

@@ -41,7 +41,7 @@ class TransportReach
             $days = array_values(array_intersect(array_keys(TransportSchedule::DAYS), (array) ($x['days'] ?? [])));
             $items[] = [
                 'schedule_id' => is_scalar($x['schedule_id'] ?? null) && ctype_digit((string) $x['schedule_id']) ? (int) $x['schedule_id'] : null,
-                'kind' => $kind, 'title' => $title, 'from_name' => $from, 'from_code' => self::text($x['from_code'] ?? null, 12), 'to_name' => $to, 'to_code' => self::text($x['to_code'] ?? null, 12),
+                'kind' => $kind, 'direction' => ($x['direction'] ?? 'going') === 'return' ? 'return' : 'going', 'title' => $title, 'from_name' => $from, 'from_code' => self::text($x['from_code'] ?? null, 12), 'to_name' => $to, 'to_code' => self::text($x['to_code'] ?? null, 12),
                 'departs' => self::time($x['departs'] ?? null), 'arrives' => self::time($x['arrives'] ?? null), 'arrives_next_day' => (bool) ($x['arrives_next_day'] ?? false),
                 'days' => $days ?: array_keys(TransportSchedule::DAYS), 'classes' => self::text($x['classes'] ?? null, 120), 'note' => self::text($x['note'] ?? null, 600),
             ];
@@ -64,11 +64,12 @@ class TransportReach
         }
         $named = ($p['transport']['wording'] ?? 'named') === 'named';
         $dest = $p['trip']['destination'] ?: 'your destination';
+        usort($items, fn ($a, $b) => ($a['direction'] === 'return') <=> ($b['direction'] === 'return'));       // the way there first, then the way back
         $out = [];
         foreach ($items as $x) {
             $time = trim(($x['departs'] ?? '').($x['departs'] && $x['arrives'] ? ' → ' : '').($x['arrives'] ?? '').($x['arrives'] && $x['arrives_next_day'] ? ' (next day)' : ''));
             $out[] = [
-                'kind' => $x['kind'], 'label' => strtoupper($x['kind']), 'title' => $named ? $x['title'] : ucfirst($x['kind']),
+                'kind' => $x['kind'], 'direction' => $x['direction'], 'label' => strtoupper($x['kind']), 'title' => $named ? $x['title'] : ucfirst($x['kind']),
                 'route' => $x['from_name'].' → '.$x['to_name'], 'time' => $time, 'runs_on' => TransportSchedule::runsOn($x['days']), 'classes' => $x['classes'], 'note' => $x['note'],
             ];
         }

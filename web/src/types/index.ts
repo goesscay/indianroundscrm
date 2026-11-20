@@ -1045,12 +1045,12 @@ export interface TransportSchedule {
   active: boolean; updated_at: string | null; needs_update: boolean;
 }
 export interface ReachItem {
-  schedule_id: number | string | null; kind: ScheduleKind; title: string; from_name: string; from_code: string | null; to_name: string; to_code: string | null;
+  schedule_id: number | string | null; kind: ScheduleKind; direction?: "going" | "return"; title: string; from_name: string; from_code: string | null; to_name: string; to_code: string | null;
   departs: string | null; arrives: string | null; arrives_next_day: boolean; days: DayKey[]; classes: string | null; note: string | null;
 }
 export interface ReachBlock {
   heading: string; disclaimer: string;
-  items: { kind: ScheduleKind; label: string; title: string; route: string; time: string; runs_on: string; classes: string | null; note: string | null }[];
+  items: { kind: ScheduleKind; direction?: "going" | "return"; label: string; title: string; route: string; time: string; runs_on: string; classes: string | null; note: string | null }[];
 }
 
 // ---- the transport rate list: one line per rate
