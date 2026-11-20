@@ -33,28 +33,35 @@ const carOf = (o: RoadOption) => o.car_name?.trim() || OTHER;
  * Car name then Route service, over the same saved rate line: the car narrows the list, the route service picks the rate. The route service stays locked until
  * a car is chosen, and a car with one route service is chosen for the sales person. Rates with no car name yet sit under "Other" with their old full name.
  */
-function CarRoutePicker({ list, all, lineId, onChange, testid, none }: { list: RoadOption[]; all: RoadOption[]; lineId: number | string | null; onChange: (id: string | null) => void; testid: string; none?: string }) {
+function CarRoutePicker({ list, all, lineId, onChange, testid, none, carLabel = "Car name", cells, dest }: { list: RoadOption[]; all: RoadOption[]; lineId: number | string | null; onChange: (id: string | null) => void; testid: string; none?: string; carLabel?: string; cells?: boolean; dest?: string | null }) {
   const [pick, setPick] = useState<string | null>(null);
   const current = lineId != null ? all.find((o) => o.id === String(lineId)) : undefined;
   const car = current ? carOf(current) : pick;
   const cars = useMemo(() => Array.from(new Set(list.map(carOf))).sort((a, b) => (a === OTHER ? 1 : b === OTHER ? -1 : a.localeCompare(b))), [list]);
   const routes = useMemo(() => (car ? list.filter((o) => carOf(o) === car) : []), [list, car]);
-  const label = (o: RoadOption) => (routes.filter((x) => x.name === o.name).length > 1 && o.supplier ? `${o.name} (${o.supplier})` : o.name);
+  const label = (o: RoadOption) => {
+    const other = dest && o.destination && !same(o.destination, dest) ? ` · ${o.destination}` : "";              // an added line may be for another destination
+    return (routes.filter((x) => x.name === o.name).length > 1 && o.supplier ? `${o.name} (${o.supplier})` : o.name) + other;
+  };
   const missing = lineId != null && !current;                               // a rate that was removed or switched off since the quotation was saved
+  const carSelect = (
+    <Select value={car ?? NONE} onValueChange={(v) => { if (v === NONE) { setPick(null); onChange(null); return; } setPick(v); const rs = list.filter((o) => carOf(o) === v); onChange(rs.length === 1 ? rs[0].id : null); }}>
+      <SelectTrigger className={cn("h-9", !cells && "mt-1", cells && "min-w-[170px]")} aria-label={carLabel} data-testid={`${testid}-car`}><SelectValue placeholder="Choose a car" /></SelectTrigger>
+      <SelectContent><SelectItem value={NONE}>{none ?? "No car"}</SelectItem>{cars.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+    </Select>
+  );
+  const routeSelect = (
+    <Select disabled={!car} value={current ? current.id : car ? NONE : ""} onValueChange={(v) => onChange(v === NONE ? null : v)}>
+      <SelectTrigger className={cn("h-9", !cells && "mt-1", cells && "min-w-[210px]")} aria-label="Route service" data-testid={`${testid}-route`}><SelectValue placeholder={car ? "Choose the route" : "Choose a car first"} /></SelectTrigger>
+      <SelectContent><SelectItem value={NONE}>Choose the route</SelectItem>{routes.map((o) => <SelectItem key={o.id} value={o.id}>{label(o)}</SelectItem>)}</SelectContent>
+    </Select>
+  );
+  const note = missing ? <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">This rate is no longer in the rate list.</p> : null;
+  if (cells) return (<><td className="p-2.5">{carSelect}</td><td className="p-2.5">{routeSelect}{note}</td></>);
   return (
     <>
-      <div><Label className="text-xs">Car name</Label>
-        <Select value={car ?? NONE} onValueChange={(v) => { if (v === NONE) { setPick(null); onChange(null); return; } setPick(v); const rs = list.filter((o) => carOf(o) === v); onChange(rs.length === 1 ? rs[0].id : null); }}>
-          <SelectTrigger className="mt-1 h-9" data-testid={`${testid}-car`}><SelectValue placeholder="Choose a car" /></SelectTrigger>
-          <SelectContent><SelectItem value={NONE}>{none ?? "No car"}</SelectItem>{cars.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-        </Select></div>
-      <div><Label className="text-xs">Route service</Label>
-        <Select disabled={!car} value={current ? current.id : NONE} onValueChange={(v) => onChange(v === NONE ? null : v)}>
-          <SelectTrigger className="mt-1 h-9" data-testid={`${testid}-route`}><SelectValue placeholder={car ? "Choose the route" : "Choose a car first"} /></SelectTrigger>
-          <SelectContent><SelectItem value={NONE}>Choose the route</SelectItem>{routes.map((o) => <SelectItem key={o.id} value={o.id}>{label(o)}</SelectItem>)}</SelectContent>
-        </Select>
-        {missing && <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">This rate is no longer in the rate list.</p>}
-      </div>
+      <div><Label className="text-xs">{carLabel}</Label>{carSelect}</div>
+      <div><Label className="text-xs">Route service</Label>{routeSelect}{note}</div>
     </>
   );
 }
@@ -178,8 +185,8 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
 
           {road.mode === "daily" && (
             <div className="overflow-x-auto rounded-md border" data-testid="road-daily">
-              <table className="w-full min-w-[620px] text-sm">
-                <thead><tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="p-2.5">Day</th><th className="p-2.5">Plan</th><th className="p-2.5">Vehicle</th><th className="p-2.5 text-right">Rate</th></tr></thead>
+              <table className="w-full min-w-[760px] text-sm">
+                <thead><tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="p-2.5">Day</th><th className="p-2.5">Plan</th><th className="p-2.5">Car name</th><th className="p-2.5">Route service</th><th className="p-2.5 text-right">Rate</th></tr></thead>
                 <tbody>
                   {days.map((d) => {
                     const idx = road.daily.findIndex((x) => x.day === d.n);
@@ -190,10 +197,8 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
                       <tr key={d.n} className="border-b last:border-0" data-testid={`road-day-${d.n}`}>
                         <td className="p-2.5 font-medium">Day {d.n}<div className="text-xs font-normal text-muted-foreground">{fmt(dateOf(d.n))}</div></td>
                         <td className="p-2.5">{d.title}</td>
-                        <td className="p-2.5"><Select value={cur?.line_id != null ? String(cur.line_id) : NONE} onValueChange={(v) => setDaily(d.n, v)}>
-                          <SelectTrigger className="h-9 min-w-[230px]" data-testid={`road-day-vehicle-${d.n}`}><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value={NONE}>No vehicle</SelectItem>{list.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent></Select>{sub(row)}</td>
-                        <td className="p-2.5 text-right tabular-nums" data-testid={`road-day-rate-${d.n}`}>{row && !row.rate_needed ? INR(row.selling) : "–"}</td>
+                        <CarRoutePicker cells list={list} all={options ?? []} lineId={cur?.line_id ?? null} onChange={(id) => setDaily(d.n, id ?? NONE)} testid={`road-day-${d.n}`} />
+                        <td className="p-2.5 text-right tabular-nums" data-testid={`road-day-rate-${d.n}`}>{row && !row.rate_needed ? INR(row.selling) : "–"}{sub(row)}</td>
                       </tr>
                     );
                   })}
@@ -215,7 +220,7 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
                       return (
                         <tr key={x.id} className="border-b last:border-0" data-testid={`road-extra-${i}`}>
                           <td className="p-2.5"><span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"><Icon size={11} />{o?.type ?? "road"}</span></td>
-                          <td className="p-2.5 font-medium">{o?.name ?? row?.name ?? "Rate removed"}<div className="text-xs font-normal text-muted-foreground">{fmt(dateOf(x.day)) || `Day ${x.day}`}{x.way === "return" ? " · return" : ""}</div>{sub(row)}</td>
+                          <td className="p-2.5 font-medium">{o ? (o.car_name ? `${o.car_name}, ${o.name}` : o.name) : row?.name ?? "Rate removed"}<div className="text-xs font-normal text-muted-foreground">{fmt(dateOf(x.day)) || `Day ${x.day}`}{x.way === "return" ? " · return" : ""}</div>{sub(row)}</td>
                           <td className="p-2.5">{row ? qtyText(row) : "–"}</td>
                           <td className="p-2.5 text-right tabular-nums">{row?.unit_selling != null ? INR(row.unit_selling) : "–"}</td>
                           <td className="p-2.5 text-right font-medium tabular-nums">{row && !row.rate_needed ? INR(row.selling) : "–"}</td>
@@ -237,17 +242,14 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
               return (
                 <div className="space-y-2 rounded-md border p-3" data-testid="road-add-form">
                   {list.length === 0 ? <p className="text-sm text-muted-foreground">There are no {k.none} in the rate list yet. Operations add them under Transport → Rates.</p> : (
-                    <div className="grid gap-2 sm:grid-cols-[1.8fr_150px_120px_90px]">
-                      <div><Label className="text-xs">{k.label}</Label>
-                        <Select value={adding.line_id || NONE} onValueChange={(v) => setAdding({ ...adding, line_id: v === NONE ? "" : v })}><SelectTrigger className="mt-1 h-9" data-testid="road-add-line"><SelectValue placeholder="Choose" /></SelectTrigger>
-                          <SelectContent><SelectItem value={NONE}>Choose</SelectItem>{list.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}{o.destination && !same(o.destination, trip.destination) ? ` · ${o.destination}` : ""}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr_150px_120px]">
+                      <CarRoutePicker list={list} all={options ?? []} lineId={adding.line_id || null} onChange={(id) => setAdding({ ...adding, line_id: id ?? "" })} testid="road-add" none="Choose" carLabel={adding.kind === "bus" ? "Bus name" : adding.kind === "ferry" ? "Boat name" : "Car name"} dest={trip.destination} />
                       <div><Label className="text-xs">Day</Label>
                         <Select value={String(adding.day)} onValueChange={(v) => setAdding({ ...adding, day: Number(v) })}><SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>{days.map((d) => <SelectItem key={d.n} value={String(d.n)}>Day {d.n} {fmt(dateOf(d.n))}</SelectItem>)}</SelectContent></Select></div>
                       <div><Label className="text-xs">Way</Label>
                         <Select value={adding.way} onValueChange={(v) => setAdding({ ...adding, way: v as "one_way" | "return" })}><SelectTrigger className="mt-1 h-9" data-testid="road-add-way"><SelectValue /></SelectTrigger>
                           <SelectContent><SelectItem value="one_way">One way</SelectItem><SelectItem value="return">Return</SelectItem></SelectContent></Select></div>
-                      <div><Label className="text-xs">Vehicles</Label><Input type="number" min={1} value={adding.qty} placeholder="auto" onChange={(e) => setAdding({ ...adding, qty: e.target.value })} className="mt-1 h-9" /></div>
                     </div>
                   )}
                   <div className="flex gap-2"><Button type="button" size="sm" disabled={!adding.line_id} onClick={confirmAdd} data-testid="road-add-confirm">Add to quotation</Button><Button type="button" size="sm" variant="outline" onClick={() => setAdding(null)}>Cancel</Button></div>
