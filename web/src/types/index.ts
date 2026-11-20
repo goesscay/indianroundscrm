@@ -990,3 +990,23 @@ export interface ProposalComputed {
   options: { name: string; tiers: (ProposalPrice & { pax: number })[]; actual: ProposalPrice }[];
   selected: number; gst_rate: number; warnings: string[];
 }
+
+// ---- transport master (Operations -> Transport)
+export type TransportMode = "cab" | "van" | "bus" | "ferry";
+export type TransportBasis = "per_day" | "per_transfer" | "per_route" | "per_person";
+export interface TransportCountry { code: string; name: string; currency: string; timezone: string | null; active: boolean }
+export interface TransportPlace { id: string; country_code: string; name: string; kind: string; city: string | null; code: string | null; timezone: string | null; active: boolean }
+export interface TransportVehicle { id: string; provider_id: string; name: string; mode: TransportMode; seats: number; notes: string | null; active: boolean }
+export interface TransportRoute { id: string; provider_id: string; title: string; kind: string; from_place_id: string | null; to_place_id: string | null; duration: string | null; inclusions: string | null; active: boolean }
+export interface TransportRate {
+  id: string; provider_id: string; vehicle_id: string; route_id: string | null; basis: TransportBasis; season: string | null;
+  start_date: string | null; end_date: string | null; cost: number; child_cost: number | null; currency: string; dates_needed: boolean;
+}
+export interface TransportProvider {
+  id: string; name: string; country_code: string; destination: string; city: string | null; modes: TransportMode[]; currency: string;
+  contact_name: string | null; phone: string | null; email: string | null; notes: string | null; active: boolean;
+  margin_type?: "percent" | "amount" | null; margin_value?: number | null;
+  vehicles_count?: number; routes_count?: number; rates_count?: number | null;
+  vehicles?: TransportVehicle[]; routes?: TransportRoute[]; rates?: TransportRate[];
+}
+export interface TransportMeta { countries: TransportCountry[]; modes: TransportMode[]; route_kinds: string[]; place_kinds: string[]; bases: Record<TransportBasis, string> }
