@@ -106,4 +106,72 @@ class TransportFormChangesTest extends TestCase
         $this->assertSame(['Local sightseeing'], $this->getJson('/api/transport/lines?destination=Manali')->assertOk()->json('*.name'));
         $this->assertCount(1, $this->getJson('/api/transport/lines?q=Ertiga')->assertOk()->json());                       // a car name can be searched
     }
+
+    public function test_road_options_carry_the_car_name_and_only_operations_see_the_supplier(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $sup = \App\Models\TransportSupplier::create(['name' => 'Manali Taxi Service']);
+        TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'supplier_id' => $sup->id, 'car_name' => 'Ertiga', 'name' => 'Local sightseeing', 'charged' => 'per_day', 'price' => 5500, 'currency' => 'INR', 'seats' => 6]);
+        TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'name' => 'Old style: Local', 'charged' => 'per_day', 'price' => 4000, 'currency' => 'INR']);
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs(User::factory()->sales()->create(), ['*'], 'sanctum');
+        $sales = collect($this->getJson('/api/transport/road-options?destination=Manali')->assertOk()->json());
+        $this->assertSame(['Ertiga', null], $sales->pluck('car_name')->sort()->reverse()->values()->all());
+        $this->assertFalse($sales->contains(fn ($o) => array_key_exists('supplier', $o) || array_key_exists('price', $o)));
+        $this->ops();
+        $ops = collect($this->getJson('/api/transport/road-options?destination=Manali')->assertOk()->json());
+        $this->assertSame('Manali Taxi Service', $ops->firstWhere('car_name', 'Ertiga')['supplier']);
+    }
+
+    public function test_the_fill_command_previews_first_then_splits_old_names_and_no_price_or_wording_changes(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $mk = fn (string $n, array $o = []) => TransportLine::create($o + ['type' => 'cab', 'destination_id' => $d->id, 'name' => $n, 'charged' => 'per_day', 'price' => 5500, 'currency' => 'INR', 'seats' => 6]);
+        $a = $mk('Ertiga, 6 seats: Local sightseeing');
+        $b = $mk('Innova: Kullu-Naggar');
+        $c = $mk('No colon here');
+        $e = $mk('Sumo: Local', ['car_name' => 'Sumo van']);                                        // already has a car name: left alone
+        $sales = User::factory()->sales()->create();
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs($sales, ['*'], 'sanctum');
+        $cust = \App\Models\Customer::create(['customer_no' => 'IRC-F1', 'name' => 'Ramesh Kumar', 'owner_id' => $sales->id]);
+        $prop = fn () => ['trip' => ['destination' => 'Manali', 'start_date' => '2026-12-05', 'nights' => 5, 'adults' => 4, 'group_sizes' => [4]], 'gst_rate' => 5,
+            'options' => [['name' => 'Option 1', 'stays' => []]], 'road' => ['mode' => 'stay', 'stays' => [['line_id' => $a->id, 'days' => 5], ['line_id' => $b->id, 'days' => 2, 'qty' => 1]], 'extras' => []]];
+        $snap = function () use ($cust, $prop) {
+            \App\Services\RoadPricing::flush();
+            $q = $this->postJson('/api/quote-proposals', ['customer_id' => (string) $cust->id, 'proposal' => $prop()])->assertOk()->json('quote');
+            $show = $this->getJson('/api/quote-proposals/'.$q['id'])->assertOk()->json();
+
+            return ['total' => $q['total'], 'lines' => array_column($q['lines'], 'description'), 'labels' => collect($show['journey']['blocks'][0]['lines'])->map(fn ($l) => [$l['label'], $l['title']])->all()];
+        };
+        $before = $snap();
+
+        $this->artisan('transport:fill-car-names')->assertSuccessful();                            // the preview changes nothing
+        $this->assertNull($a->fresh()->car_name);
+        $this->artisan('transport:fill-car-names', ['--apply' => true])->assertSuccessful();
+        $this->assertSame(['Ertiga', 'Local sightseeing'], [$a->fresh()->car_name, $a->fresh()->name]);       // "6 seats" belongs to the seats field
+        $this->assertSame(['Innova', 'Kullu-Naggar'], [$b->fresh()->car_name, $b->fresh()->name]);
+        $this->assertNull($c->fresh()->car_name);
+        $this->assertSame(['Sumo van', 'Sumo: Local'], [$e->fresh()->car_name, $e->fresh()->name]);
+
+        $after = $snap();
+        $this->assertEquals($before['total'], $after['total']);                                    // the same price through the same saved rate lines
+        $this->assertGreaterThan(0, $after['total']);
+        $this->assertSame($before['labels'], $after['labels']);                                     // and the customer reads the same journey
+        $this->assertCount(2, $after['lines']);
+        $this->assertStringContainsString('Ertiga: Local sightseeing, 5 days', $after['lines'][0]);   // the car stays in the quotation line
+    }
+
+    public function test_a_second_car_on_the_same_days_is_one_vehicle_and_the_first_still_sizes_the_group(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $ertiga = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'Ertiga', 'name' => 'Local', 'charged' => 'per_day', 'price' => 5000, 'currency' => 'INR', 'seats' => 6]);
+        $innova = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'Innova', 'name' => 'Local', 'charged' => 'per_day', 'price' => 6000, 'currency' => 'INR', 'seats' => 7]);
+        $this->ops();
+        $p = ['trip' => ['destination' => 'Manali', 'start_date' => '2026-12-05', 'nights' => 2, 'adults' => 8, 'group_sizes' => [8]], 'gst_rate' => 5,
+            'options' => [['name' => 'Option 1', 'stays' => []]], 'road' => ['mode' => 'stay', 'stays' => [['line_id' => $ertiga->id, 'days' => 3], ['line_id' => $innova->id, 'days' => 3, 'qty' => 1]], 'extras' => []]];
+        $rows = collect($this->postJson('/api/quote-proposals/compute', ['proposal' => $p])->assertOk()->json('computed.options.0.actual.road.rows'));
+        $this->assertSame([2, 1], $rows->pluck('qty')->all());                                      // 8 guests need two 6-seat Ertigas; the added Innova is one
+        $this->assertEquals(5000 * 2 * 3 + 6000 * 1 * 3, $rows->sum('selling') / (1 + 0) - $rows->sum('margin_amount'));
+    }
 }

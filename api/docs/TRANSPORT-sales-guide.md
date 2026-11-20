@@ -8,11 +8,11 @@ At the bottom of the card a bar always shows the **Transport price**. It counts 
 
 1. **Set the trip first.** Destination, travel date, nights and travellers. The rate is found from the travel date and season, so set the date before choosing.
 2. **Cab for the stay** has two buttons:
-   - **Same vehicle every day** (the default): choose the vehicle once. The number of days comes from the itinerary (change it if needed). The rate per day and the amount appear at once, and the price follows if you change the vehicle.
+   - **Same vehicle every day** (the default): choose the **Car name**, then the **Route service** (it stays locked until a car is chosen, and is filled in for you when the car has only one route). The number of days comes from the itinerary (change it if needed). The rate per day and the amount appear at once, and the price follows if you change the vehicle.
    - **Choose day by day:** one line per day with that day's plan beside it. Pick a vehicle for each day, or **No vehicle** (for example the arrival day by Volvo).
    Switching between the two keeps everything you added below.
 3. **Add** buttons put extra transport in the list under the card: **Airport transfer**, **Volvo or bus**, **Ferry or boat**, **Another vehicle**. Choose the service, the day, one way or return, and the number of vehicles if you want to change the suggestion. A bus counts the travellers, and a return counts twice.
-4. **Vehicles** are suggested from the number of travellers and the seats (one Ertiga fits four). Type a number to change it for this group.
+4. **The number of vehicles** is worked out from the travellers and the seats, and shown under the row (for example "2 vehicles for 8 guests, 6 seats each"). For a second, different car on the same days press **Add another car**: it counts as one vehicle.
 5. **"Rate needed"** means no rate covers that date. It is left out of the price. Ask Operations to add or fix the rate; you cannot type a price over it.
 6. **A trip with several destinations:** use **Add another destination** under the same-vehicle choice, then pick that destination's vehicle and the day it starts.
 7. **Foreign prices** (for example Singapore): converted at the exchange rate held on the quotation, which Operations keep as a default. If it is missing the card says so.

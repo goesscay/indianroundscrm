@@ -1078,7 +1078,7 @@ export interface RoadDaily { day: number; line_id: number | string | null; qty: 
 export type RoadKind = "transfer" | "bus" | "ferry" | "vehicle";
 export interface RoadExtra { id: string; kind: RoadKind; line_id: number | string | null; qty: number | null; day: number; way: "one_way" | "return" }
 export interface RoadPlan { mode: "stay" | "daily"; stays: RoadStay[]; daily: RoadDaily[]; extras: RoadExtra[] }
-export interface RoadOption { id: string; type: LineType; name: string; charged: Charged; seats: number | null; from_name: string | null; to_name: string | null; way: "one_way" | "return" | null; destination: string | null }
+export interface RoadOption { id: string; type: LineType; car_name: string | null; supplier?: string | null; name: string; charged: Charged; seats: number | null; from_name: string | null; to_name: string | null; way: "one_way" | "return" | null; destination: string | null }
 export interface RoadRow {
   key: string; source: "stay" | "daily" | "extra"; line_id: string; type: LineType; name: string; destination: string | null; from_name: string | null; to_name: string | null; charged: Charged;
   way: "one_way" | "return"; day: number; days: number; date: string | null; persons: number; qty: number | null; unit_selling: number | null; selling: number; cost?: number; margin_amount?: number;

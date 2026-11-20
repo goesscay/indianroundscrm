@@ -38,7 +38,8 @@ class TransportLoadRatesSample extends Command
     private function addLine(TransportDestination $d, string $supplier, array $a): TransportLine
     {
         $sup = TransportSupplier::firstOrCreate(['name' => $supplier]);
-        $line = TransportLine::where('destination_id', $d->id)->where('type', $a['type'])->where('name', $a['name'])->where('supplier_id', $sup->id)->first();
+        $line = TransportLine::where('destination_id', $d->id)->where('type', $a['type'])->where('name', $a['name'])->where('supplier_id', $sup->id)->where(fn ($q) => isset($a['car_name']) ? $q->where('car_name', $a['car_name'])->orWhereNull('car_name') : $q)->first()
+            ?? (isset($a['car_name']) ? TransportLine::where('destination_id', $d->id)->where('type', $a['type'])->where('name', $a['car_name'].': '.$a['name'])->where('supplier_id', $sup->id)->first() : null);      // a line loaded before the car name existed
         $data = $a + ['currency' => $d->currency, 'destination_id' => $d->id, 'supplier_id' => $sup->id];
         $line ? $line->fill($data)->save() : $line = TransportLine::create($data);
 
@@ -57,12 +58,12 @@ class TransportLoadRatesSample extends Command
         ] as $vehicle => [$type, $seats, $local, $naggar, $manikaran]) {
             foreach (['Local Manali, Solang Valley' => $local, 'Local Manali, Solang Valley, Kullu-Naggar' => $naggar, 'Local Manali, Solang Valley, Kullu-Manikaran' => $manikaran] as $route => $price) {
                 if ($price !== null) {
-                    $this->addLine($d, $taxi, ['type' => $type, 'name' => "$vehicle: $route", 'charged' => 'per_day', 'price' => $price, 'season_name' => 'Off Season', 'seats' => $seats, 'note' => $note]);
+                    $this->addLine($d, $taxi, ['type' => $type, 'car_name' => $vehicle, 'name' => $route, 'charged' => 'per_day', 'price' => $price, 'season_name' => 'Off Season', 'seats' => $seats, 'note' => $note]);
                 }
             }
         }
         foreach (['Delhi', 'Chandigarh'] as $from) {
-            $l = $this->addLine($d, 'Volvo desk', ['type' => 'bus', 'name' => "Volvo: $from to Manali", 'from_name' => $from, 'to_name' => 'Manali', 'way' => 'one_way', 'charged' => 'per_person', 'price' => 2000, 'season_name' => 'Off Season',
+            $l = $this->addLine($d, 'Volvo desk', ['type' => 'bus', 'car_name' => 'Volvo', 'name' => "$from to Manali", 'from_name' => $from, 'to_name' => 'Manali', 'way' => 'one_way', 'charged' => 'per_person', 'price' => 2000, 'season_name' => 'Off Season',
                 'note' => 'Pickup and drop both ways. Confirm with the client whether the rate is per leg or for the return trip.']);
             foreach (['Mid Season' => 2500, 'On Season' => 3000] as $name => $price) {
                 $s = $l->seasons()->where('name', $name)->first();
@@ -77,8 +78,8 @@ class TransportLoadRatesSample extends Command
         $sup = 'Lion City Cabs (Sample)';
         $note = 'Sample rate to show a second country and currency working. Not a real vendor rate.';
         foreach ([['Sedan', 4, 55, 320], ['MPV', 6, 75, 420], ['Minibus (13 seater)', 13, 110, 650]] as [$vehicle, $seats, $transfer, $day]) {
-            $this->addLine($d, $sup, ['type' => $vehicle === 'Sedan' ? 'cab' : ($seats > 6 ? 'van' : 'cab'), 'name' => "$vehicle: Changi Airport to city hotel", 'from_name' => 'Changi Airport', 'to_name' => 'City hotel', 'charged' => 'per_trip', 'price' => $transfer, 'seats' => $seats, 'note' => $note]);
-            $this->addLine($d, $sup, ['type' => $seats > 6 ? 'van' : 'cab', 'name' => "$vehicle: Singapore city tour (8 hours)", 'charged' => 'per_day', 'price' => $day, 'seats' => $seats, 'hours_per_day' => 8, 'note' => $note]);
+            $this->addLine($d, $sup, ['type' => $vehicle === 'Sedan' ? 'cab' : ($seats > 6 ? 'van' : 'cab'), 'car_name' => $vehicle, 'name' => 'Changi Airport to city hotel', 'from_name' => 'Changi Airport', 'to_name' => 'City hotel', 'charged' => 'per_trip', 'price' => $transfer, 'seats' => $seats, 'note' => $note]);
+            $this->addLine($d, $sup, ['type' => $seats > 6 ? 'van' : 'cab', 'car_name' => $vehicle, 'name' => 'Singapore city tour (8 hours)', 'charged' => 'per_day', 'price' => $day, 'seats' => $seats, 'hours_per_day' => 8, 'note' => $note]);
         }
     }
 }

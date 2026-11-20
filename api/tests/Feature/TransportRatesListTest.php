@@ -273,10 +273,10 @@ class TransportRatesListTest extends TestCase
         $this->artisan('transport:load-rates-sample')->assertSuccessful();
         $this->artisan('transport:load-rates-sample')->assertSuccessful();
         $this->assertSame(23, TransportLine::count());
-        $ertiga = TransportLine::where('name', 'Ertiga: Local Manali, Solang Valley, Kullu-Naggar')->first();
+        $ertiga = TransportLine::where('car_name', 'Ertiga')->where('name', 'Local Manali, Solang Valley, Kullu-Naggar')->first();
         $this->assertEquals([5000, 'per_day', 'INR', 6], [$ertiga->price, $ertiga->charged, $ertiga->currency, $ertiga->seats]);
-        $this->assertNull(TransportLine::where('name', 'like', 'Ertiga: Local Manali, Solang Valley')->where('name', 'not like', '%Kullu%')->first());       // the sheet has no short-route Ertiga rate
-        $volvo = TransportLine::with('seasons')->where('name', 'Volvo: Delhi to Manali')->first();
+        $this->assertNull(TransportLine::where('car_name', 'Ertiga')->where('name', 'like', 'Local Manali, Solang Valley')->where('name', 'not like', '%Kullu%')->first());       // the sheet has no short-route Ertiga rate
+        $volvo = TransportLine::with('seasons')->where('car_name', 'Volvo')->where('name', 'Delhi to Manali')->first();
         $this->assertEquals([2000, 'per_person'], [$volvo->price, $volvo->charged]);
         $this->assertSame([2500.0, 3000.0], $volvo->seasons->pluck('price')->all());
         $this->assertSame('SGD', TransportLine::whereHas('destination', fn ($q) => $q->where('name', 'Singapore'))->first()->currency);

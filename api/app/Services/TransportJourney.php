@@ -159,7 +159,7 @@ class TransportJourney
         // the Transport card's road plan: the same lines, from the rate list
         foreach ($roadRows as $r) {
             $master = true;
-            [$veh, $route] = self::splitName($r['name']);
+            [$veh, $route] = ($r['car_name'] ?? null) ? [trim((string) $r['car_name']), trim((string) $r['name'])] : self::splitName($r['name']);       // a rate with a car name keeps it apart; an older one carries both in one name
             $label = $named ? match ($r['type']) {
                 'cab' => 'Private '.$veh,
                 'bus' => stripos($veh, 'bus') === false ? $veh.' bus' : $veh,
