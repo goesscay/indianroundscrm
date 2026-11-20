@@ -971,10 +971,25 @@ export interface QuoteSettings { margin_default: { type: "percent" | "amount"; v
 export interface ProposalStay { hotel_id: number | string | null; room_id: number | string | null; meal_plan: MealPlan; start_offset: number; nights: number; stars?: number | null }
 export interface QuoteTemplateBrief { id: string; name: string; destination: string; tagline: string | null; nights: number; days: number; options: string[]; cover_url: string | null }
 export interface ProposalDay { title: string; stay: string; bullets: string[]; media_id: number | string | null }
+export type LegMode = "flight" | "train" | "bus" | "cab" | "van" | "ferry";
+export interface ProposalLeg {
+  id: string; mode: LegMode; day_offset: number; destination: string | null;
+  provider_id: number | string | null; vehicle_id: number | string | null; route_id: number | string | null;
+  qty: number | null; days: number; legs: number;
+  title: string | null; from: string | null; to: string | null; depart: string | null; arrive: string | null; class: string | null; baggage: string | null; reference: string | null;
+  fare_pp: number | null; child_fare_pp: number | null; currency: string; included: boolean; note: string | null;
+}
+export interface ProposalTransportSettings { fx: { date: string | null; rates: Record<string, number>; safety_pct: number }; cab_scope: Record<string, "stay" | "daily"> }
+export interface ProposalLegPrice {
+  id: string; mode: LegMode; day: number; included: boolean; qty: number | null; basis: string | null; description: string; selling: number; cost?: number; margin_amount?: number;
+  currency: string; rate_needed: boolean; warnings?: string[];
+}
+export interface ProposalTransportPrice { selling: number; cost?: number; margin_amount?: number; by_mode: Record<string, number>; legs: ProposalLegPrice[]; fx_needed: string[] }
 export interface ProposalData {
   trip: { destination: string; start_date: string | null; nights: number; adults: number; children_bed: number; children_no_bed: number; group_sizes: number[] };
   days: ProposalDay[];
-  options: { name: string; stays: ProposalStay[] }[];
+  options: { name: string; stays: ProposalStay[]; legs?: ProposalLeg[] }[];
+  transport?: ProposalTransportSettings;
   land: { label: string; rows: { pax: number; cost_pp: number; child_cost_pp: number | null }[] };
   gst_rate: number; selected_option: number; cover_media_id: number | string | null;
   content: {
@@ -983,7 +998,7 @@ export interface ProposalData {
   };
 }
 export interface ProposalPrice {
-  persons: number; adults: number; land_selling: number; total: number; per_person: number; cost?: number; margin_amount?: number;
+  persons: number; adults: number; land_selling: number; hotel_selling?: number; transport?: ProposalTransportPrice; total: number; per_person: number; cost?: number; margin_amount?: number;
   stays: { hotel: string; room: string; meal_plan: MealPlan; check_in: string; nights: number; selling: number; cost?: number }[];
 }
 export interface ProposalComputed {
