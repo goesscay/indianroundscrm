@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Operations -> Transport -> Rates: one list, one line per rate. Only the type, destination, service name, price and how it is charged are required.
+ * Operations -> Transport -> Rates: one list, one line per rate. Only the type, destination, route service, price and how it is charged are required.
  * Costs and prices are for transport.manage (Operations and Admin); sales never reach this list.
  */
 class TransportLineController extends Controller
@@ -77,6 +77,7 @@ class TransportLineController extends Controller
 
         return [
             'destinations' => $destinations, 'places' => $places,
+            'car_names' => TransportLine::query()->whereNotNull('car_name')->select('car_name', DB::raw('count(*) as rates'))->groupBy('car_name')->orderBy('car_name')->get()->map(fn ($c) => ['name' => $c->car_name, 'rates' => (int) $c->rates])->values(),
             'suppliers' => TransportLine::query()->join('transport_suppliers', 'transport_suppliers.id', '=', 'transport_lines.supplier_id')->select('transport_suppliers.name', DB::raw('count(*) as rates'))->groupBy('transport_suppliers.name')->orderBy('transport_suppliers.name')->get()->map(fn ($s) => ['name' => $s->name, 'rates' => (int) $s->rates])->values(),
             'types' => TransportLine::TYPES, 'charged' => TransportLine::CHARGED, 'ways' => TransportLine::WAYS,
         ];
@@ -170,13 +171,13 @@ class TransportLineController extends Controller
         $req = $partial ? 'sometimes|required' : 'required';
         $d = Fail::validate(Fail::body($request), [
             'type' => "$req|in:".implode(',', array_keys(TransportLine::TYPES)), 'destination' => "$req|string|max:120", 'country' => 'nullable|string|max:100', 'dest_currency' => 'nullable|alpha|size:3',
-            'name' => "$req|string|max:200", 'charged' => "$req|in:".implode(',', array_keys(TransportLine::CHARGED)), 'price' => "$req|numeric|min:0|max:100000000",
+            'name' => "$req|string|max:200", 'car_name' => 'nullable|string|max:120', 'charged' => "$req|in:".implode(',', array_keys(TransportLine::CHARGED)), 'price' => "$req|numeric|min:0|max:100000000",
             'currency' => 'nullable|alpha|size:3', 'supplier' => 'nullable|string|max:150', 'from_name' => 'nullable|string|max:120', 'to_name' => 'nullable|string|max:120',
             'way' => 'nullable|in:one_way,return', 'season_name' => 'nullable|string|max:80', 'valid_from' => 'nullable|string', 'valid_to' => 'nullable|string',
             'seats' => 'nullable|integer|min:1|max:100', 'hours_per_day' => 'nullable|numeric|min:0|max:24', 'km_included' => 'nullable|integer|min:0|max:100000',
             'extra_hour' => 'nullable|numeric|min:0|max:100000000', 'note' => 'nullable|string|max:600', 'active' => 'sometimes|boolean',
         ]);
-        foreach (['name', 'from_name', 'to_name', 'season_name', 'note', 'supplier'] as $k) {
+        foreach (['name', 'car_name', 'from_name', 'to_name', 'season_name', 'note', 'supplier'] as $k) {
             if (array_key_exists($k, $d) && is_string($d[$k])) {
                 $d[$k] = trim($d[$k]) === '' ? null : trim($d[$k]);
             }
@@ -192,7 +193,7 @@ class TransportLineController extends Controller
 
     private function lineFields(array $d): array
     {
-        return array_intersect_key($d, array_flip(['type', 'name', 'charged', 'price', 'from_name', 'to_name', 'way', 'season_name', 'valid_from', 'valid_to', 'seats', 'hours_per_day', 'km_included', 'extra_hour', 'note', 'active']));
+        return array_intersect_key($d, array_flip(['type', 'name', 'car_name', 'charged', 'price', 'from_name', 'to_name', 'way', 'season_name', 'valid_from', 'valid_to', 'seats', 'hours_per_day', 'km_included', 'extra_hour', 'note', 'active']));
     }
 
     public function store(Request $request)
@@ -381,14 +382,14 @@ class TransportLineController extends Controller
 
     // ------------------------------------------------------------------ import
 
-    private const IMPORT_COLUMNS = ['type', 'destination', 'country', 'currency', 'service', 'from', 'to', 'way', 'charged', 'price', 'season', 'valid_from', 'valid_to', 'supplier', 'seats', 'hours_per_day', 'km_included', 'extra_hour', 'note'];
+    private const IMPORT_COLUMNS = ['type', 'destination', 'country', 'currency', 'car_name', 'service', 'from', 'to', 'way', 'charged', 'price', 'season', 'valid_from', 'valid_to', 'supplier', 'seats', 'note'];
 
     public function importTemplate()
     {
         $rows = [self::IMPORT_COLUMNS,
-            ['cab', 'Manali', 'India', 'INR', 'Ertiga, 6 seats: local sightseeing', '', '', '', 'per_day', '5000', 'Off season', '', '', 'Manali Taxi Service', '6', '', '', '', ''],
-            ['bus', 'Manali', '', '', 'Volvo, semi-sleeper', 'Delhi', 'Manali', 'one_way', 'per_person', '1800', '', '', '', 'Volvo desk', '', '', '', '', ''],
-            ['cab', 'Singapore', 'Singapore', 'SGD', 'MPV, 6 seats: airport to hotel', 'Changi Airport', 'Hotel', '', 'per_trip', '60', '', '', '', '', '6', '', '', '', '']];
+            ['cab', 'Manali', 'India', 'INR', 'Ertiga', 'Local sightseeing', '', '', '', 'per_day', '5000', 'Off Season', '', '', 'Manali Taxi Service', '6', ''],
+            ['bus', 'Manali', '', '', 'Volvo, semi-sleeper', 'Delhi to Manali', 'Delhi', 'Manali', 'one_way', 'per_person', '1800', '', '', '', 'Volvo desk', '', ''],
+            ['cab', 'Singapore', 'Singapore', 'SGD', 'MPV', 'Airport to hotel', 'Changi Airport', 'Hotel', '', 'per_trip', '60', '', '', '', '', '6', '']];
         $csv = "\xEF\xBB\xBF".implode("\n", array_map(fn ($r) => implode(',', array_map(fn ($c) => '"'.str_replace('"', '""', $c).'"', $r)), $rows))."\n";
 
         return response($csv, 200, ['Content-Type' => 'text/csv; charset=utf-8', 'Content-Disposition' => 'attachment; filename="transport-rates-template.csv"']);
@@ -442,7 +443,7 @@ class TransportLineController extends Controller
         }
         $rows = SpreadsheetRows::read($file->getRealPath(), $ext);
         $head = array_map(fn ($h) => strtolower(trim(str_replace([' ', '-'], '_', (string) $h))), array_shift($rows) ?? []);
-        $head = array_map(fn ($h) => $h === 'name' ? 'service' : $h, $head);
+        $head = array_map(fn ($h) => match ($h) { 'name', 'service_name', 'route_service', 'route' => 'service', 'car', 'bus_name', 'train_name', 'boat_name', 'vehicle' => 'car_name', default => $h }, $head);
         foreach (['type', 'destination', 'service', 'price'] as $need) {
             if (! in_array($need, $head, true)) {
                 Fail::unprocessable(['file' => "The sheet needs a \"$need\" column. Use the template."]);
@@ -484,7 +485,7 @@ class TransportLineController extends Controller
 
             if (! isset(TransportLine::TYPES[$type]) || $dest === '' || ($r['service'] ?? '') === '') {
                 $item['status'] = 'Missing';
-                $item['note'] = 'Needs a type (cab, van, bus or ferry), a destination and a service name. Will be skipped.';
+                $item['note'] = 'Needs a type (cab, van, bus or ferry), a destination and a route service. Will be skipped.';
             } elseif (! is_numeric($price) || (float) $price < 0) {
                 $item['status'] = 'Missing';
                 $item['note'] = 'Price is empty in the sheet. Will be skipped.';
@@ -533,10 +534,12 @@ class TransportLineController extends Controller
                 $r = $p['r'];
                 $dest = $this->destination($r['destination'], $p['country'], $p['currency']);
                 $sup = $this->supplier($r['supplier'] ?? null);
-                $line = TransportLine::where('destination_id', $dest->id)->where('type', $p['type'])->whereRaw('lower(name) = ?', [mb_strtolower($r['service'])])
-                    ->when($sup, fn ($q) => $q->where('supplier_id', $sup->id), fn ($q) => $q->whereNull('supplier_id'))->first();
+                $car = ($r['car_name'] ?? '') !== '' ? mb_substr($r['car_name'], 0, 120) : null;
+                $found = TransportLine::where('destination_id', $dest->id)->where('type', $p['type'])->whereRaw('lower(name) = ?', [mb_strtolower($r['service'])])
+                    ->when($sup, fn ($q) => $q->where('supplier_id', $sup->id), fn ($q) => $q->whereNull('supplier_id'))->get();
+                // an old rate with no car name takes the sheet's car name; a rate that already has a different car name is another rate
+                $line = $found->first(fn ($x) => $car !== null && mb_strtolower((string) $x->car_name) === mb_strtolower($car)) ?? $found->first(fn ($x) => $x->car_name === null || $car === null);
                 $season = ($r['season'] ?? '') !== '' ? $r['season'] : null;
-                $num = fn ($k) => ($r[$k] ?? '') !== '' && is_numeric(str_replace(',', '', $r[$k])) ? (float) str_replace(',', '', $r[$k]) : null;
                 if ($line && $line->season_name !== $season && ($season !== null || $line->season_name !== null)) {
                     $s = $line->seasons()->whereRaw('lower(name) = ?', [mb_strtolower((string) $season)])->first();          // another season of a service already in the list
                     $data = ['name' => $season ?: 'Season', 'valid_from' => $p['from'], 'valid_to' => $p['to'], 'price' => $p['price']];
@@ -544,10 +547,10 @@ class TransportLineController extends Controller
                     $updated++;
                     continue;
                 }
-                $data = ['name' => $r['service'], 'charged' => $p['charged'], 'price' => $p['price'], 'season_name' => $season, 'valid_from' => $p['from'], 'valid_to' => $p['to'],
+                $data = ['name' => $r['service'], 'car_name' => $car ?? $line?->car_name, 'charged' => $p['charged'], 'price' => $p['price'], 'season_name' => $season, 'valid_from' => $p['from'], 'valid_to' => $p['to'],
                     'from_name' => ($r['from'] ?? '') ?: null, 'to_name' => ($r['to'] ?? '') ?: null, 'way' => in_array(strtolower(str_replace(' ', '_', $r['way'] ?? '')), ['one_way', 'return'], true) ? strtolower(str_replace(' ', '_', $r['way'])) : null,
-                    'seats' => ctype_digit($r['seats'] ?? '') && (int) $r['seats'] > 0 ? min(100, (int) $r['seats']) : null, 'hours_per_day' => $num('hours_per_day'),
-                    'km_included' => ctype_digit($r['km_included'] ?? '') ? (int) $r['km_included'] : null, 'extra_hour' => $num('extra_hour'), 'note' => ($r['note'] ?? '') ?: null];
+                    'seats' => ctype_digit($r['seats'] ?? '') && (int) $r['seats'] > 0 ? min(100, (int) $r['seats']) : null,
+                    'note' => ($r['note'] ?? '') ?: null];
                 if ($line) {
                     $line->fill($data)->save();
                     $updated++;
