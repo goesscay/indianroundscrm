@@ -12,7 +12,7 @@ import { useSupplierReplies } from "@/context/SupplierRepliesContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   LayoutDashboard, Users, ClipboardList, Truck, Database, Activity, LogOut, Sparkles,
-  ListChecks, Plane, ClipboardCheck, Bell, Handshake, ContactRound, TrendingUp, Package, FileText, ReceiptText, Wallet, Landmark, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck, BarChart3, Hotel, Images,
+  ListChecks, Plane, ClipboardCheck, Bell, Handshake, ContactRound, TrendingUp, Package, FileText, ReceiptText, Wallet, Landmark, Inbox, MailOpen, MailWarning, Shield, Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, User as UserIcon, MessageSquare, ShieldCheck, BarChart3, Hotel, Images, Bus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAiPanel } from "@/components/ai/AiPanelContext";
@@ -48,6 +48,7 @@ const NAV: NavItem[] = [
   { to: "/supplier-inbox", label: "Supplier Inbox", icon: MailOpen, testId: "nav-supplier-inbox", group: "Operations", perms: ["rsq.manage"] },
   { to: "/suppliers", label: "Suppliers", icon: Truck, testId: "nav-suppliers", group: "Operations", perms: ["suppliers.view"] },
   { to: "/hotels", label: "Hotels", icon: Hotel, testId: "nav-hotels", group: "Operations", perms: ["hotels.view", "hotels.manage"] },
+  { to: "/transport", label: "Transport", icon: Bus, testId: "nav-transport", group: "Operations", perms: ["transport.view", "transport.manage"] },
   { to: "/quote-content", label: "Quotation Content", icon: FileText, testId: "nav-quote-content", group: "Operations", perms: ["hotels.manage"] },
   { to: "/media", label: "Photo Library", icon: Images, testId: "nav-media", group: "Operations", perms: ["hotels.manage"] },
   { to: "/supplier-bills", label: "Supplier Bills", icon: ReceiptText, testId: "nav-supplier-bills", group: "Operations", perms: ["finance.bills"] },
