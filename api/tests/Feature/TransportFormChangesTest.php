@@ -290,4 +290,78 @@ class TransportFormChangesTest extends TestCase
         $this->assertEquals($a, $b);                                                                // ticked: not a rupee different
         $this->assertGreaterThan(0, $a['options'][0]['actual']['road']['selling']);                 // and the priced train is still there
     }
+
+    private function breakdownProposal(array $road, array $extra = []): array
+    {
+        return array_merge(['trip' => ['destination' => 'Manali', 'start_date' => '2026-12-05', 'nights' => 4, 'adults' => 4, 'group_sizes' => [4]], 'gst_rate' => 5, 'options' => [['name' => 'Option 1', 'stays' => []]], 'road' => $road], $extra);
+    }
+
+    public function test_the_price_breakdown_adds_up_to_the_transport_price_for_percentage_and_per_person_margins(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $cab = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'Swift Dzire', 'name' => 'Local', 'charged' => 'per_day', 'price' => 2200, 'currency' => 'INR', 'seats' => 4]);
+        $train = TransportLine::create(['type' => 'train', 'destination_id' => $d->id, 'car_name' => 'Shatabdi', 'name' => 'New Delhi to Kalka', 'charged' => 'per_person', 'price' => 1000, 'currency' => 'INR', 'way' => 'one_way']);
+        $road = ['mode' => 'stay', 'stays' => [['line_id' => $cab->id, 'days' => 5]], 'extras' => [['id' => 't1', 'kind' => 'train', 'line_id' => $train->id, 'day' => 1, 'way' => 'return']]];
+        $this->ops();
+        foreach ([['percent', 15], ['amount', 300]] as [$type, $value]) {
+            \App\Models\QuoteSetting::write('margin_default', ['type' => $type, 'value' => $value]);
+            $r = $this->postJson('/api/quote-proposals/compute', ['proposal' => $this->breakdownProposal($road)])->assertOk()->json('computed.options.0.actual.road');
+            $rows = collect($r['rows']);
+            $this->assertCount(2, $rows);
+            $this->assertEqualsWithDelta($r['selling'], $rows->sum('selling'), 0.01);                                 // the lines add up to the Transport price
+            $this->assertEqualsWithDelta($rows->sum('selling'), $rows->sum('cost') + $rows->sum('margin_amount'), 0.01);       // cost + margin = selling
+            foreach ($rows as $x) {
+                $b = $x['breakdown'];
+                $this->assertEqualsWithDelta($x['cost'], $b['raw'] * ($b['fx'] ?? 1), 0.01);                           // rate x times (x exchange) = cost
+                $this->assertEqualsWithDelta($b['raw'], $b['rate'] * $b['multiplier'], 0.01);
+                $this->assertSame($type, $b['margin_type']);
+                $this->assertEquals($value, $b['margin_value']);
+            }
+            $cabRow = $rows->firstWhere('type', 'cab');
+            $this->assertEquals([2200, 5], [$cabRow['breakdown']['rate'], $cabRow['breakdown']['days']]);
+            $this->assertEqualsWithDelta($type === 'percent' ? 11000 * 0.15 : 300 * 4, $cabRow['margin_amount'], 0.01);   // 15% of the cost, or 300 a person x 4
+            $trainRow = $rows->firstWhere('type', 'train');
+            $this->assertEquals([4, 2], [$trainRow['breakdown']['units'], $trainRow['breakdown']['legs']]);            // 4 persons, return on a one-way fare
+        }
+    }
+
+    public function test_the_breakdown_converts_foreign_rates_and_marks_a_season_that_changes_the_price(): void
+    {
+        $d = TransportDestination::create(['name' => 'Singapore', 'country' => 'Singapore', 'currency' => 'SGD']);
+        $l = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'MPV', 'name' => 'City tour', 'charged' => 'per_day', 'price' => 400, 'currency' => 'SGD', 'seats' => 6, 'valid_from' => '2026-12-01', 'valid_to' => '2026-12-06']);
+        $l->seasons()->create(['name' => 'On Season', 'valid_from' => '2026-12-07', 'valid_to' => '2026-12-31', 'price' => 500]);
+        \App\Models\QuoteSetting::write('margin_default', ['type' => 'percent', 'value' => 10]);
+        $this->ops();
+        $p = $this->breakdownProposal(['mode' => 'stay', 'stays' => [['destination' => 'Singapore', 'line_id' => $l->id, 'days' => 4]], 'extras' => []], ['transport' => ['fx' => ['date' => '2026-11-20', 'rates' => ['SGD' => 62], 'safety_pct' => 0], 'cab_scope' => []]]);
+        $p['trip']['destination'] = 'Singapore';
+        $row = $this->postJson('/api/quote-proposals/compute', ['proposal' => $p])->assertOk()->json('computed.options.0.actual.road.rows.0');
+        $b = $row['breakdown'];
+        $this->assertEquals(400 * 2 + 500 * 2, $b['raw']);                                          // 5-6 Dec at 400, 7-8 Dec at 500
+        $this->assertTrue($b['rate_varies']);
+        $this->assertEquals(62, $b['fx']);
+        $this->assertEqualsWithDelta(1800 * 62, $row['cost'], 0.01);
+    }
+
+    public function test_sales_never_receive_the_breakdown_cost_or_margin_and_a_manager_does(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $cab = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'Swift Dzire', 'name' => 'Local', 'charged' => 'per_day', 'price' => 2200, 'currency' => 'INR', 'seats' => 4]);
+        \App\Models\QuoteSetting::write('margin_default', ['type' => 'percent', 'value' => 15]);
+        $p = $this->breakdownProposal(['mode' => 'stay', 'stays' => [['line_id' => $cab->id, 'days' => 5]], 'extras' => []]);
+        $this->ops();
+        $mgr = $this->postJson('/api/quote-proposals/compute', ['proposal' => $p])->assertOk();
+        $this->assertArrayHasKey('breakdown', $mgr->json('computed.options.0.actual.road.rows.0'));
+        $sales = User::factory()->sales()->create();
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs($sales, ['*'], 'sanctum');
+        $res = $this->postJson('/api/quote-proposals/compute', ['proposal' => $p])->assertOk();
+        $row = $res->json('computed.options.0.actual.road.rows.0');
+        $this->assertSame([], array_values(array_intersect(['breakdown', 'cost', 'margin_amount'], array_keys($row))));
+        $this->assertEquals(12650, $row['selling']);                                                // the selling price is all they see
+        $this->assertStringNotContainsString('margin', strtolower(json_encode($res->json('computed.options.0.actual.road'))));
+        $cust = \App\Models\Customer::create(['customer_no' => 'IRC-B1', 'name' => 'Ramesh Kumar', 'owner_id' => $sales->id]);
+        $q = $this->postJson('/api/quote-proposals', ['customer_id' => (string) $cust->id, 'proposal' => $p])->assertOk()->json('quote');
+        $shown = $this->getJson('/api/quote-proposals/'.$q['id'])->assertOk();
+        $this->assertStringNotContainsString('breakdown', $shown->getContent());                    // not on a reopened quotation either
+    }
 }
