@@ -20,9 +20,10 @@ const KINDS: { v: RoadKind; label: string; button?: string; types: string[]; non
   { v: "bus", label: "Volvo or bus", button: "Add Volvo Bus", types: ["bus"], none: "buses" },
   { v: "ferry", label: "Ferry or boat", button: "Add Ferry", types: ["ferry"], none: "ferries" },
   { v: "vehicle", label: "Another vehicle", types: ["cab", "van"], none: "vehicles" },
+  { v: "train", label: "Train", button: "Add train", types: ["train"], none: "trains" },
 ];
 const BUTTONS = KINDS.filter((k) => k.button) as (typeof KINDS[number] & { button: string })[];       // the transfer and vehicle kinds stay for quotations saved with them, but have no button
-const TYPE_ICON = { cab: Car, van: Truck, bus: Bus, ferry: Ship } as const;
+const TYPE_ICON = { cab: Car, van: Truck, bus: Bus, ferry: Ship, train: Train } as const;
 const defaultRoad = (dest: string | null): RoadPlan => ({ mode: "stay", stays: [{ destination: dest, line_id: null, from_day: 1, days: null, qty: null }], daily: [], extras: [] });
 const same = (a: string | null | undefined, b: string | null | undefined) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 const newId = () => `x${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -110,7 +111,8 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
   const confirmAdd = () => {
     if (!adding || !adding.line_id) return;
     const a = adding;
-    setRoad((r) => { r.extras.push({ id: newId(), kind: a.kind, line_id: a.line_id, qty: a.qty === "" ? null : Math.max(1, Number(a.qty) || 1), day: a.day, way: a.way } as RoadExtra); });
+    const n = a.qty === "" ? null : Math.max(1, Number(a.qty) || 1);
+    setRoad((r) => { r.extras.push({ id: newId(), kind: a.kind, line_id: a.line_id, qty: a.kind === "train" ? null : n, persons: a.kind === "train" ? n : null, day: a.day, way: a.way } as RoadExtra); });
     setAdding(null);
   };
   const needFx = priced?.fx_needed ?? [];
@@ -242,7 +244,6 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
               <Button type="button" variant="outline" size="sm" disabled={road.mode !== "stay"} title={road.mode !== "stay" ? "Choose the same car every day to add another destination" : undefined}
                 onClick={() => setRoad((r) => { const last = r.stays[r.stays.length - 1]; r.stays.push({ destination: null, line_id: null, from_day: Math.min(dayCount, (last?.from_day ?? 1) + (last?.days ?? 1)), days: null, qty: null }); })} data-testid="road-add-destination"><Plus size={14} /> Add another destination</Button>
               {BUTTONS.map((k) => <Button key={k.v} type="button" variant="outline" size="sm" onClick={() => startAdd(k.v)} data-testid={`road-add-${k.v}`}><Plus size={14} /> {k.button}</Button>)}
-              <Button type="button" variant="outline" size="sm" disabled title="Added in the next step" data-testid="road-add-train"><Plus size={14} /> Add train</Button>
             </div>
             {adding && (() => {
               const k = KINDS.find((x) => x.v === adding.kind)!;
@@ -250,14 +251,15 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
               return (
                 <div className="space-y-2 rounded-md border p-3" data-testid="road-add-form">
                   {list.length === 0 ? <p className="text-sm text-muted-foreground">There are no {k.none} in the rate list yet. Operations add them under Transport → Rates.</p> : (
-                    <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr_150px_120px]">
-                      <CarRoutePicker list={list} all={options ?? []} lineId={adding.line_id || null} onChange={(id) => setAdding({ ...adding, line_id: id ?? "" })} testid="road-add" none="Choose" carLabel={adding.kind === "bus" ? "Bus name" : adding.kind === "ferry" ? "Boat name" : "Car name"} dest={trip.destination} />
+                    <div className={cn("grid gap-2", adding.kind === "train" ? "sm:grid-cols-[1fr_1.4fr_150px_120px_90px]" : "sm:grid-cols-[1fr_1.4fr_150px_120px]")}>
+                      <CarRoutePicker list={list} all={options ?? []} lineId={adding.line_id || null} onChange={(id) => setAdding({ ...adding, line_id: id ?? "" })} testid="road-new" none="Choose" carLabel={adding.kind === "bus" ? "Bus name" : adding.kind === "ferry" ? "Boat name" : adding.kind === "train" ? "Train name" : "Car name"} dest={trip.destination} />
                       <div><Label className="text-xs">Day</Label>
                         <Select value={String(adding.day)} onValueChange={(v) => setAdding({ ...adding, day: Number(v) })}><SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>{days.map((d) => <SelectItem key={d.n} value={String(d.n)}>Day {d.n} {fmt(dateOf(d.n))}</SelectItem>)}</SelectContent></Select></div>
                       <div><Label className="text-xs">Way</Label>
                         <Select value={adding.way} onValueChange={(v) => setAdding({ ...adding, way: v as "one_way" | "return" })}><SelectTrigger className="mt-1 h-9" data-testid="road-add-way"><SelectValue /></SelectTrigger>
                           <SelectContent><SelectItem value="one_way">One way</SelectItem><SelectItem value="return">Return</SelectItem></SelectContent></Select></div>
+                      {adding.kind === "train" && <div><Label className="text-xs">Persons</Label><Input type="number" min={1} value={adding.qty} placeholder={String(pax || "")} onChange={(e) => setAdding({ ...adding, qty: e.target.value })} className="mt-1 h-9" data-testid="road-add-persons" /></div>}
                     </div>
                   )}
                   <div className="flex gap-2"><Button type="button" size="sm" disabled={!adding.line_id} onClick={confirmAdd} data-testid="road-add-confirm">Add to quotation</Button><Button type="button" size="sm" variant="outline" onClick={() => setAdding(null)}>Cancel</Button></div>

@@ -175,7 +175,7 @@ class TransportRoadTabTest extends TestCase
         $this->assertEquals(1800, $price([$x('transfer', $f['transfer'], 'return')]));
         $big = $this->road($this->compute($this->proposal(['mode' => 'stay', 'extras' => [$x('transfer', $f['transfer'], 'one_way')]], ['adults' => 9])));
         $this->assertEquals(2700, $big['selling']);                                                // nine travellers: three sedans
-        $this->assertSame(['transfer', 'bus', 'ferry', 'vehicle'], array_keys(\App\Services\RoadPricing::KINDS));
+        $this->assertSame(['transfer', 'bus', 'ferry', 'vehicle', 'train'], array_keys(\App\Services\RoadPricing::KINDS));
     }
 
     public function test_the_margin_is_added_and_foreign_prices_convert_at_the_quotation_rate(): void

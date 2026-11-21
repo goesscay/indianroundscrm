@@ -241,4 +241,37 @@ class TransportFormChangesTest extends TestCase
         $this->assertEqualsWithDelta(420 * 2 * 62 * 1.1, $rows['City tour (8 hours)']['selling'], 0.01);          // per day: two days
         $this->assertEqualsWithDelta(75 * 1 * 62 * 1.1, $rows['Airport to hotel']['selling'], 0.01);               // per trip: once, although the row says four days
     }
+
+    public function test_a_train_is_a_priced_rate_and_an_added_train_counts_in_the_transport_price_with_the_margin(): void
+    {
+        $this->ops();
+        $t = $this->postJson('/api/transport/lines', ['type' => 'train', 'destination' => 'Manali', 'car_name' => 'Shatabdi Express 12011', 'name' => 'New Delhi to Kalka, Chair Car', 'from_name' => 'New Delhi', 'to_name' => 'Kalka',
+            'way' => 'one_way', 'price' => 1000, 'charged' => 'per_person'])->assertOk()->json();
+        $this->assertSame('train', $t['type']);
+        $this->assertContains('Shatabdi Express 12011', collect($this->getJson('/api/transport/road-options?destination=Manali')->assertOk()->json())->pluck('car_name')->all());
+        \App\Models\QuoteSetting::write('margin_default', ['type' => 'percent', 'value' => 10]);
+        $p = fn (array $extras) => ['trip' => ['destination' => 'Manali', 'start_date' => '2026-12-05', 'nights' => 4, 'adults' => 4, 'group_sizes' => [2, 4, 6]], 'gst_rate' => 5, 'options' => [['name' => 'Option 1', 'stays' => []]],
+            'road' => ['mode' => 'stay', 'stays' => [], 'extras' => $extras]];
+        $c = fn (array $extras) => $this->postJson('/api/quote-proposals/compute', ['proposal' => $p($extras)])->assertOk()->json('computed.options.0');
+        $one = $c([['id' => 't1', 'kind' => 'train', 'line_id' => $t['id'], 'day' => 1, 'way' => 'one_way']]);
+        $this->assertEqualsWithDelta(1000 * 4 * 1.1, $one['actual']['road']['selling'], 0.01);        // 4 persons, one way, 10% margin
+        $this->assertEqualsWithDelta(1000 * 4 * 1.1, $one['actual']['total'], 0.01);                  // it is in the Transport price
+        $this->assertEqualsWithDelta(1000 * 4 * 1.1, $one['actual']['road']['by_mode']['train'], 0.01);
+        $this->assertSame('train', $one['actual']['road']['rows'][0]['type']);
+        $this->assertEqualsWithDelta(1000 * 2 * 1.1, $one['tiers'][0]['road']['selling'] ?? 2200, 0.01);       // the group of 2 pays for 2
+
+        $ret = $c([['id' => 't1', 'kind' => 'train', 'line_id' => $t['id'], 'day' => 1, 'way' => 'return']]);
+        $this->assertEqualsWithDelta(1000 * 4 * 2 * 1.1, $ret['actual']['road']['selling'], 0.01);    // a return on a one-way fare is paid twice
+        $few = $c([['id' => 't1', 'kind' => 'train', 'line_id' => $t['id'], 'day' => 1, 'way' => 'one_way', 'persons' => 3]]);
+        $this->assertEqualsWithDelta(1000 * 3 * 1.1, $few['actual']['road']['selling'], 0.01);        // only three of the four take the train
+        $this->assertEquals(0, $c([])['actual']['total']);                                            // removed: no price
+    }
+
+    public function test_a_train_rate_can_be_imported_from_a_sheet(): void
+    {
+        $this->ops();
+        TransportDestination::create(['name' => 'Manali']);
+        $r = $this->post('/api/transport/lines/import', ['file' => $this->sheet(['type', 'destination', 'car_name', 'route_service', 'charged', 'price'], [['train', 'Manali', 'Shatabdi 12011', 'New Delhi to Kalka', 'per_person', '1000']])], ['Accept' => 'application/json'])->assertOk()->json();
+        $this->assertSame('train', TransportLine::firstOrFail()->type);
+    }
 }

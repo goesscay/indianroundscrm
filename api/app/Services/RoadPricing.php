@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
 class RoadPricing
 {
     /** What each add button offers from the rate list. */
-    public const KINDS = ['transfer' => ['cab', 'van'], 'bus' => ['bus'], 'ferry' => ['ferry'], 'vehicle' => ['cab', 'van']];
+    public const KINDS = ['transfer' => ['cab', 'van'], 'bus' => ['bus'], 'ferry' => ['ferry'], 'vehicle' => ['cab', 'van'], 'train' => ['train']];
     public const MODES = ['stay', 'daily'];
 
     /** @var array<int,TransportLine|null> */
@@ -60,7 +60,7 @@ class RoadPricing
             if (! isset(self::KINDS[$kind])) {
                 continue;
             }
-            $extras[] = ['id' => trim(mb_substr((string) ($x['id'] ?? ''), 0, 40)) ?: 'x'.($i + 1), 'kind' => $kind, 'line_id' => self::id($x['line_id'] ?? null), 'qty' => self::int($x['qty'] ?? null, 1, 50),
+            $extras[] = ['id' => trim(mb_substr((string) ($x['id'] ?? ''), 0, 40)) ?: 'x'.($i + 1), 'kind' => $kind, 'line_id' => self::id($x['line_id'] ?? null), 'qty' => self::int($x['qty'] ?? null, 1, 50), 'persons' => self::int($x['persons'] ?? null, 1, 500),
                 'day' => self::int($x['day'] ?? 1, 1, 90, 1), 'way' => ($x['way'] ?? 'one_way') === 'return' ? 'return' : 'one_way'];
         }
 
@@ -130,7 +130,7 @@ class RoadPricing
         $sell = $cost = $marginAmt = 0.0;
 
         // one priced row for a rate line over some days
-        $make = function (string $source, ?int $lineId, int $fromDay, int $days, ?int $qtyIn, string $way, string $key) use (&$rows, &$warnings, &$fxNeeded, &$byMode, &$sell, &$cost, &$marginAmt, $persons, $adults, $actual, $dateOf, $start, $fx): void {
+        $make = function (string $source, ?int $lineId, int $fromDay, int $days, ?int $qtyIn, string $way, string $key, ?int $personsIn = null) use (&$rows, &$warnings, &$fxNeeded, &$byMode, &$sell, &$cost, &$marginAmt, $persons, $adults, $actual, $dateOf, $start, $fx): void {
             $l = $lineId ? self::line($lineId) : null;
             if (! $l) {
                 if ($lineId) {
@@ -140,11 +140,11 @@ class RoadPricing
                 return;
             }
             $row = ['key' => $key, 'source' => $source, 'line_id' => (string) $l->id, 'type' => $l->type, 'car_name' => $l->car_name, 'name' => $l->name, 'destination' => $l->destination?->name, 'from_name' => $l->from_name, 'to_name' => $l->to_name,
-                'charged' => $l->charged, 'way' => $way, 'day' => $fromDay, 'days' => $days, 'date' => $dateOf($fromDay), 'persons' => $persons, 'qty' => null, 'unit_selling' => null, 'selling' => 0.0, 'cost' => 0.0,
+                'charged' => $l->charged, 'way' => $way, 'day' => $fromDay, 'days' => $days, 'date' => $dateOf($fromDay), 'persons' => $l->charged === 'per_person' && $actual && $personsIn ? $personsIn : $persons, 'qty' => null, 'unit_selling' => null, 'selling' => 0.0, 'cost' => 0.0,
                 'margin_amount' => 0.0, 'currency' => $l->currency, 'rate_needed' => false, 'warnings' => []];
             $w = [];
             $auto = $l->seats ? max(1, (int) ceil($persons / $l->seats)) : 1;
-            $units = $l->charged === 'per_person' ? $persons : ($actual ? ($qtyIn ?? $auto) : max($qtyIn ?? 0, $auto));
+            $units = $l->charged === 'per_person' ? ($actual && $personsIn ? $personsIn : $persons) : ($actual ? ($qtyIn ?? $auto) : max($qtyIn ?? 0, $auto));
             $legs = $way === 'return' ? ($l->way === 'return' ? 1 : 2) : 1;                 // a return journey on a one-way price is paid twice
             $raw = null;
             if ($l->charged === 'per_day') {
@@ -212,7 +212,7 @@ class RoadPricing
         }
         foreach ($road['extras'] as $x) {
             if ($x['line_id']) {
-                $make('extra', $x['line_id'], $x['day'], 1, $x['qty'], $x['way'], $x['id']);
+                $make('extra', $x['line_id'], $x['day'], 1, $x['qty'], $x['way'], $x['id'], $x['persons'] ?? null);
             }
         }
         usort($rows, fn ($a, $b) => $a['day'] <=> $b['day']);

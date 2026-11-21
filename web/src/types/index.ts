@@ -1054,7 +1054,7 @@ export interface ReachBlock {
 }
 
 // ---- the transport rate list: one line per rate
-export type LineType = "cab" | "van" | "bus" | "ferry";
+export type LineType = "cab" | "van" | "bus" | "ferry" | "train";
 export type Charged = "per_day" | "per_trip" | "per_person";
 export interface TransportLineSeason { id: string; name: string; valid_from: string | null; valid_to: string | null; price: number; dates_needed: boolean }
 export interface TransportLineRow {
@@ -1075,8 +1075,8 @@ export interface LineImportResult {
 // ---- the Transport card: road transport priced from the rate list
 export interface RoadStay { destination: string | null; line_id: number | string | null; from_day: number; days: number | null; qty: number | null }
 export interface RoadDaily { day: number; line_id: number | string | null; qty: number | null }
-export type RoadKind = "transfer" | "bus" | "ferry" | "vehicle";
-export interface RoadExtra { id: string; kind: RoadKind; line_id: number | string | null; qty: number | null; day: number; way: "one_way" | "return" }
+export type RoadKind = "transfer" | "bus" | "ferry" | "vehicle" | "train";
+export interface RoadExtra { id: string; kind: RoadKind; line_id: number | string | null; qty: number | null; persons?: number | null; day: number; way: "one_way" | "return" }
 export interface RoadPlan { mode: "stay" | "daily"; stays: RoadStay[]; daily: RoadDaily[]; extras: RoadExtra[] }
 export interface RoadOption { id: string; type: LineType; car_name: string | null; supplier?: string | null; name: string; charged: Charged; seats: number | null; from_name: string | null; to_name: string | null; way: "one_way" | "return" | null; destination: string | null }
 export interface RoadRow {

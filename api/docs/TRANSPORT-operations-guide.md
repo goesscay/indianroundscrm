@@ -36,3 +36,5 @@ There is nothing to set up first. No countries, places or providers screens. The
 - Sample schedules (marked "Sample schedule: confirm before use") can be loaded with `php artisan transport:load-schedules-sample`. Replace them with the real list before use.
 
 **Moving old rates to Car name and Route service (once):** rates entered before the Car name field keep both in one name (for example "Ertiga: Local sightseeing"). Run `php artisan transport:fill-car-names` to see the proposed split, and `php artisan transport:fill-car-names --apply` to save it. Prices, seasons and saved quotations do not change. Until a rate has a car name it appears under **Other** in the quotation's Car name list. A car added in Rates appears in the quotation list with no extra step.
+
+**Train rates:** a rate can now be of type **Train** (train name as the Car name, route service such as "New Delhi to Kalka, Chair Car", charged per person, one way or return). Sales add it on a quotation with **Add train** in Road transport, and the destination margin is added like any other transport. The Trains tab stays a list of suggestions with no price.

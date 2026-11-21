@@ -480,14 +480,14 @@ class TransportLineController extends Controller
             }
             $line = $i + 2;
             $type = strtolower($r['type'] ?? '');
-            $type = ['cabs' => 'cab', 'car' => 'cab', 'taxi' => 'cab', 'tempo' => 'van', 'tempo traveller' => 'van', 'vans' => 'van', 'buses' => 'bus', 'coach' => 'bus', 'ferries' => 'ferry', 'boat' => 'ferry'][$type] ?? $type;
+            $type = ['cabs' => 'cab', 'car' => 'cab', 'taxi' => 'cab', 'tempo' => 'van', 'tempo traveller' => 'van', 'vans' => 'van', 'buses' => 'bus', 'coach' => 'bus', 'ferries' => 'ferry', 'boat' => 'ferry', 'trains' => 'train', 'rail' => 'train'][$type] ?? $type;
             $dest = $r['destination'] ?? '';
             $price = str_replace(',', '', $r['price'] ?? '');
             $item = ['row' => $line, 'status' => 'Ready', 'type' => $type, 'destination' => $dest, 'service' => $r['service'] ?? '', 'charged' => null, 'price' => is_numeric($price) ? (float) $price : null, 'currency' => null, 'note' => '', 'needs' => null];
 
             if (! isset(TransportLine::TYPES[$type]) || $dest === '' || ($r['service'] ?? '') === '') {
                 $item['status'] = 'Missing';
-                $item['note'] = 'Needs a type (cab, van, bus or ferry), a destination and a route service. Will be skipped.';
+                $item['note'] = 'Needs a type (cab, van, bus, ferry or train), a destination and a route service. Will be skipped.';
             } elseif (! is_numeric($price) || (float) $price < 0) {
                 $item['status'] = 'Missing';
                 $item['note'] = 'Price is empty in the sheet. Will be skipped.';
