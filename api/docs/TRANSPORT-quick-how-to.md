@@ -13,7 +13,7 @@
 
 ## Sales: the Transport card (Quotes → New premium quotation)
 1. Fill in the trip first (destination, **travel date**, nights, travellers).
-2. **Road transport tab** (priced): pick **Same vehicle every day** or **Choose day by day**. Use **Add** for an airport transfer, a Volvo or bus, a ferry or another vehicle. The bar at the bottom shows the **Transport price**.
+2. **Road transport tab** (priced): pick **Same vehicle every day** or **Choose day by day**. Use the buttons: **Add another car**, **Add another destination**, **Add Volvo Bus**, **Add Ferry** (and **Add train**, coming). The bar at the bottom shows the **Transport price**.
 3. **Flights and Trains tabs** (no price): the list is filtered by route and date. Use **Going** for the way there and **Return** for the way back (enter **From** first). **Tick** what to show, or add one just for this quote.
 4. **Rate needed** means no rate covers that date: ask Operations. You cannot type a price over it.
 5. Check the **package price**: ticking flights and trains never changes it.
@@ -25,4 +25,4 @@
 
 ## Who to ask
 - A missing or wrong rate, flight or train: Operations.
-- The wording the customer sees (vehicle and airline names, GST shown or not): set on the card, under "What the customer sees".
+- The wording the customer sees: car names show and the transport total includes GST. Quotations saved earlier keep their old choice.

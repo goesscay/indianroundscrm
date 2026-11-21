@@ -226,4 +226,19 @@ class TransportFormChangesTest extends TestCase
         $this->assertEquals(0, $r['selling']);
         $this->assertStringContainsString('Rate needed', implode(' ', $c['warnings']));
     }
+
+    public function test_a_per_trip_transfer_in_a_car_row_is_priced_once_whatever_the_days_so_no_transfer_button_is_needed(): void
+    {
+        $d = TransportDestination::create(['name' => 'Singapore', 'country' => 'Singapore', 'currency' => 'SGD']);
+        $tour = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'MPV', 'name' => 'City tour (8 hours)', 'charged' => 'per_day', 'price' => 420, 'currency' => 'SGD', 'seats' => 6]);
+        $transfer = TransportLine::create(['type' => 'cab', 'destination_id' => $d->id, 'car_name' => 'MPV', 'name' => 'Airport to hotel', 'charged' => 'per_trip', 'price' => 75, 'currency' => 'SGD', 'seats' => 6]);
+        \App\Models\QuoteSetting::write('margin_default', ['type' => 'percent', 'value' => 10]);
+        $this->ops();
+        $p = ['trip' => ['destination' => 'Singapore', 'start_date' => '2026-12-05', 'nights' => 3, 'adults' => 4, 'group_sizes' => [4]], 'gst_rate' => 5, 'options' => [['name' => 'Option 1', 'stays' => []]],
+            'transport' => ['fx' => ['date' => '2026-11-20', 'rates' => ['SGD' => 62], 'safety_pct' => 0], 'cab_scope' => []],
+            'road' => ['mode' => 'stay', 'stays' => [['destination' => 'Singapore', 'line_id' => $tour->id, 'days' => 2], ['destination' => 'Singapore', 'line_id' => $transfer->id, 'days' => 4, 'qty' => 1]], 'extras' => []]];
+        $rows = collect($this->postJson('/api/quote-proposals/compute', ['proposal' => $p])->assertOk()->json('computed.options.0.actual.road.rows'))->keyBy('name');
+        $this->assertEqualsWithDelta(420 * 2 * 62 * 1.1, $rows['City tour (8 hours)']['selling'], 0.01);          // per day: two days
+        $this->assertEqualsWithDelta(75 * 1 * 62 * 1.1, $rows['Airport to hotel']['selling'], 0.01);               // per trip: once, although the row says four days
+    }
 }
