@@ -147,6 +147,8 @@ class RoadPricing
             $units = $l->charged === 'per_person' ? ($actual && $personsIn ? $personsIn : $persons) : ($actual ? ($qtyIn ?? $auto) : max($qtyIn ?? 0, $auto));
             $legs = $way === 'return' ? ($l->way === 'return' ? 1 : 2) : 1;                 // a return journey on a one-way price is paid twice
             $raw = null;
+            $dayPrices = [];
+            $mult = $l->charged === 'per_day' ? $units * $days : $units * $legs;                // what the rate is multiplied by
             if ($l->charged === 'per_day') {
                 $raw = 0.0;
                 for ($k = 0; $k < $days; $k++) {
@@ -158,6 +160,7 @@ class RoadPricing
                         break;
                     }
                     $raw += $p * $units;
+                    $dayPrices[] = $p;
                 }
             } else {
                 [$p] = self::unitPrice($l, $dateOf($fromDay));
@@ -182,7 +185,10 @@ class RoadPricing
                     $ma = $m['type'] === 'amount' ? $m['value'] * max(1, $persons) : $c * $m['value'] / 100;
                     $selling = round($c + $ma, 2);
                     $divisor = $l->charged === 'per_day' ? max(1, $units * $days) : max(1, $units * $legs);
-                    $row = array_merge($row, ['cost' => $c, 'margin_amount' => round($ma, 2), 'selling' => $selling, 'unit_selling' => round($selling / $divisor, 2)]);
+                    // how the price was built, for people who may see costs and margins; it is removed for everyone else
+                    $bd = ['currency' => $l->currency, 'rate' => round($raw / max(1, $mult), 4), 'multiplier' => $mult, 'units' => $units, 'days' => $l->charged === 'per_day' ? $days : null, 'legs' => $l->charged === 'per_day' ? null : $legs,
+                        'raw' => round($raw, 2), 'fx' => $rate, 'margin_type' => $m['type'], 'margin_value' => (float) $m['value'], 'persons' => $persons, 'rate_varies' => count(array_unique($dayPrices)) > 1];                // a season changes the price inside the stay
+                    $row = array_merge($row, ['cost' => $c, 'margin_amount' => round($ma, 2), 'selling' => $selling, 'unit_selling' => round($selling / $divisor, 2), 'breakdown' => $bd]);
                     $sell += $selling;
                     $cost += $c;
                     $marginAmt += $ma;

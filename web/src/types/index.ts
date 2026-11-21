@@ -1080,8 +1080,9 @@ export interface RoadExtra { id: string; kind: RoadKind; line_id: number | strin
 export interface RoadPlan { mode: "stay" | "daily"; stays: RoadStay[]; daily: RoadDaily[]; extras: RoadExtra[] }
 export interface RoadOption { id: string; type: LineType; car_name: string | null; supplier?: string | null; name: string; charged: Charged; seats: number | null; from_name: string | null; to_name: string | null; way: "one_way" | "return" | null; destination: string | null }
 export interface RoadRow {
-  key: string; source: "stay" | "daily" | "extra"; line_id: string; type: LineType; name: string; destination: string | null; from_name: string | null; to_name: string | null; charged: Charged;
+  key: string; source: "stay" | "daily" | "extra"; line_id: string; type: LineType; car_name?: string | null; name: string; destination: string | null; from_name: string | null; to_name: string | null; charged: Charged;
   way: "one_way" | "return"; day: number; days: number; date: string | null; persons: number; qty: number | null; unit_selling: number | null; selling: number; cost?: number; margin_amount?: number;
   currency: string; rate_needed: boolean; warnings: string[];
+  breakdown?: { currency: string; rate: number; multiplier: number; units: number; days: number | null; legs: number | null; raw: number; fx: number | null; margin_type: "percent" | "amount"; margin_value: number; persons: number; rate_varies: boolean };
 }
 export interface RoadPrice { selling: number; cost?: number; margin_amount?: number; by_mode: Record<string, number>; rows: RoadRow[]; fx_needed: string[] }

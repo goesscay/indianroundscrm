@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { INR } from "@/components/crm/shared";
 import ProposalReach from "@/components/crm/ProposalReach";
+import RoadPriceBreakdown from "@/components/crm/RoadPriceBreakdown";
 import { cn } from "@/lib/utils";
 import type { ProposalComputed, ProposalData, RoadExtra, RoadKind, RoadOption, RoadPlan, RoadRow } from "@/types";
 
@@ -285,6 +286,7 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
         </div>
       )}
 
+      {tab === "road" && priced && <RoadPriceBreakdown rows={priced.rows} gstRate={p.gst_rate} total={priced.selling} />}
       {tab === "flight" && <ProposalReach p={p} set={set} kind="flight" />}
       {tab === "train" && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" data-testid="trains-banner">

@@ -225,7 +225,7 @@ class ProposalPricing
                     unset($r['cost'], $r['margin_amount']);
                     unset($r['transport']['cost'], $r['transport']['margin_amount'], $r['road']['cost'], $r['road']['margin_amount']);
                     $r['road']['rows'] = array_map(function ($x) {
-                        unset($x['cost'], $x['margin_amount']);
+                        unset($x['cost'], $x['margin_amount'], $x['breakdown']);
 
                         return $x;
                     }, $r['road']['rows']);
