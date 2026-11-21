@@ -12,7 +12,7 @@ class TransportLine extends Model
 {
     use StringId;
 
-    public const TYPES = ['cab' => 'Cab', 'van' => 'Tempo or van', 'bus' => 'Bus', 'ferry' => 'Ferry'];
+    public const TYPES = ['cab' => 'Cab', 'van' => 'Tempo or van', 'bus' => 'Bus', 'ferry' => 'Ferry', 'train' => 'Train'];
     public const CHARGED = ['per_day' => 'Per day', 'per_trip' => 'Per trip', 'per_person' => 'Per person'];
     public const WAYS = ['one_way' => 'One way', 'return' => 'Return'];
 

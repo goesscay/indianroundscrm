@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Bus, Car, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, MapPin, MoreHorizontal, Pencil, Plus, Search, Ship, Trash2, Truck, Upload, X } from "lucide-react";
+import { Bus, Car, ChevronDown, Copy, Download, FileSpreadsheet, Loader2, MapPin, MoreHorizontal, Pencil, Plus, Search, Ship, TrainFront, Trash2, Truck, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useCurrentUser } from "@/context/AuthContext";
@@ -20,23 +20,23 @@ import type { Charged, LineImportResult, LineLookups, LineType, TransportLineRow
 
 const TYPES: { v: LineType; label: string; filter: string; icon: typeof Car }[] = [
   { v: "cab", label: "Cab", filter: "Cabs", icon: Car }, { v: "van", label: "Tempo or van", filter: "Vans", icon: Truck },
-  { v: "bus", label: "Bus", filter: "Buses", icon: Bus }, { v: "ferry", label: "Ferry", filter: "Ferries", icon: Ship },
+  { v: "bus", label: "Bus", filter: "Buses", icon: Bus }, { v: "ferry", label: "Ferry", filter: "Ferries", icon: Ship }, { v: "train", label: "Train", filter: "Trains", icon: TrainFront },
 ];
 const CHARGED: { v: Charged; label: string }[] = [{ v: "per_day", label: "Per day" }, { v: "per_trip", label: "Per trip" }, { v: "per_person", label: "Per person" }];
 const chargedLabel = (c: string) => CHARGED.find((x) => x.v === c)?.label ?? c;
 const typeLabel = (t: string) => TYPES.find((x) => x.v === t)?.label ?? t;
 const money = (n: number | null | undefined, cur: string) => (n == null ? "–" : new Intl.NumberFormat(cur === "INR" ? "en-IN" : "en-US", { style: "currency", currency: cur, maximumFractionDigits: 2 }).format(n));
 const num = (v: string) => (v.trim() === "" ? null : Number(v));
-const defaultCharged = (t: LineType): Charged => (t === "bus" || t === "ferry" ? "per_person" : "per_day");
+const defaultCharged = (t: LineType): Charged => (t === "bus" || t === "ferry" || t === "train" ? "per_person" : "per_day");
 const DEST_KEY = "transport.rates.destination";
-const routeType = (t: LineType) => t === "bus" || t === "ferry";
+const routeType = (t: LineType) => t === "bus" || t === "ferry" || t === "train";
 
 interface Form {
   type: LineType; destination: string; country: string; dest_currency: string; car_name: string; name: string; from_name: string; to_name: string; way: "one_way" | "return"; price: string; currency: string; charged: Charged;
   supplier: string; season_name: string; valid_from: string; valid_to: string; seats: string; note: string;
 }
 const SEASONS = ["On Season", "Off Season", "Mid Season"];
-const carLabel = (t: LineType) => (t === "bus" ? "Bus name" : t === "ferry" ? "Boat name" : "Car name");
+const carLabel = (t: LineType) => (t === "bus" ? "Bus name" : t === "ferry" ? "Boat name" : t === "train" ? "Train name" : "Car name");
 const blank = (type: LineType = "cab", destination = ""): Form => ({ type, destination, country: "India", dest_currency: "INR", car_name: "", name: "", from_name: "", to_name: "", way: "one_way", price: "", currency: "", charged: defaultCharged(type),
   supplier: "", season_name: "", valid_from: "", valid_to: "", seats: "", note: "" });
 
@@ -91,7 +91,7 @@ function RateDialog({ open, item, look, preset, onClose, onSaved }: { open: bool
         <form onSubmit={(e) => save(e, false)} className="space-y-3">
           <div>
             <Label className="label-caps">1. What is it?</Label>
-            <div className="mt-1.5 grid grid-cols-4 gap-2" data-testid="rate-types">
+            <div className="mt-1.5 grid grid-cols-5 gap-2" data-testid="rate-types">
               {TYPES.map((t) => <button key={t.v} type="button" aria-pressed={f.type === t.v} onClick={() => setF({ ...f, type: t.v, charged: item ? f.charged : defaultCharged(t.v) })}
                 className={cn("flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs", f.type === t.v ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-accent")} data-testid={`rate-type-${t.v}`}><t.icon size={16} />{t.label}</button>)}
             </div>
@@ -116,8 +116,8 @@ function RateDialog({ open, item, look, preset, onClose, onSaved }: { open: bool
                 <Select value={f.way} onValueChange={(v) => setF({ ...f, way: v as "one_way" | "return" })}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="one_way">One way</SelectItem><SelectItem value="return">Return</SelectItem></SelectContent></Select></div>
             </div>
           )}
-          <div><Label className="label-caps">{carLabel(f.type)}</Label><Input className="mt-1.5" list="tl-car-names" value={f.car_name} onChange={(e) => setF({ ...f, car_name: e.target.value })} maxLength={120} placeholder={routeType(f.type) ? "Volvo B11R" : "Ertiga"} data-testid="rate-car-name" /></div>
-          <div><Label className="label-caps">Route service</Label><Input className="mt-1.5" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required placeholder={routeType(f.type) ? "Delhi to Manali, semi-sleeper" : "Local sightseeing"} data-testid="rate-name" /></div>
+          <div><Label className="label-caps">{carLabel(f.type)}</Label><Input className="mt-1.5" list="tl-car-names" value={f.car_name} onChange={(e) => setF({ ...f, car_name: e.target.value })} maxLength={120} placeholder={f.type === "train" ? "Shatabdi Express 12011" : routeType(f.type) ? "Volvo B11R" : "Ertiga"} data-testid="rate-car-name" /></div>
+          <div><Label className="label-caps">Route service</Label><Input className="mt-1.5" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required placeholder={f.type === "train" ? "New Delhi to Kalka, Chair Car" : routeType(f.type) ? "Delhi to Manali, semi-sleeper" : "Local sightseeing"} data-testid="rate-name" /></div>
           <div className="grid grid-cols-[1fr_90px] gap-3">
             <div><Label className="label-caps">3. Price</Label><Input className="mt-1.5" type="number" min={0} step="any" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} required placeholder="5500" data-testid="rate-price" /></div>
             <div><Label className="label-caps">Currency</Label><Input className="mt-1.5" value={f.currency || (dest?.currency ?? f.dest_currency)} maxLength={3} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} data-testid="rate-currency" /></div>
@@ -358,7 +358,7 @@ export default function RateList() {
   useEffect(() => { if (rows && dest && !destNames.includes(dest)) pickDest(""); }, [rows, dest, destNames]);          // a remembered destination that has no rates any more is dropped
   const counts = useMemo(() => {
     const r = rows ?? [];
-    return { all: r.length, cab: r.filter((x) => x.type === "cab").length, van: r.filter((x) => x.type === "van").length, bus: r.filter((x) => x.type === "bus").length, ferry: r.filter((x) => x.type === "ferry").length, needs_price: r.filter((x) => x.needs_price).length };
+    return { all: r.length, cab: r.filter((x) => x.type === "cab").length, van: r.filter((x) => x.type === "van").length, bus: r.filter((x) => x.type === "bus").length, ferry: r.filter((x) => x.type === "ferry").length, train: r.filter((x) => x.type === "train").length, needs_price: r.filter((x) => x.needs_price).length };
   }, [rows]);
   const shown = useMemo(() => (rows ?? []).filter((r) => matchesType(r) && matchesText(r) && (!dest || r.destination?.name === dest)), [rows, matchesType, matchesText, dest]);
   const groups = useMemo(() => {

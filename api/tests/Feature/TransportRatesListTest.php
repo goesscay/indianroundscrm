@@ -48,7 +48,7 @@ class TransportRatesListTest extends TestCase
             unset($body[$missing]);
             $this->postJson('/api/transport/lines', $body)->assertStatus(422);
         }
-        $this->postJson('/api/transport/lines', ['type' => 'train', 'destination' => 'Manali', 'name' => 'X', 'price' => 1, 'charged' => 'per_day'])->assertStatus(422);    // trains are details only, not rates
+        $this->postJson('/api/transport/lines', ['type' => 'plane', 'destination' => 'Manali', 'name' => 'X', 'price' => 1, 'charged' => 'per_day'])->assertStatus(422);
         $this->postJson('/api/transport/lines', ['type' => 'cab', 'destination' => 'Manali', 'name' => 'X', 'price' => 1, 'charged' => 'per_km'])->assertStatus(422);
         $this->postJson('/api/transport/lines', ['type' => 'cab', 'destination' => 'Manali', 'name' => 'X', 'price' => -5, 'charged' => 'per_day'])->assertStatus(422);
     }
