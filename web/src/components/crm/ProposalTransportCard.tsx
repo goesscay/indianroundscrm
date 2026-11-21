@@ -286,6 +286,12 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
       )}
 
       {tab === "flight" && <ProposalReach p={p} set={set} kind="flight" />}
+      {tab === "train" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" data-testid="trains-banner">
+          <p className="min-w-0 flex-1"><span className="font-medium">Suggestions only.</span> Ticking a train here shows it to the customer as a way to reach the destination and never changes the price. To include a train in the package price, use <span className="font-medium">Road transport → Add train</span>.</p>
+          <Button type="button" size="sm" variant="outline" onClick={() => { setTab("road"); startAdd("train"); }} data-testid="trains-banner-go"><Train size={14} /> Go to Road transport</Button>
+        </div>
+      )}
       {tab === "train" && <ProposalReach p={p} set={set} kind="train" />}
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-secondary/60 px-4 py-3" data-testid="transport-price-bar">

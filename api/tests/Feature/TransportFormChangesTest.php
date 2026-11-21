@@ -274,4 +274,20 @@ class TransportFormChangesTest extends TestCase
         $r = $this->post('/api/transport/lines/import', ['file' => $this->sheet(['type', 'destination', 'car_name', 'route_service', 'charged', 'price'], [['train', 'Manali', 'Shatabdi 12011', 'New Delhi to Kalka', 'per_person', '1000']])], ['Accept' => 'application/json'])->assertOk()->json();
         $this->assertSame('train', TransportLine::firstOrFail()->type);
     }
+
+    public function test_ticking_and_unticking_train_suggestions_leaves_the_price_unchanged_with_a_priced_train_on_the_quotation(): void
+    {
+        $d = TransportDestination::create(['name' => 'Manali']);
+        $train = TransportLine::create(['type' => 'train', 'destination_id' => $d->id, 'car_name' => 'Shatabdi 12011', 'name' => 'New Delhi to Kalka', 'charged' => 'per_person', 'price' => 1000, 'currency' => 'INR', 'way' => 'one_way']);
+        \App\Models\QuoteSetting::write('margin_default', ['type' => 'percent', 'value' => 10]);
+        $this->ops();
+        $sched = \App\Models\TransportSchedule::create(['kind' => 'train', 'title' => 'Shatabdi 12011', 'from_name' => 'New Delhi', 'to_name' => 'Kalka', 'days' => ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], 'departs' => '07:40', 'arrives' => '11:45', 'classes' => 'CC']);
+        $base = ['trip' => ['destination' => 'Manali', 'start_date' => '2026-12-05', 'nights' => 4, 'adults' => 4, 'group_sizes' => [2, 4]], 'gst_rate' => 5, 'options' => [['name' => 'Option 1', 'stays' => []]],
+            'road' => ['mode' => 'stay', 'stays' => [], 'extras' => [['id' => 't1', 'kind' => 'train', 'line_id' => $train->id, 'day' => 1, 'way' => 'one_way']]]];
+        $tick = ['kind' => 'train', 'title' => 'Shatabdi 12011', 'from_name' => 'New Delhi', 'to_name' => 'Kalka', 'schedule_id' => $sched->id, 'direction' => 'going'];
+        $a = $this->postJson('/api/quote-proposals/compute', ['proposal' => $base])->assertOk()->json('computed');
+        $b = $this->postJson('/api/quote-proposals/compute', ['proposal' => $base + ['reach' => ['from' => 'Delhi', 'items' => [$tick, $tick + ['direction' => 'return']]]]])->assertOk()->json('computed');
+        $this->assertEquals($a, $b);                                                                // ticked: not a rupee different
+        $this->assertGreaterThan(0, $a['options'][0]['actual']['road']['selling']);                 // and the priced train is still there
+    }
 }
