@@ -1,6 +1,6 @@
 # Transport in a Premium Quotation: guide for Sales
 
-**Where:** Quotes → New premium quotation → the **Transport** card (under Hotel options). One card, three tabs, each with a count: **Road transport**, **Flights** and **Trains**. Road transport is priced from the rates Operations keep. Flights and trains show details only, with no price.
+**Where:** Quotes → New premium quotation → the **Transport** card (under Hotel options). One card, three tabs, each with a count: **Road transport**, **Flights** and **Trains**. Road transport is priced from the rates Operations keep. Flights and trains on their own tabs show details only, with no price (a train that is part of the package price is added with **Add train** under Road transport).
 
 At the bottom of the card a bar always shows the **Transport price**. It counts road transport only, and updates as you change things.
 
@@ -22,7 +22,7 @@ You see selling prices only. Suppliers, costs and margin are never shown to you 
 
 ## Flights and trains (suggestions, no price)
 
-Open the **Flights** or **Trains** tab. Details only: nothing is priced and the package price never changes.
+Open the **Flights** or **Trains** tab. Details only: nothing is priced and the package price never changes. The Trains tab shows a banner that says so, with a **Go to Road transport** button that opens the Add train form for a priced train.
 
 1. The list is already filtered by the trip: **From** (where the customer starts), **To** (the destination) and the **travel date**. Only services that run on that weekday are shown. A service that ends near the destination (for example a train to Kalka for Manali) is shown with its note on how to continue.
 2. **Going / Return:** *Going* lists services from where the customer starts to the destination. Switch to *Return* for the way back: the date becomes the last day of the trip (change it if needed) and the list shows services that start at or near the destination and end where the customer started. Enter **From** first: the way back needs to know where it is going back to.
