@@ -15,12 +15,13 @@ import type { ProposalComputed, ProposalData, RoadExtra, RoadKind, RoadOption, R
 const NONE = "none";
 type SetFn = (fn: (d: ProposalData) => void) => void;
 
-const KINDS: { v: RoadKind; label: string; types: string[]; none: string }[] = [
+const KINDS: { v: RoadKind; label: string; button?: string; types: string[]; none: string }[] = [
   { v: "transfer", label: "Airport transfer", types: ["cab", "van"], none: "airport transfers" },
-  { v: "bus", label: "Volvo or bus", types: ["bus"], none: "buses" },
-  { v: "ferry", label: "Ferry or boat", types: ["ferry"], none: "ferries" },
+  { v: "bus", label: "Volvo or bus", button: "Add Volvo Bus", types: ["bus"], none: "buses" },
+  { v: "ferry", label: "Ferry or boat", button: "Add Ferry", types: ["ferry"], none: "ferries" },
   { v: "vehicle", label: "Another vehicle", types: ["cab", "van"], none: "vehicles" },
 ];
+const BUTTONS = KINDS.filter((k) => k.button) as (typeof KINDS[number] & { button: string })[];       // the transfer and vehicle kinds stay for quotations saved with them, but have no button
 const TYPE_ICON = { cab: Car, van: Truck, bus: Bus, ferry: Ship } as const;
 const defaultRoad = (dest: string | null): RoadPlan => ({ mode: "stay", stays: [{ destination: dest, line_id: null, from_day: 1, days: null, qty: null }], daily: [], extras: [] });
 const same = (a: string | null | undefined, b: string | null | undefined) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
@@ -172,7 +173,7 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
                     <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr_80px_110px_110px]">
                       <CarRoutePicker list={list} all={options ?? []} lineId={s.line_id} onChange={(id) => setRoad((r) => { r.stays[i].line_id = id; })} testid={`road-stay-${i}`} />
                       <div><Label className="text-xs">Days</Label><Input type="number" min={1} max={90} value={s.days ?? ""} placeholder={String(Math.max(1, dayCount - s.from_day + 1))} onChange={(e) => setRoad((r) => { r.stays[i].days = e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1); })} className="mt-1 h-9" data-testid={`road-stay-days-${i}`} /></div>
-                      <div><Label className="text-xs">Rate per day</Label><div className="mt-1 flex h-9 items-center text-sm tabular-nums" data-testid={`road-stay-rate-${i}`}>{row?.unit_selling != null ? INR(row.unit_selling) : "–"}</div></div>
+                      <div><Label className="text-xs">{row?.charged === "per_trip" ? "Rate per trip" : row?.charged === "per_person" ? "Rate per person" : "Rate per day"}</Label><div className="mt-1 flex h-9 items-center text-sm tabular-nums" data-testid={`road-stay-rate-${i}`}>{row?.unit_selling != null ? INR(row.unit_selling) : "–"}</div></div>
                       <div><Label className="text-xs">Amount</Label><div className="mt-1 flex h-9 items-center text-sm font-semibold tabular-nums" data-testid={`road-stay-amount-${i}`}>{row && !row.rate_needed ? INR(row.selling) : "–"}</div></div>
                     </div>
                     {row && row.qty != null && <p className="mt-2 text-xs text-muted-foreground" data-testid={`road-stay-vehicles-${i}`}>{row.qty} vehicle{row.qty === 1 ? "" : "s"} for {pax} guest{pax === 1 ? "" : "s"}{opt(s.line_id)?.seats ? `, ${opt(s.line_id)?.seats} seats each` : ""}.</p>}
@@ -183,8 +184,6 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
                 );
               })}
               <datalist id="road-destinations">{destinations.map((d) => <option key={d} value={d} />)}</datalist>
-              <Button type="button" variant="outline" size="sm" disabled={!road.stays.some((x) => x.line_id != null)} onClick={() => setRoad((r) => { const f = r.stays.find((x) => x.line_id != null) ?? r.stays[0]; r.stays.push({ destination: f.destination, line_id: null, from_day: f.from_day, days: f.days, qty: 1 }); })} data-testid="road-add-car"><Plus size={14} /> Add another car</Button>
-              <Button type="button" variant="outline" size="sm" className="ml-2" onClick={() => setRoad((r) => { const last = r.stays[r.stays.length - 1]; r.stays.push({ destination: null, line_id: null, from_day: Math.min(dayCount, (last?.from_day ?? 1) + (last?.days ?? 1)), days: null, qty: null }); })} data-testid="road-add-destination"><Plus size={14} /> Add another destination</Button>
             </div>
           )}
 
@@ -237,9 +236,13 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
                 </table>
               </div>
             )}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium">Add:</span>
-              {KINDS.map((k) => <Button key={k.v} type="button" variant="outline" size="sm" onClick={() => startAdd(k.v)} data-testid={`road-add-${k.v}`}><Plus size={14} /> {k.label}</Button>)}
+            <div className="flex flex-wrap items-center gap-2" data-testid="road-buttons">
+              <Button type="button" variant="outline" size="sm" disabled={road.mode !== "stay" || !road.stays.some((x) => x.line_id != null)} title={road.mode !== "stay" ? "Choose the same car every day to add another car" : undefined}
+                onClick={() => setRoad((r) => { const f = r.stays.find((x) => x.line_id != null) ?? r.stays[0]; r.stays.push({ destination: f.destination, line_id: null, from_day: f.from_day, days: f.days, qty: 1 }); })} data-testid="road-add-car"><Plus size={14} /> Add another car</Button>
+              <Button type="button" variant="outline" size="sm" disabled={road.mode !== "stay"} title={road.mode !== "stay" ? "Choose the same car every day to add another destination" : undefined}
+                onClick={() => setRoad((r) => { const last = r.stays[r.stays.length - 1]; r.stays.push({ destination: null, line_id: null, from_day: Math.min(dayCount, (last?.from_day ?? 1) + (last?.days ?? 1)), days: null, qty: null }); })} data-testid="road-add-destination"><Plus size={14} /> Add another destination</Button>
+              {BUTTONS.map((k) => <Button key={k.v} type="button" variant="outline" size="sm" onClick={() => startAdd(k.v)} data-testid={`road-add-${k.v}`}><Plus size={14} /> {k.button}</Button>)}
+              <Button type="button" variant="outline" size="sm" disabled title="Added in the next step" data-testid="road-add-train"><Plus size={14} /> Add train</Button>
             </div>
             {adding && (() => {
               const k = KINDS.find((x) => x.v === adding.kind)!;
@@ -277,17 +280,6 @@ export default function ProposalTransportCard({ p, set, computed, manager }: { p
               ) : <p className="mt-1 text-xs text-muted-foreground">Converted at the exchange rates held on this quotation{p.transport?.fx.date ? `, set on ${p.transport.fx.date}` : ""}.</p>}
             </div>
           )}
-
-          <div className="flex flex-wrap items-end gap-4 rounded-md border bg-muted/30 p-3 text-sm" data-testid="customer-wording">
-            <span className="font-medium">What the customer sees</span>
-            <div className="w-[250px]"><Label className="text-xs">Vehicle names</Label>
-              <Select value={p.transport?.wording ?? "named"} onValueChange={(v) => set((d) => { ensureTransport(d).wording = v as "named" | "general"; })}><SelectTrigger className="mt-1 h-9" data-testid="wording-select"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="named">Show them (Private Ertiga)</SelectItem><SelectItem value="general">General only (Private cab)</SelectItem></SelectContent></Select></div>
-            <div className="w-[250px]"><Label className="text-xs">Transport price</Label>
-              <Select value={p.transport?.tax_display ?? "with_gst"} onValueChange={(v) => set((d) => { ensureTransport(d).tax_display = v as "with_gst" | "before_gst"; })}><SelectTrigger className="mt-1 h-9" data-testid="taxdisplay-select"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="with_gst">Show the total including GST</SelectItem><SelectItem value="before_gst">Show before GST (GST extra)</SelectItem></SelectContent></Select></div>
-            <span className="text-xs text-muted-foreground">Suppliers, costs and margin are never shown to the customer.</span>
-          </div>
         </div>
       )}
 

@@ -11,12 +11,12 @@ At the bottom of the card a bar always shows the **Transport price**. It counts 
    - **Same vehicle every day** (the default): choose the **Car name**, then the **Route service** (it stays locked until a car is chosen, and is filled in for you when the car has only one route). The number of days comes from the itinerary (change it if needed). The rate per day and the amount appear at once, and the price follows if you change the vehicle.
    - **Choose day by day:** one line per day with that day's plan beside it. Pick the **Car name** and then the **Route service** for each day, or **No car** (for example the arrival day by Volvo).
    Switching between the two keeps everything you added below.
-3. **Add** buttons put extra transport in the list under the card: **Airport transfer**, **Volvo or bus**, **Ferry or boat**, **Another vehicle**. Choose the car (or bus or boat) name, then its route service, the day, and one way or return. The number of vehicles is worked out for you. A bus counts the travellers, and a return counts twice.
+3. **The five buttons under the card:** **Add another car** (a second car for the same days), **Add another destination**, **Add Volvo Bus**, **Add Ferry** and **Add train** (coming). A one-off transfer, such as an airport pickup, is a route service charged per trip: pick it in a car row and it is priced once. Choose the car (or bus or boat) name, then its route service, the day, and one way or return. The number of vehicles is worked out for you. A bus counts the travellers, and a return counts twice.
 4. **The number of vehicles** is worked out from the travellers and the seats, and shown under the row (for example "2 vehicles for 8 guests, 6 seats each"). For a second, different car on the same days press **Add another car**: it counts as one vehicle.
 5. **"Rate needed"** means no rate covers that date. It is left out of the price. Ask Operations to add or fix the rate; you cannot type a price over it.
 6. **A trip with several destinations:** use **Add another destination** under the same-vehicle choice, then pick that destination's vehicle and the day it starts.
 7. **Foreign prices** (for example Singapore): converted at the exchange rate held on the quotation, which Operations keep as a default. If it is missing the card says so.
-8. **What the customer sees:** choose to show vehicle names ("Private Ertiga") or only a general description ("Private cab"), and whether the transport total shows with GST or before GST.
+8. **What the customer sees:** car names show ("Private Ertiga") and the transport total shows including GST. The box that changed these on the card is gone; quotations saved earlier keep the choice they had.
 
 You see selling prices only. Suppliers, costs and margin are never shown to you or to the customer.
 
